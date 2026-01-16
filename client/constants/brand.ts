@@ -209,6 +209,10 @@ export const emptyStates = {
 export const microcopy = {
   online: 'online',
   hot: 'hot',
+  hotThreads: 'Hot Threads',
+  activeNow: 'Active now',
+  new: 'New',
+  solved: 'Solved',
   post: 'Post',
   addVehicle: 'Add Vehicle',
   addNote: 'Add Note',

@@ -60,14 +60,35 @@ export const GARAGES: Garage[] = [
   },
 ];
 
-export const SAMPLE_THREADS = [
+export interface Thread {
+  id: string;
+  title: string;
+  author: string;
+  replies: number;
+  lastActivity: string;
+  lastActivityTime: number;
+  garageId: string;
+  isNew: boolean;
+  hasSolution: boolean;
+  createdAt: number;
+}
+
+const NOW = Date.now();
+const HOUR = 3600000;
+const DAY = 86400000;
+
+export const SAMPLE_THREADS: Thread[] = [
   {
     id: "1",
     title: "Best cold air intake for 5.0 Coyote?",
     author: "gearhead_mike",
     replies: 24,
     lastActivity: "2h ago",
+    lastActivityTime: NOW - 2 * HOUR,
     garageId: "ford",
+    isNew: false,
+    hasSolution: true,
+    createdAt: NOW - 3 * DAY,
   },
   {
     id: "2",
@@ -75,15 +96,83 @@ export const SAMPLE_THREADS = [
     author: "wrench_warrior",
     replies: 18,
     lastActivity: "4h ago",
+    lastActivityTime: NOW - 4 * HOUR,
     garageId: "ford",
+    isNew: false,
+    hasSolution: false,
+    createdAt: NOW - 2 * DAY,
   },
   {
     id: "3",
+    title: "Check engine light P0420 - cat or O2 sensor?",
+    author: "diag_dave",
+    replies: 6,
+    lastActivity: "30m ago",
+    lastActivityTime: NOW - 0.5 * HOUR,
+    garageId: "ford",
+    isNew: true,
+    hasSolution: false,
+    createdAt: NOW - 2 * HOUR,
+  },
+  {
+    id: "4",
     title: "LED headlight conversion complete",
     author: "night_rider",
     replies: 42,
     lastActivity: "1h ago",
+    lastActivityTime: NOW - HOUR,
     garageId: "dodge",
+    isNew: false,
+    hasSolution: true,
+    createdAt: NOW - 5 * DAY,
+  },
+  {
+    id: "5",
+    title: "Death wobble fix - finally solved",
+    author: "trail_master",
+    replies: 67,
+    lastActivity: "45m ago",
+    lastActivityTime: NOW - 0.75 * HOUR,
+    garageId: "jeep",
+    isNew: false,
+    hasSolution: true,
+    createdAt: NOW - 7 * DAY,
+  },
+  {
+    id: "6",
+    title: "LS swap into classic C10 - wiring help",
+    author: "shop_rat",
+    replies: 31,
+    lastActivity: "3h ago",
+    lastActivityTime: NOW - 3 * HOUR,
+    garageId: "chevy",
+    isNew: false,
+    hasSolution: false,
+    createdAt: NOW - 4 * DAY,
+  },
+  {
+    id: "7",
+    title: "Hemi tick - should I be worried?",
+    author: "mopar_mike",
+    replies: 12,
+    lastActivity: "20m ago",
+    lastActivityTime: NOW - 0.33 * HOUR,
+    garageId: "dodge",
+    isNew: true,
+    hasSolution: false,
+    createdAt: NOW - 1 * HOUR,
+  },
+  {
+    id: "8",
+    title: "Brake upgrade recommendations for towing",
+    author: "haul_it_all",
+    replies: 8,
+    lastActivity: "5h ago",
+    lastActivityTime: NOW - 5 * HOUR,
+    garageId: "general",
+    isNew: false,
+    hasSolution: true,
+    createdAt: NOW - 3 * DAY,
   },
 ];
 

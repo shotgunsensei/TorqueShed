@@ -13,9 +13,17 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useChat } from "@/hooks/useChat";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { SAMPLE_THREADS } from "@/constants/garages";
-import { placeholders } from "@/constants/brand";
+import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
+import { placeholders, microcopy } from "@/constants/brand";
 import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
+
+function calculateHotScore(thread: Thread): number {
+  const MAX_RECENCY_SCORE = 100;
+  const HOUR = 3600000;
+  const hoursAgo = (Date.now() - thread.lastActivityTime) / HOUR;
+  const recencyScore = Math.max(0, MAX_RECENCY_SCORE - hoursAgo * 10);
+  return thread.replies + recencyScore;
+}
 
 type RoutePropType = RouteProp<GaragesStackParamList, "GarageDetail">;
 
@@ -45,10 +53,20 @@ export default function GarageDetailScreen() {
     userName: TEMP_USER_NAME,
   });
 
-  const threads = useMemo(
+  const allThreads = useMemo(
     () => SAMPLE_THREADS.filter((t) => t.garageId === garageId),
     [garageId]
   );
+
+  const hotThreads = useMemo(() => {
+    return [...allThreads]
+      .sort((a, b) => calculateHotScore(b) - calculateHotScore(a))
+      .slice(0, 3);
+  }, [allThreads]);
+
+  const threads = useMemo(() => {
+    return [...allThreads].sort((a, b) => b.lastActivityTime - a.lastActivityTime);
+  }, [allThreads]);
 
   const handleSend = useCallback(() => {
     if (!messageInput.trim()) return;
@@ -85,21 +103,43 @@ export default function GarageDetailScreen() {
     />
   ), []);
 
-  const renderThread = useCallback(({ item }: { item: typeof SAMPLE_THREADS[0] }) => (
+  const renderThread = useCallback(({ item, isHot = false }: { item: Thread; isHot?: boolean }) => (
     <Pressable
       style={({ pressed }) => [
         styles.threadCard,
         {
           backgroundColor: theme.backgroundDefault,
-          borderColor: theme.cardBorder,
+          borderColor: item.isNew ? theme.primary + "40" : theme.cardBorder,
+          borderLeftWidth: item.isNew ? 3 : 1,
+          borderLeftColor: item.isNew ? theme.primary : theme.cardBorder,
           opacity: pressed ? 0.9 : 1,
         },
       ]}
       onPress={() => {}}
+      testID={`thread-card-${item.id}`}
     >
-      <ThemedText type="h4" numberOfLines={2}>
-        {item.title}
-      </ThemedText>
+      <View style={styles.threadHeader}>
+        <ThemedText type="h4" numberOfLines={2} style={styles.threadTitle}>
+          {item.title}
+        </ThemedText>
+        <View style={styles.threadBadges}>
+          {item.isNew ? (
+            <View style={[styles.badge, { backgroundColor: theme.primary + "20" }]}>
+              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                {microcopy.new}
+              </ThemedText>
+            </View>
+          ) : null}
+          {item.hasSolution ? (
+            <View style={[styles.badge, { backgroundColor: theme.success + "20" }]}>
+              <Feather name="check-circle" size={10} color={theme.success} />
+              <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600", marginLeft: 2 }}>
+                {microcopy.solved}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+      </View>
       <View style={styles.threadMeta}>
         <ThemedText type="caption" style={{ color: theme.textSecondary }}>
           by {item.author}
@@ -254,6 +294,26 @@ export default function GarageDetailScreen() {
           keyExtractor={(item) => item.id}
           ListEmptyComponent={renderEmptyThreads}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            hotThreads.length > 0 ? (
+              <View style={styles.hotSection}>
+                <View style={styles.hotSectionHeader}>
+                  <Feather name="zap" size={16} color={theme.primary} />
+                  <ThemedText type="h4" style={{ color: theme.primary }}>
+                    {microcopy.hotThreads}
+                  </ThemedText>
+                </View>
+                {hotThreads.map((thread) => (
+                  <View key={`hot-${thread.id}`}>
+                    {renderThread({ item: thread, isHot: true })}
+                  </View>
+                ))}
+                <ThemedText type="h4" style={styles.allThreadsHeader}>
+                  All Threads
+                </ThemedText>
+              </View>
+            ) : null
+          }
         />
       )}
     </KeyboardAvoidingView>
@@ -332,6 +392,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
+  threadHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  threadTitle: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  threadBadges: {
+    flexDirection: "row",
+    gap: Spacing.xs,
+  },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
   threadMeta: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -345,6 +425,18 @@ const styles = StyleSheet.create({
   replyCount: {
     marginLeft: 4,
     marginRight: Spacing.sm,
+  },
+  hotSection: {
+    marginBottom: Spacing.lg,
+  },
+  hotSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  allThreadsHeader: {
+    marginBottom: Spacing.md,
   },
   emptyChatContainer: {
     flex: 1,
