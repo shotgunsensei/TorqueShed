@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Image, Pressable } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
@@ -12,21 +13,135 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+
+const FOCUS_AREAS = [
+  "Engine",
+  "Electrical",
+  "Suspension",
+  "Diesel",
+  "Tuning",
+  "Fabrication",
+  "Diagnostics",
+  "HVAC",
+  "Brakes",
+  "Drivetrain",
+] as const;
+
+type FocusArea = typeof FOCUS_AREAS[number];
+
+interface UserProfile {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  location: string | null;
+  focusAreas: FocusArea[];
+  vehiclesWorkedOn: string | null;
+  yearsWrenching: number | null;
+  shopAffiliation: string | null;
+  createdAt: string;
+}
+
+const MOCK_USER_ID = "demo-user-123";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
+  const queryClient = useQueryClient();
 
-  const [handle, setHandle] = useState("gearhead_user");
-  const [bio, setBio] = useState("Car enthusiast | DIY mechanic");
-  const [location, setLocation] = useState("Denver, CO");
-  const [specialties, setSpecialties] = useState("Ford trucks, suspension");
+  const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
+  const [vehiclesWorkedOn, setVehiclesWorkedOn] = useState("");
+  const [yearsWrenching, setYearsWrenching] = useState("");
+  const [shopAffiliation, setShopAffiliation] = useState("");
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<FocusArea[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const { data: profile, isLoading } = useQuery<UserProfile>({
+    queryKey: ["/api/users", MOCK_USER_ID, "profile"],
+    queryFn: async () => {
+      const url = new URL(`/api/users/${MOCK_USER_ID}/profile`, getApiUrl());
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            id: MOCK_USER_ID,
+            username: "TorqueShed User",
+            avatarUrl: null,
+            bio: null,
+            location: null,
+            focusAreas: [],
+            vehiclesWorkedOn: null,
+            yearsWrenching: null,
+            shopAffiliation: null,
+            createdAt: new Date().toISOString(),
+          };
+        }
+        throw new Error("Failed to fetch profile");
+      }
+      return response.json();
+    },
+  });
+
+  useEffect(() => {
+    if (profile) {
+      setBio(profile.bio || "");
+      setLocation(profile.location || "");
+      setVehiclesWorkedOn(profile.vehiclesWorkedOn || "");
+      setYearsWrenching(profile.yearsWrenching?.toString() || "");
+      setShopAffiliation(profile.shopAffiliation || "");
+      setSelectedFocusAreas(profile.focusAreas || []);
+    }
+  }, [profile]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (updates: Partial<UserProfile>) => {
+      return apiRequest("PATCH", `/api/users/${MOCK_USER_ID}/profile`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", MOCK_USER_ID, "profile"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setHasChanges(false);
+    },
+    onError: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    },
+  });
 
   const handleSave = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const years = yearsWrenching ? parseInt(yearsWrenching, 10) : null;
+    updateMutation.mutate({
+      bio: bio || undefined,
+      location: location || undefined,
+      focusAreas: selectedFocusAreas,
+      vehiclesWorkedOn: vehiclesWorkedOn || undefined,
+      yearsWrenching: years,
+      shopAffiliation: shopAffiliation || undefined,
+    } as any);
   };
+
+  const toggleFocusArea = (area: FocusArea) => {
+    setHasChanges(true);
+    setSelectedFocusAreas((prev) =>
+      prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]
+    );
+  };
+
+  const handleFieldChange = (setter: (value: string) => void) => (value: string) => {
+    setHasChanges(true);
+    setter(value);
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAwareScrollViewCompat
@@ -56,71 +171,99 @@ export default function ProfileScreen() {
         >
           <Feather name="camera" size={16} color="#FFFFFF" />
         </Pressable>
-      </View>
-
-      <View
-        style={[
-          styles.statsRow,
-          { borderColor: theme.border },
-        ]}
-      >
-        <View style={styles.statItem}>
-          <ThemedText type="h3">42</ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            Reputation
-          </ThemedText>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.statItem}>
-          <ThemedText type="h3">2</ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            Vehicles
-          </ThemedText>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.statItem}>
-          <ThemedText type="h3">15</ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            Posts
-          </ThemedText>
-        </View>
+        <ThemedText type="h2" style={styles.username}>
+          {profile?.username || "TorqueShed User"}
+        </ThemedText>
       </View>
 
       <View style={styles.formSection}>
         <Input
-          label="Handle"
-          placeholder="Your username"
-          value={handle}
-          onChangeText={setHandle}
-          leftIcon="at-sign"
-        />
-
-        <Input
           label="Bio"
-          placeholder="Tell us about yourself"
+          placeholder="Tell us about yourself and your automotive experience"
           value={bio}
-          onChangeText={setBio}
+          onChangeText={handleFieldChange(setBio)}
           leftIcon="user"
           multiline
+          maxLength={500}
         />
 
         <Input
           label="Location"
           placeholder="City, State"
           value={location}
-          onChangeText={setLocation}
+          onChangeText={handleFieldChange(setLocation)}
           leftIcon="map-pin"
+          maxLength={100}
+        />
+
+        <View style={styles.fieldGroup}>
+          <ThemedText type="caption" style={styles.label}>
+            Focus Areas
+          </ThemedText>
+          <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+            Select areas where you have expertise
+          </ThemedText>
+          <View style={styles.focusAreasGrid}>
+            {FOCUS_AREAS.map((area) => {
+              const isSelected = selectedFocusAreas.includes(area);
+              return (
+                <Pressable
+                  key={area}
+                  style={[
+                    styles.focusAreaChip,
+                    {
+                      backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
+                      borderColor: isSelected ? theme.primary : theme.border,
+                    },
+                  ]}
+                  onPress={() => toggleFocusArea(area)}
+                >
+                  <ThemedText
+                    type="caption"
+                    style={{ color: isSelected ? "#FFFFFF" : theme.text }}
+                  >
+                    {area}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <Input
+          label="Vehicles Worked On"
+          placeholder="e.g., Ford F-150, Chevy Silverado, Jeep Wrangler..."
+          value={vehiclesWorkedOn}
+          onChangeText={handleFieldChange(setVehiclesWorkedOn)}
+          leftIcon="truck"
+          multiline
+          maxLength={1000}
         />
 
         <Input
-          label="Specialties"
-          placeholder="What are you good at?"
-          value={specialties}
-          onChangeText={setSpecialties}
-          leftIcon="award"
+          label="Years Wrenching"
+          placeholder="How many years of experience?"
+          value={yearsWrenching}
+          onChangeText={handleFieldChange(setYearsWrenching)}
+          leftIcon="clock"
+          keyboardType="number-pad"
         />
 
-        <Button onPress={handleSave}>Save Profile</Button>
+        <Input
+          label="Shop Affiliation (Optional)"
+          placeholder="Are you affiliated with a shop or brand?"
+          value={shopAffiliation}
+          onChangeText={handleFieldChange(setShopAffiliation)}
+          leftIcon="home"
+          maxLength={200}
+        />
+
+        <Button
+          onPress={handleSave}
+          disabled={!hasChanges || updateMutation.isPending}
+        >
+          {updateMutation.isPending ? "Saving..." : "Save Profile"}
+        </Button>
       </View>
 
       <View style={styles.menuSection}>
@@ -203,6 +346,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   avatarSection: {
     alignItems: "center",
     marginBottom: Spacing.xl,
@@ -219,7 +367,7 @@ const styles = StyleSheet.create({
   },
   editAvatarButton: {
     position: "absolute",
-    bottom: 0,
+    top: 68,
     right: "35%",
     width: 32,
     height: 32,
@@ -227,23 +375,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: Spacing.lg,
-    marginBottom: Spacing.xl,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statDivider: {
-    width: 1,
-    height: "100%",
+  username: {
+    marginTop: Spacing.md,
   },
   formSection: {
     marginBottom: Spacing.xl,
+  },
+  fieldGroup: {
+    marginBottom: Spacing.lg,
+  },
+  label: {
+    marginBottom: Spacing.xs,
+  },
+  focusAreasGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  focusAreaChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
   menuSection: {},
   menuTitle: {
