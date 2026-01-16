@@ -1,7 +1,22 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const FOCUS_AREAS = [
+  "Engine",
+  "Electrical", 
+  "Suspension",
+  "Diesel",
+  "Tuning",
+  "Fabrication",
+  "Diagnostics",
+  "HVAC",
+  "Brakes",
+  "Drivetrain",
+] as const;
+
+export type FocusArea = typeof FOCUS_AREAS[number];
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 })
@@ -13,6 +28,10 @@ export const users = pgTable("users", {
   bio: text("bio"),
   location: varchar("location", { length: 100 }),
   role: varchar("role", { length: 20 }).default("user"),
+  focusAreas: json("focus_areas").$type<FocusArea[]>().default([]),
+  vehiclesWorkedOn: text("vehicles_worked_on"),
+  yearsWrenching: integer("years_wrenching"),
+  shopAffiliation: varchar("shop_affiliation", { length: 200 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

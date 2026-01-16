@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
-import { storage } from "./storage";
+import { storage, type ProfileUpdate } from "./storage";
 import { setupWebSocket, getGarageUserCount } from "./websocket";
 import { 
   validateRequest, 
@@ -9,6 +9,7 @@ import {
   cacheResponse, 
   generateTorqueAssistResponse 
 } from "./torque-assist";
+import { FOCUS_AREAS, type FocusArea } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/garages", async (_req: Request, res: Response) => {
@@ -106,6 +107,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating report:", error);
       res.status(500).json({ error: "Failed to create report" });
+    }
+  });
+
+  app.get("/api/users/:id/profile", async (req: Request, res: Response) => {
+    try {
+      const profile = await storage.getPublicProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  app.patch("/api/users/:id/profile", async (req: Request, res: Response) => {
+    try {
+      const { bio, location, avatarUrl, focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation } = req.body;
+      
+      const updates: ProfileUpdate = {};
+      
+      if (bio !== undefined) {
+        if (typeof bio !== "string" || bio.length > 500) {
+          return res.status(400).json({ error: "Bio must be a string under 500 characters" });
+        }
+        updates.bio = bio;
+      }
+      
+      if (location !== undefined) {
+        if (typeof location !== "string" || location.length > 100) {
+          return res.status(400).json({ error: "Location must be a string under 100 characters" });
+        }
+        updates.location = location;
+      }
+      
+      if (avatarUrl !== undefined) {
+        if (typeof avatarUrl !== "string") {
+          return res.status(400).json({ error: "Avatar URL must be a string" });
+        }
+        updates.avatarUrl = avatarUrl;
+      }
+      
+      if (focusAreas !== undefined) {
+        if (!Array.isArray(focusAreas)) {
+          return res.status(400).json({ error: "Focus areas must be an array" });
+        }
+        const validAreas = focusAreas.filter((area): area is FocusArea => 
+          FOCUS_AREAS.includes(area as FocusArea)
+        );
+        if (validAreas.length !== focusAreas.length) {
+          return res.status(400).json({ error: "Invalid focus area provided" });
+        }
+        updates.focusAreas = validAreas;
+      }
+      
+      if (vehiclesWorkedOn !== undefined) {
+        if (vehiclesWorkedOn !== null && (typeof vehiclesWorkedOn !== "string" || vehiclesWorkedOn.length > 1000)) {
+          return res.status(400).json({ error: "Vehicles worked on must be a string under 1000 characters" });
+        }
+        updates.vehiclesWorkedOn = vehiclesWorkedOn || undefined;
+      }
+      
+      if (yearsWrenching !== undefined) {
+        if (yearsWrenching !== null && (typeof yearsWrenching !== "number" || yearsWrenching < 0 || yearsWrenching > 100)) {
+          return res.status(400).json({ error: "Years wrenching must be a number between 0 and 100" });
+        }
+        updates.yearsWrenching = yearsWrenching;
+      }
+      
+      if (shopAffiliation !== undefined) {
+        if (shopAffiliation !== null && (typeof shopAffiliation !== "string" || shopAffiliation.length > 200)) {
+          return res.status(400).json({ error: "Shop affiliation must be a string under 200 characters" });
+        }
+        updates.shopAffiliation = shopAffiliation;
+      }
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid updates provided" });
+      }
+      
+      const updated = await storage.updateUserProfile(req.params.id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const profile = await storage.getPublicProfile(req.params.id);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
     }
   });
 

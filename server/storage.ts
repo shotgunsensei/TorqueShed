@@ -10,14 +10,40 @@ import {
   type InsertChatMessage,
   type Report,
   type InsertReport,
+  type FocusArea,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, sql } from "drizzle-orm";
+
+export interface ProfileUpdate {
+  bio?: string;
+  location?: string;
+  avatarUrl?: string;
+  focusAreas?: FocusArea[];
+  vehiclesWorkedOn?: string;
+  yearsWrenching?: number | null;
+  shopAffiliation?: string | null;
+}
+
+export interface PublicProfile {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  location: string | null;
+  focusAreas: FocusArea[];
+  vehiclesWorkedOn: string | null;
+  yearsWrenching: number | null;
+  shopAffiliation: string | null;
+  createdAt: Date | null;
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getPublicProfile(id: string): Promise<PublicProfile | undefined>;
+  updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined>;
   
   getGarages(): Promise<Garage[]>;
   getGarage(id: string): Promise<Garage | undefined>;
@@ -46,6 +72,40 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async getPublicProfile(id: string): Promise<PublicProfile | undefined> {
+    const [user] = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        avatarUrl: users.avatarUrl,
+        bio: users.bio,
+        location: users.location,
+        focusAreas: users.focusAreas,
+        vehiclesWorkedOn: users.vehiclesWorkedOn,
+        yearsWrenching: users.yearsWrenching,
+        shopAffiliation: users.shopAffiliation,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.id, id));
+    
+    if (!user) return undefined;
+    
+    return {
+      ...user,
+      focusAreas: (user.focusAreas as FocusArea[]) || [],
+    };
+  }
+
+  async updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async getGarages(): Promise<Garage[]> {
