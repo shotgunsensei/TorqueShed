@@ -62,6 +62,15 @@ interface PurchaseLink {
   type: "oem" | "aftermarket" | "used";
 }
 
+interface PurchaseOption {
+  vendorName: string;
+  priceRange: string | null;
+  affiliateUrl: string | null;
+  disclosureFlag: boolean;
+  partName: string;
+  type: "oem" | "aftermarket" | "used";
+}
+
 interface TorqueAssistResponse {
   vehicle: DecodedVehicle;
   normalizedIssue: string;
@@ -70,6 +79,7 @@ interface TorqueAssistResponse {
   torqueSpecs: TorqueSpec[] | null;
   suggestedParts: SuggestedPart[];
   purchaseLinks: PurchaseLink[];
+  purchaseOptions: PurchaseOption[];
   confidenceNote: "common_issue" | "vehicle_specific" | "general_guidance" | "requires_diagnosis";
   disclaimer: string;
 }
@@ -82,15 +92,15 @@ const confidenceLabels: Record<string, string> = {
 };
 
 const difficultyColors: Record<string, string> = {
-  beginner: Colors.success,
-  intermediate: Colors.warning,
-  advanced: Colors.error,
+  beginner: Colors.dark.success,
+  intermediate: Colors.dark.accent,
+  advanced: Colors.dark.error,
 };
 
 const priorityColors: Record<string, string> = {
-  high: Colors.error,
-  medium: Colors.warning,
-  low: Colors.success,
+  high: Colors.dark.error,
+  medium: Colors.dark.accent,
+  low: Colors.dark.success,
 };
 
 export default function PartsScreen() {
@@ -314,24 +324,68 @@ Has anyone dealt with this before? Looking for advice.`;
             ))}
           </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Where to Buy</Text>
-            <View style={styles.linksGrid}>
-              {response.purchaseLinks.map((link, index) => (
-                <Pressable
-                  key={index}
-                  onPress={() => openLink(link.url)}
-                  style={({ pressed }) => [
-                    styles.linkButton,
-                    { backgroundColor: theme.backgroundSecondary, borderColor: theme.border, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                >
-                  <Text style={[styles.linkProvider, { color: theme.text }]}>{link.provider}</Text>
-                  <Text style={[styles.linkType, { color: theme.textMuted }]}>{link.type}</Text>
-                </Pressable>
+          {response.purchaseOptions && response.purchaseOptions.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Purchase Options</Text>
+              <View style={[styles.disclosureBanner, { backgroundColor: theme.backgroundTertiary }]}>
+                <Feather name="info" size={12} color={theme.textMuted} />
+                <Text style={[styles.disclosureText, { color: theme.textMuted }]}>
+                  Links may earn TorqueShed a small commission.
+                </Text>
+              </View>
+              {Object.entries(
+                response.purchaseOptions.reduce((acc, opt) => {
+                  if (!acc[opt.partName]) acc[opt.partName] = [];
+                  acc[opt.partName].push(opt);
+                  return acc;
+                }, {} as Record<string, PurchaseOption[]>)
+              ).map(([partName, options]) => (
+                <View key={partName} style={styles.purchaseGroup}>
+                  <Text style={[styles.purchasePartName, { color: theme.text }]}>{partName}</Text>
+                  <View style={styles.vendorList}>
+                    {options.map((option, idx) => (
+                      <Pressable
+                        key={idx}
+                        onPress={() => option.affiliateUrl ? openLink(option.affiliateUrl) : null}
+                        disabled={!option.affiliateUrl}
+                        style={({ pressed }) => [
+                          styles.vendorCard,
+                          { 
+                            backgroundColor: theme.backgroundSecondary, 
+                            borderColor: theme.border,
+                            opacity: pressed && option.affiliateUrl ? 0.8 : 1,
+                          },
+                        ]}
+                        testID={`vendor-${option.vendorName.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <View style={styles.vendorHeader}>
+                          <Text style={[styles.vendorName, { color: option.affiliateUrl ? theme.primary : theme.text }]}>
+                            {option.vendorName}
+                          </Text>
+                          {option.disclosureFlag ? (
+                            <View style={[styles.affiliateBadge, { backgroundColor: theme.accent + "20" }]}>
+                              <Text style={[styles.affiliateText, { color: theme.accent }]}>Ad</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <View style={styles.vendorMeta}>
+                          <Text style={[styles.vendorType, { color: theme.textMuted }]}>{option.type}</Text>
+                          {option.priceRange ? (
+                            <Text style={[styles.vendorPrice, { color: theme.textSecondary }]}>{option.priceRange}</Text>
+                          ) : null}
+                        </View>
+                        {option.affiliateUrl ? (
+                          <Feather name="external-link" size={14} color={theme.textMuted} style={styles.externalIcon} />
+                        ) : (
+                          <Text style={[styles.noLinkText, { color: theme.textMuted }]}>Search vendor directly</Text>
+                        )}
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
               ))}
             </View>
-          </View>
+          ) : null}
 
           <View style={[styles.disclaimerBox, { backgroundColor: theme.backgroundTertiary }]}>
             <Feather name="info" size={14} color={theme.textMuted} />
@@ -489,9 +543,9 @@ Has anyone dealt with this before? Looking for advice.`;
           </View>
 
           {error ? (
-            <View style={[styles.errorBox, { backgroundColor: Colors.error + "15" }]}>
-              <Feather name="alert-circle" size={16} color={Colors.error} />
-              <Text style={[styles.errorText, { color: Colors.error }]}>{error}</Text>
+            <View style={[styles.errorBox, { backgroundColor: theme.error + "15" }]}>
+              <Feather name="alert-circle" size={16} color={theme.error} />
+              <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
             </View>
           ) : null}
 
@@ -857,5 +911,75 @@ const styles = StyleSheet.create({
   askBayHint: {
     ...Typography.caption,
     textAlign: "center",
+  },
+  disclosureBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.md,
+  },
+  disclosureText: {
+    ...Typography.caption,
+    fontStyle: "italic",
+  },
+  purchaseGroup: {
+    marginBottom: Spacing.lg,
+  },
+  purchasePartName: {
+    ...Typography.body,
+    fontWeight: "600",
+    marginBottom: Spacing.sm,
+  },
+  vendorList: {
+    gap: Spacing.sm,
+  },
+  vendorCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    position: "relative",
+  },
+  vendorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  vendorName: {
+    ...Typography.body,
+    fontWeight: "500",
+  },
+  affiliateBadge: {
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  affiliateText: {
+    fontSize: 9,
+    fontWeight: "700",
+  },
+  vendorMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  vendorType: {
+    ...Typography.caption,
+    textTransform: "capitalize",
+  },
+  vendorPrice: {
+    ...Typography.small,
+    fontWeight: "500",
+  },
+  externalIcon: {
+    position: "absolute",
+    top: Spacing.md,
+    right: Spacing.md,
+  },
+  noLinkText: {
+    ...Typography.caption,
+    marginTop: Spacing.xs,
   },
 });
