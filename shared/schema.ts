@@ -143,6 +143,58 @@ export const reportsRelations = relations(reports, ({ one }) => ({
   reporter: one(users, { fields: [reports.reporterId], references: [users.id] }),
 }));
 
+export const PRODUCT_CATEGORIES = [
+  "Performance",
+  "Suspension",
+  "Exhaust",
+  "Lighting",
+  "Interior",
+  "Exterior",
+  "Tools",
+  "Safety",
+  "Electronics",
+  "Maintenance",
+] as const;
+
+export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
+
+export const products = pgTable("products", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  whyItMatters: text("why_it_matters"),
+  price: varchar("price", { length: 50 }),
+  priceRange: varchar("price_range", { length: 50 }),
+  category: varchar("category", { length: 50 }).notNull(),
+  affiliateLink: text("affiliate_link"),
+  vendor: varchar("vendor", { length: 100 }),
+  imageUrl: text("image_url"),
+  isSponsored: boolean("is_sponsored").default(false),
+  isApproved: boolean("is_approved").default(false),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productsRelations = relations(products, ({ one }) => ({
+  creator: one(users, { fields: [products.createdBy], references: [users.id] }),
+}));
+
+export const insertProductSchema = createInsertSchema(products).pick({
+  title: true,
+  description: true,
+  whyItMatters: true,
+  price: true,
+  priceRange: true,
+  category: true,
+  affiliateLink: true,
+  vendor: true,
+  imageUrl: true,
+  isSponsored: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -172,3 +224,5 @@ export type Vehicle = typeof vehicles.$inferSelect;
 export type VehicleNote = typeof vehicleNotes.$inferSelect;
 export type Report = typeof reports.$inferSelect;
 export type InsertReport = z.infer<typeof insertReportSchema>;
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;

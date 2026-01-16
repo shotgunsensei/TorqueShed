@@ -3,6 +3,7 @@ import {
   garages, 
   chatMessages, 
   reports,
+  products,
   type User, 
   type InsertUser,
   type Garage,
@@ -10,6 +11,8 @@ import {
   type InsertChatMessage,
   type Report,
   type InsertReport,
+  type Product,
+  type InsertProduct,
   type FocusArea,
 } from "@shared/schema";
 import { db } from "./db";
@@ -53,6 +56,13 @@ export interface IStorage {
   deleteChatMessage(id: string, deletedBy: string): Promise<void>;
   
   createReport(report: InsertReport): Promise<Report>;
+  
+  getApprovedProducts(): Promise<Product[]>;
+  getAllProducts(): Promise<Product[]>;
+  getProduct(id: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct, createdBy: string): Promise<Product>;
+  updateProduct(id: string, updates: Partial<InsertProduct> & { isApproved?: boolean }): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -176,6 +186,47 @@ export class DatabaseStorage implements IStorage {
       .values(report)
       .returning();
     return newReport;
+  }
+
+  async getApprovedProducts(): Promise<Product[]> {
+    return db
+      .select()
+      .from(products)
+      .where(eq(products.isApproved, true))
+      .orderBy(desc(products.createdAt));
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    return db
+      .select()
+      .from(products)
+      .orderBy(desc(products.createdAt));
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product || undefined;
+  }
+
+  async createProduct(product: InsertProduct, createdBy: string): Promise<Product> {
+    const [newProduct] = await db
+      .insert(products)
+      .values({ ...product, createdBy, isApproved: true })
+      .returning();
+    return newProduct;
+  }
+
+  async updateProduct(id: string, updates: Partial<InsertProduct> & { isApproved?: boolean }): Promise<Product | undefined> {
+    const [updated] = await db
+      .update(products)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
   }
 }
 

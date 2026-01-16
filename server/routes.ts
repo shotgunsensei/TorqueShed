@@ -9,7 +9,7 @@ import {
   cacheResponse, 
   generateTorqueAssistResponse 
 } from "./torque-assist";
-import { FOCUS_AREAS, type FocusArea } from "@shared/schema";
+import { FOCUS_AREAS, PRODUCT_CATEGORIES, type FocusArea } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/garages", async (_req: Request, res: Response) => {
@@ -237,6 +237,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "An error occurred processing your request" 
         } 
       });
+    }
+  });
+
+  // Product routes - public read, admin-only write
+  app.get("/api/products", async (_req: Request, res: Response) => {
+    try {
+      const productList = await storage.getApprovedProducts();
+      res.json(productList);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/products/:id", async (req: Request, res: Response) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product || !product.isApproved) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  // Admin-only product management routes
+  const requireAdmin = async (req: Request, res: Response, next: () => void) => {
+    const adminUserId = req.headers["x-admin-user-id"] as string;
+    if (!adminUserId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const user = await storage.getUser(adminUserId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden - Admin access required" });
+    }
+    next();
+  };
+
+  app.get("/api/admin/products", async (req: Request, res: Response) => {
+    try {
+      const adminUserId = req.headers["x-admin-user-id"] as string;
+      if (!adminUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(adminUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const productList = await storage.getAllProducts();
+      res.json(productList);
+    } catch (error) {
+      console.error("Error fetching admin products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  app.post("/api/admin/products", async (req: Request, res: Response) => {
+    try {
+      const adminUserId = req.headers["x-admin-user-id"] as string;
+      if (!adminUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(adminUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored } = req.body;
+      
+      if (!title || typeof title !== "string" || title.length > 255) {
+        return res.status(400).json({ error: "Valid title is required (max 255 chars)" });
+      }
+      if (!category || !PRODUCT_CATEGORIES.includes(category)) {
+        return res.status(400).json({ error: "Valid category is required" });
+      }
+
+      const product = await storage.createProduct({
+        title,
+        description: description || null,
+        whyItMatters: whyItMatters || null,
+        price: price || null,
+        priceRange: priceRange || null,
+        category,
+        affiliateLink: affiliateLink || null,
+        vendor: vendor || null,
+        imageUrl: imageUrl || null,
+        isSponsored: isSponsored || false,
+      }, adminUserId);
+
+      res.status(201).json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      res.status(500).json({ error: "Failed to create product" });
+    }
+  });
+
+  app.patch("/api/admin/products/:id", async (req: Request, res: Response) => {
+    try {
+      const adminUserId = req.headers["x-admin-user-id"] as string;
+      if (!adminUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(adminUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const existing = await storage.getProduct(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      const updates: Record<string, unknown> = {};
+      const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved } = req.body;
+
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (whyItMatters !== undefined) updates.whyItMatters = whyItMatters;
+      if (price !== undefined) updates.price = price;
+      if (priceRange !== undefined) updates.priceRange = priceRange;
+      if (category !== undefined) {
+        if (!PRODUCT_CATEGORIES.includes(category)) {
+          return res.status(400).json({ error: "Invalid category" });
+        }
+        updates.category = category;
+      }
+      if (affiliateLink !== undefined) updates.affiliateLink = affiliateLink;
+      if (vendor !== undefined) updates.vendor = vendor;
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+      if (isSponsored !== undefined) updates.isSponsored = isSponsored;
+      if (isApproved !== undefined) updates.isApproved = isApproved;
+
+      const updated = await storage.updateProduct(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ error: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/admin/products/:id", async (req: Request, res: Response) => {
+    try {
+      const adminUserId = req.headers["x-admin-user-id"] as string;
+      if (!adminUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(adminUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const existing = await storage.getProduct(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      await storage.deleteProduct(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ error: "Failed to delete product" });
     }
   });
 
