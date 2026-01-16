@@ -1,7 +1,7 @@
-# GearHead - Automotive Community Platform
+# TorqueShed - Automotive Community Platform
 
 ## Overview
-GearHead is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers with chatrooms, forums, vehicle tracking, parts finding, and a curated marketplace.
+TorqueShed (formerly GearHead) is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers with chatrooms, forums, vehicle tracking, parts finding, and a curated marketplace. Tagline: "The Garage for Real People"
 
 ## Tech Stack
 - **Mobile**: React Native + Expo (TypeScript)
@@ -30,6 +30,7 @@ GearHead is a mobile-first automotive community platform connecting mechanics, e
 │   │   ├── ThemedView.tsx  # Themed container
 │   │   └── VehicleCard.tsx # Vehicle list card
 │   ├── constants/          # App constants
+│   │   ├── brand.ts        # TorqueShed branding, themes, copy
 │   │   ├── theme.ts        # Colors, spacing, typography
 │   │   ├── garages.ts      # Garage data and sample messages
 │   │   ├── vehicles.ts     # Vehicle data structures
@@ -41,20 +42,22 @@ GearHead is a mobile-first automotive community platform connecting mechanics, e
 │   ├── navigation/         # React Navigation setup
 │   │   ├── RootStackNavigator.tsx  # Root stack with modals
 │   │   ├── MainTabNavigator.tsx    # Bottom tab navigator
-│   │   ├── CommunityStackNavigator.tsx
-│   │   ├── MyGarageStackNavigator.tsx
-│   │   ├── PartsFinderStackNavigator.tsx
-│   │   ├── MarketplaceStackNavigator.tsx
+│   │   ├── GaragesStackNavigator.tsx # Community stack
+│   │   ├── NotesStackNavigator.tsx   # Vehicle notes stack
+│   │   ├── PartsStackNavigator.tsx   # Parts finder stack
+│   │   ├── SwapShopStackNavigator.tsx # P2P marketplace stack
+│   │   ├── TrendingStackNavigator.tsx # Curated products stack
 │   │   └── ProfileStackNavigator.tsx
 │   ├── screens/            # App screens
-│   │   ├── CommunityScreen.tsx     # Garage list
+│   │   ├── GaragesScreen.tsx       # Brand garage list
 │   │   ├── GarageDetailScreen.tsx  # Chat + Forums
-│   │   ├── MyGarageScreen.tsx      # Vehicle list
+│   │   ├── NotesScreen.tsx         # Vehicle list
 │   │   ├── VehicleDetailScreen.tsx # Vehicle notes
 │   │   ├── AddVehicleScreen.tsx    # Add vehicle modal
 │   │   ├── AddNoteScreen.tsx       # Add note modal
-│   │   ├── PartsFinderScreen.tsx   # Parts search
-│   │   ├── MarketplaceScreen.tsx   # Product grid
+│   │   ├── PartsScreen.tsx         # Parts search (VIN/YMM)
+│   │   ├── SwapShopScreen.tsx      # P2P marketplace
+│   │   ├── TrendingScreen.tsx      # Curated products
 │   │   ├── SubmitProductScreen.tsx # Vendor submission
 │   │   └── ProfileScreen.tsx       # User profile
 │   └── lib/                # Utilities
@@ -63,6 +66,8 @@ GearHead is a mobile-first automotive community platform connecting mechanics, e
 │   ├── index.ts           # Server entry point
 │   ├── routes.ts          # API routes
 │   └── templates/         # HTML templates
+├── packages/              # Shared packages (reference only)
+│   └── shared/            # Brand tokens, themes, UI primitives
 ├── assets/                # Static assets
 │   └── images/            # App icons and illustrations
 ├── docs/                  # Documentation
@@ -76,25 +81,37 @@ GearHead is a mobile-first automotive community platform connecting mechanics, e
 ```
 RootStackNavigator
 ├── MainTabNavigator
-│   ├── CommunityTab → CommunityScreen (Garages grid)
-│   ├── MyGarageTab → MyGarageScreen (Vehicles list)
-│   ├── PartsFinderTab → PartsFinderScreen (Parts search)
-│   ├── MarketplaceTab → MarketplaceScreen (Products grid)
-│   └── ProfileTab → ProfileScreen (User settings)
+│   ├── GaragesTab → GaragesScreen (Brand communities)
+│   ├── SwapShopTab → SwapShopScreen (P2P marketplace)
+│   ├── NotesTab → NotesScreen (Vehicle tracking)
+│   ├── PartsTab → PartsScreen (VIN/YMM parts lookup)
+│   └── TrendingTab → TrendingScreen (Curated products)
 ├── GarageDetail (Chat + Forums)
 ├── VehicleDetail (Notes list)
 ├── AddVehicle (Modal)
 ├── AddNote (Modal)
-└── SubmitProduct (Modal)
+├── SubmitProduct (Modal)
+└── Profile (User settings)
 ```
 
 ## Design System
 
+### Brand Identity
+- **Name**: TorqueShed
+- **Tagline**: "The Garage for Real People"
+- **Legal**: TorqueShed, LLC
+
 ### Colors
 - **Primary**: #FF6B35 (Racing Orange)
-- **Secondary**: #1A1A1A (Industrial Black)
-- **Accent**: #FFC107 (Caution Yellow)
-- **Brand Colors**: Ford Blue, Dodge Red, Chevy Gold, Jeep Green
+- **Secondary**: #0D0F12 (Industrial Black / neutral-950)
+- **Accent**: #F59E0B (Caution Yellow)
+- **Garage Brand Colors**:
+  - Ford: #003478 (Ford Blue)
+  - Dodge: #C8102E (Dodge Red)
+  - Chevy: #F2A900 (Chevy Gold)
+  - Jeep: #006341 (Jeep Green)
+  - General: #6B6B6B (General Gray)
+  - Swap Shop: #FF6B35 (Primary Orange)
 
 ### Typography
 - **Headings**: Montserrat (Bold/SemiBold)
@@ -109,14 +126,15 @@ RootStackNavigator
 ## Key Features
 
 ### MVP (Current)
-1. **Community Hub**: Browse brand garages, join discussions
+1. **Garages Hub**: Browse brand-specific garage communities (Ford, Dodge, Chevy, Jeep, General, Swap Shop)
 2. **Realtime Chat**: Message other enthusiasts in garage chatrooms
 3. **Forum Threads**: Create and reply to discussion threads
-4. **My Garage**: Track your vehicles with VIN or Y/M/M
+4. **Notes**: Track your vehicles with VIN or Y/M/M, document maintenance
 5. **Vehicle Notes**: Document maintenance and modifications
 6. **Parts Finder**: Search for parts by VIN or vehicle info
-7. **Marketplace**: Browse trending automotive products
-8. **Vendor Submission**: Submit products for admin approval
+7. **Swap Shop**: P2P marketplace for buying/selling/trading parts
+8. **Trending**: Browse curated trending automotive products
+9. **Vendor Submission**: Submit products for admin approval
 
 ### Post-MVP
 - Real VIN decoding API integration
@@ -143,6 +161,7 @@ The app runs via two workflows:
 2. Add to appropriate stack navigator
 3. Update type definitions in navigator file
 4. Follow existing component patterns
+5. Use brand constants from `client/constants/brand.ts`
 
 ## API Routes (Backend)
 
@@ -154,14 +173,16 @@ Currently the backend serves:
 See `docs/MVP_PRD.md` for complete API specification.
 
 ## Recent Changes
-- Initial MVP implementation
-- 5-tab navigation: Community, My Garage, Parts, Shop, Profile
-- Custom design system with automotive theme
-- Sample data for testing all features
+- Rebranded from "GearHead" to "TorqueShed"
+- Created comprehensive brand system in `client/constants/brand.ts`
+- New 5-tab navigation: Garages, Swap Shop, Notes, Parts, Trending
+- All screens use local brand imports (no monorepo shared package)
 - Complete PRD with database schema and event flows
+- Dark theme with Racing Orange (#FF6B35) primary color
 
 ## User Preferences
 - Bold, industrial design aesthetic
-- Racing orange as primary accent color
+- Racing Orange as primary accent color
 - No emojis in the app
 - Mobile-first with iOS 26 liquid glass inspiration
+- Dark theme by default (neutral-950 background)
