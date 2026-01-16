@@ -1,0 +1,70 @@
+Prompt 3 is complete. Now implement Brand + UI System + App Shell integration across mobile and web, using the existing /packages/shared types and API client.
+
+PROJECT IDENTITY (must be applied everywhere)
+- Brand name: TorqueShed
+- Domain: torqueshed.shop
+- Tagline: “The Garage for Real People”
+- Voice: confident, practical, mechanic-shop smart, not cringe
+- Visual vibe: dark, clean, modern “garage-tech” (high contrast, minimal chrome)
+- Make it addictive via usability: fast navigation, clear info scent, low friction posting
+
+NON-NEGOTIABLE UI PRINCIPLES (“contagious” without gimmicks)
+1) Speed-first: screens must feel immediate; skeleton loaders; optimistic UI for posting where safe.
+2) Social proof loops: visible activity indicators (online count per garage, “hot threads”, “recently active”).
+3) Identity: profiles with specialties/tags; badge stubs (ASE, Diesel, Fabrication, Tuning, Electrical).
+4) Clear hierarchy: big headings, simple cards, minimal text density; no clutter.
+5) Sticky affordances: obvious “Post”, “Reply”, “Save note”, “Find part” entry points.
+6) Guardrails: safety/modeation controls are present but not obnoxious.
+
+IMPLEMENTATION TASKS
+A) Create a shared branding package
+- Add /packages/shared/brand:
+  - tokens.ts (design tokens: spacing, radius, typography scale, elevations)
+  - theme.ts (color roles: bg, surface, text, muted, primary, danger, success, border)
+  - copy.ts (tagline, empty states, microcopy)
+  - constants.ts (domain, app name, support email placeholders)
+- Export everything from /packages/shared/index.ts
+
+B) Shared UI primitives (minimal set)
+Create /packages/shared/ui with cross-platform-friendly primitives (no heavy libraries):
+- Button, Card, Input, TextArea, Avatar, Tag/Chip, Separator, Toast hook stub, Skeleton
+Rules:
+- TypeScript strict
+- Styling must be consistent and token-driven (use the tokens from brand)
+- Components must work for both web and mobile (use platform-aware styles or small wrappers)
+
+C) App Shell (web + mobile)
+Implement a consistent shell/navigation:
+- Mobile (Expo):
+  - Bottom tabs: Garages (Chats/Forums), Swap Shop, Notes, Parts, Trending
+  - Each tab has a stack navigator
+  - Header shows TorqueShed wordmark (text is fine), and an icon button to Profile
+- Web (Next.js):
+  - Left rail nav on desktop; bottom nav on small screens
+  - Routes: /garages, /swap, /notes, /parts, /trending, /profile
+  - Use the same labels and icon metaphors as mobile
+
+D) “Contagious” home surfaces (MVP UI only, real data hooks later)
+Create these screens with stub data now, but wired to shared types:
+- Garages screen: list of garages with:
+  - online count (stub)
+  - “latest message time” (stub)
+  - “hot threads” count (stub)
+- Trending screen: product cards with image placeholder, title, price range, and “View Deal” outbound link button
+- Notes screen: “My Vehicles” entry + quick add
+- Parts screen: VIN/YMM + Part Needed inputs; “Assist Me” button (wires to shared api client endpoint already stubbed)
+
+E) Wiring requirements
+- Both apps must import brand tokens and shared UI components from /packages/shared
+- No duplicated constants (TorqueShed name, domain, tagline must exist only in shared package)
+- Ensure lint/TS pass
+- Add a simple “Brand QA checklist” section to README:
+  - Where brand name appears
+  - Where domain used
+  - How to change tokens in one place
+
+OUTPUT REQUIREMENTS
+- Provide a file tree of what you created/changed
+- Provide key code snippets for tokens/theme and one shared component
+- Provide confirmation of which screens show TorqueShed branding
+- Do NOT invent additional features; focus on brand + UI system + app shells + stubbed surfaces only
