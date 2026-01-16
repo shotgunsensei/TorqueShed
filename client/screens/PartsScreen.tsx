@@ -17,7 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { emptyStates, microcopy, placeholders, bayBrands } from "@/constants/brand";
+import { emptyStates, microcopy, placeholders, garageBrandColors } from "@/constants/brand";
 import { getApiUrl } from "@/lib/query-client";
 
 interface DecodedVehicle {
@@ -344,7 +344,7 @@ Has anyone dealt with this before? Looking for advice.`;
             onPress={handleAskTheBay}
             style={({ pressed }) => [
               styles.askBayButton,
-              { backgroundColor: bayBrands[getBayForMake(response.vehicle.make)]?.color || theme.primary, opacity: pressed ? 0.9 : 1 },
+              { backgroundColor: garageBrandColors[getBayForMake(response.vehicle.make) as keyof typeof garageBrandColors] || theme.primary, opacity: pressed ? 0.9 : 1 },
             ]}
           >
             <Feather name="message-circle" size={20} color="#FFFFFF" />
