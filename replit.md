@@ -176,8 +176,10 @@ Currently the backend serves:
 ### REST Endpoints
 - `GET /api/garages` - List all garage communities with active user count
 - `GET /api/garages/:id` - Get specific garage details
-- `GET /api/garages/:id/messages` - Get chat messages with pagination (?limit=50&before=msgId)
+- `GET /api/garages/:id/messages` - Get chat messages with pagination (?limit=50&before=msgId), includes user credibility (focusAreas, yearsWrenching)
 - `POST /api/garages/:id/messages` - Send a new message (body: userId, content)
+- `GET /api/users/:id/profile` - Get public user profile (excludes password)
+- `PATCH /api/users/:id/profile` - Update user profile (body: bio, location, focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation)
 - `POST /api/reports` - Submit a content report (body: reporterId, reportedUserId, contentType, contentId, reason, details)
 - `POST /api/torque-assist` - Get diagnostic guidance and parts suggestions
 
@@ -225,13 +227,19 @@ Currently the backend serves:
 See `docs/MVP_PRD.md` for complete API specification.
 
 ## Database Schema (PostgreSQL + Drizzle ORM)
-- **users** - User accounts with username, password, avatar, bio, location
+- **users** - User accounts with username, password, avatar, bio, location, and credibility fields (focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation)
 - **garages** - Garage communities (ford, dodge, chevy, jeep, general, swap-shop)
 - **garage_members** - User-garage membership (many-to-many)
 - **chat_messages** - Realtime chat messages with soft delete
 - **vehicles** - User vehicles with VIN or Y/M/M
 - **vehicle_notes** - Maintenance and modification notes
 - **reports** - Content moderation reports
+
+### User Credibility Fields
+- **focusAreas** (JSON array): Up to 10 predefined areas - Engine, Electrical, Suspension, Diesel, Tuning, Fabrication, Diagnostics, HVAC, Brakes, Drivetrain
+- **vehiclesWorkedOn** (text): Free text describing vehicles user has experience with
+- **yearsWrenching** (integer): Years of automotive experience (0-100)
+- **shopAffiliation** (varchar 200): Shop or brand affiliation if any
 
 ## Recent Changes
 - Rebranded from "GearHead" to "TorqueShed"
@@ -247,6 +255,8 @@ See `docs/MVP_PRD.md` for complete API specification.
 - Added profanity filter stub (client/lib/profanity-filter.ts)
 - **Terminology update**: Garages → Bays, Parts Finder → TorqueAssist, Trending → Tool & Gear, Forums → Threads
 - **TorqueAssist MVP**: Full vehicle-aware diagnostic assistant with structured JSON responses, rate limiting, caching, and "Ask the Bay" integration
+- **User Profile Credibility**: Added profile fields for expertise (focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation) with editable UI
+- **Credibility Signals in Chat**: MessageBubble displays user expertise (years wrenching, focus areas) next to usernames for credibility context
 
 ## User Preferences
 - Bold, industrial design aesthetic
