@@ -8,7 +8,7 @@ import GaragesScreen from "@/screens/GaragesScreen";
 import GarageDetailScreen from "@/screens/GarageDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
-import { brand } from "@gearhead/shared";
+import { brand } from "@/constants/brand";
 
 export type GaragesStackParamList = {
   Garages: undefined;

@@ -13,7 +13,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
-import { microcopy } from "@gearhead/shared";
+import { microcopy } from "@/constants/brand";
 
 interface ProductItem {
   id: string;

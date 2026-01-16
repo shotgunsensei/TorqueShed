@@ -7,7 +7,7 @@ import {
   radius,
   typography as brandTypography,
   elevation,
-} from "@gearhead/shared";
+} from "./brand";
 
 export const Colors = {
   light: {

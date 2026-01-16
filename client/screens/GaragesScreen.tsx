@@ -14,7 +14,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
-import { brand, emptyStates, microcopy } from "@gearhead/shared";
+import { brand, emptyStates, microcopy } from "@/constants/brand";
 import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<GaragesStackParamList>;

@@ -13,7 +13,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_NOTES, type VehicleNote } from "@/constants/vehicles";
-import { emptyStates, microcopy } from "@gearhead/shared";
+import { emptyStates, microcopy } from "@/constants/brand";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 

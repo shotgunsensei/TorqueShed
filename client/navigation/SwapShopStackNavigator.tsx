@@ -7,7 +7,6 @@ import { useNavigation } from "@react-navigation/native";
 import SwapShopScreen from "@/screens/SwapShopScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
-import { brand } from "@gearhead/shared";
 
 export type SwapShopStackParamList = {
   SwapShop: undefined;

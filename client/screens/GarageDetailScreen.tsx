@@ -12,7 +12,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { SAMPLE_MESSAGES, SAMPLE_THREADS } from "@/constants/garages";
-import { microcopy, placeholders } from "@gearhead/shared";
+import { microcopy, placeholders } from "@/constants/brand";
 import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
 
 type RoutePropType = RouteProp<GaragesStackParamList, "GarageDetail">;

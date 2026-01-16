@@ -14,7 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { emptyStates, microcopy, placeholders } from "@gearhead/shared";
+import { emptyStates, microcopy, placeholders } from "@/constants/brand";
 
 export default function PartsScreen() {
   const { theme } = useTheme();
