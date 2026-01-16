@@ -158,6 +158,9 @@ export const PRODUCT_CATEGORIES = [
 
 export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
 
+export const SUBMISSION_STATUSES = ["pending", "approved", "featured"] as const;
+export type SubmissionStatus = typeof SUBMISSION_STATUSES[number];
+
 export const products = pgTable("products", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -172,7 +175,10 @@ export const products = pgTable("products", {
   vendor: varchar("vendor", { length: 100 }),
   imageUrl: text("image_url"),
   isSponsored: boolean("is_sponsored").default(false),
-  isApproved: boolean("is_approved").default(false),
+  submissionStatus: varchar("submission_status", { length: 20 }).default("pending"),
+  featuredExpiration: timestamp("featured_expiration"),
+  views: integer("views").default(0),
+  clicks: integer("clicks").default(0),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

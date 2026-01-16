@@ -16,7 +16,7 @@ import {
   type FocusArea,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, sql } from "drizzle-orm";
+import { eq, desc, lt, and, sql, or, isNull, gt } from "drizzle-orm";
 
 export interface ProfileUpdate {
   bio?: string;
@@ -61,8 +61,10 @@ export interface IStorage {
   getAllProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct, createdBy: string): Promise<Product>;
-  updateProduct(id: string, updates: Partial<InsertProduct> & { isApproved?: boolean }): Promise<Product | undefined>;
+  updateProduct(id: string, updates: Partial<InsertProduct> & { submissionStatus?: string; featuredExpiration?: Date | null }): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<void>;
+  incrementProductViews(id: string): Promise<void>;
+  incrementProductClicks(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -189,11 +191,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApprovedProducts(): Promise<Product[]> {
+    const now = new Date();
     return db
       .select()
       .from(products)
-      .where(eq(products.isApproved, true))
-      .orderBy(desc(products.createdAt));
+      .where(
+        and(
+          or(
+            eq(products.submissionStatus, "approved"),
+            and(
+              eq(products.submissionStatus, "featured"),
+              or(
+                isNull(products.featuredExpiration),
+                gt(products.featuredExpiration, now)
+              )
+            )
+          )
+        )
+      )
+      .orderBy(desc(products.submissionStatus), desc(products.createdAt));
   }
 
   async getAllProducts(): Promise<Product[]> {
@@ -211,12 +227,12 @@ export class DatabaseStorage implements IStorage {
   async createProduct(product: InsertProduct, createdBy: string): Promise<Product> {
     const [newProduct] = await db
       .insert(products)
-      .values({ ...product, createdBy, isApproved: true })
+      .values({ ...product, createdBy, submissionStatus: "approved" })
       .returning();
     return newProduct;
   }
 
-  async updateProduct(id: string, updates: Partial<InsertProduct> & { isApproved?: boolean }): Promise<Product | undefined> {
+  async updateProduct(id: string, updates: Partial<InsertProduct> & { submissionStatus?: string; featuredExpiration?: Date | null }): Promise<Product | undefined> {
     const [updated] = await db
       .update(products)
       .set({ ...updates, updatedAt: new Date() })
@@ -227,6 +243,20 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: string): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  async incrementProductViews(id: string): Promise<void> {
+    await db
+      .update(products)
+      .set({ views: sql`${products.views} + 1` })
+      .where(eq(products.id, id));
+  }
+
+  async incrementProductClicks(id: string): Promise<void> {
+    await db
+      .update(products)
+      .set({ clicks: sql`${products.clicks} + 1` })
+      .where(eq(products.id, id));
   }
 }
 
