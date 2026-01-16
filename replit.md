@@ -133,7 +133,7 @@ RootStackNavigator
 3. **Threads**: Create and reply to discussion threads within bays
 4. **Notes**: Track your vehicles with VIN or Y/M/M, document maintenance
 5. **Vehicle Notes**: Document maintenance and modifications
-6. **TorqueAssist**: AI-assisted parts search by VIN or vehicle info
+6. **TorqueAssist**: Vehicle-aware diagnostic and parts assistant with structured guidance
 7. **Swap Shop**: P2P marketplace for buying/selling/trading parts
 8. **Tool & Gear**: Browse curated automotive tools and gear
 9. **Vendor Submission**: Submit products for admin approval
@@ -179,6 +179,41 @@ Currently the backend serves:
 - `GET /api/garages/:id/messages` - Get chat messages with pagination (?limit=50&before=msgId)
 - `POST /api/garages/:id/messages` - Send a new message (body: userId, content)
 - `POST /api/reports` - Submit a content report (body: reporterId, reportedUserId, contentType, contentId, reason, details)
+- `POST /api/torque-assist` - Get diagnostic guidance and parts suggestions
+
+### TorqueAssist API
+
+**Request:**
+```json
+{
+  "vehicle": {
+    "type": "vin" | "ymm",
+    "vin": "1FTEW1EP7KFC12345",  // if type=vin
+    "year": 2020,                // if type=ymm
+    "make": "Ford",              // if type=ymm
+    "model": "F-150"             // if type=ymm
+  },
+  "issue": "brakes squeaking when stopping"
+}
+```
+
+**Response:**
+```json
+{
+  "vehicle": { "year": 2020, "make": "Ford", "model": "F-150", "trim": null, "engine": "V8 5.0L", "transmission": "Automatic", "drivetrain": "4WD" },
+  "normalizedIssue": "Brake System Issue",
+  "likelyCauses": [{ "cause": "Worn brake pads", "probability": "high", "explanation": "..." }],
+  "recommendedChecks": [{ "step": 1, "action": "Visually inspect brake pads", "tools": ["Flashlight"], "difficulty": "beginner" }],
+  "torqueSpecs": [{ "component": "Caliper bracket bolts", "spec": "85-95 ft-lbs", "notes": "Use thread locker" }],
+  "suggestedParts": [{ "name": "Brake pad set (front)", "category": "Brakes", "priority": "high", "estimatedCost": "$30-80" }],
+  "purchaseLinks": [{ "provider": "RockAuto", "url": "https://www.rockauto.com", "type": "aftermarket" }],
+  "confidenceNote": "common_issue",
+  "disclaimer": "This guidance is based on common brake system issues..."
+}
+```
+
+**Rate Limiting:** 10 requests per minute per client
+**Caching:** 5 minute TTL for identical requests
 
 ### WebSocket Events (ws/chat)
 - `join_garage` - Join a garage chatroom
@@ -211,6 +246,7 @@ See `docs/MVP_PRD.md` for complete API specification.
 - Added ReportModal component for content reporting
 - Added profanity filter stub (client/lib/profanity-filter.ts)
 - **Terminology update**: Garages → Bays, Parts Finder → TorqueAssist, Trending → Tool & Gear, Forums → Threads
+- **TorqueAssist MVP**: Full vehicle-aware diagnostic assistant with structured JSON responses, rate limiting, caching, and "Ask the Bay" integration
 
 ## User Preferences
 - Bold, industrial design aesthetic
