@@ -257,6 +257,9 @@ See `docs/MVP_PRD.md` for complete API specification.
 - **TorqueAssist MVP**: Full vehicle-aware diagnostic assistant with structured JSON responses, rate limiting, caching, and "Ask the Bay" integration
 - **User Profile Credibility**: Added profile fields for expertise (focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation) with editable UI
 - **Credibility Signals in Chat**: MessageBubble displays user expertise (years wrenching, focus areas) next to usernames for credibility context
+- **Bay Activity Signals**: Added online count per Bay with green dot indicator, hot threads badge with zap icon
+- **Hot Threads Section**: Threads tab now shows "Hot Threads" section with top 3 threads by score (replies + recency)
+- **Thread Visual Distinctions**: New threads show orange left border + "New" badge; solved threads show green "Solved" badge with checkmark
 
 ## User Preferences
 - Bold, industrial design aesthetic
