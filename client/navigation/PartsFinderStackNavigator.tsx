@@ -1,25 +1,25 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import ProfileScreen from "@/screens/ProfileScreen";
+import PartsFinderScreen from "@/screens/PartsFinderScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
-export type ProfileStackParamList = {
-  Profile: undefined;
+export type PartsFinderStackParamList = {
+  PartsFinder: undefined;
 };
 
-const Stack = createNativeStackNavigator<ProfileStackParamList>();
+const Stack = createNativeStackNavigator<PartsFinderStackParamList>();
 
-export default function ProfileStackNavigator() {
+export default function PartsFinderStackNavigator() {
   const screenOptions = useScreenOptions();
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
-        name="Profile"
-        component={ProfileScreen}
+        name="PartsFinder"
+        component={PartsFinderScreen}
         options={{
-          headerTitle: "Profile",
+          headerTitle: "Parts Finder",
         }}
       />
     </Stack.Navigator>

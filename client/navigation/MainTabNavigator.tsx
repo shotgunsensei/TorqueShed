@@ -2,13 +2,20 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet } from "react-native";
-import HomeStackNavigator from "@/navigation/HomeStackNavigator";
+import { Platform, StyleSheet, View } from "react-native";
+
+import CommunityStackNavigator from "@/navigation/CommunityStackNavigator";
+import MyGarageStackNavigator from "@/navigation/MyGarageStackNavigator";
+import PartsFinderStackNavigator from "@/navigation/PartsFinderStackNavigator";
+import MarketplaceStackNavigator from "@/navigation/MarketplaceStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
-  HomeTab: undefined;
+  CommunityTab: undefined;
+  MyGarageTab: undefined;
+  PartsFinderTab: undefined;
+  MarketplaceTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -19,7 +26,7 @@ export default function MainTabNavigator() {
 
   return (
     <Tab.Navigator
-      initialRouteName="HomeTab"
+      initialRouteName="CommunityTab"
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -28,6 +35,7 @@ export default function MainTabNavigator() {
           backgroundColor: Platform.select({
             ios: "transparent",
             android: theme.backgroundRoot,
+            web: theme.backgroundRoot,
           }),
           borderTopWidth: 0,
           elevation: 0,
@@ -44,12 +52,49 @@ export default function MainTabNavigator() {
       }}
     >
       <Tab.Screen
-        name="HomeTab"
-        component={HomeStackNavigator}
+        name="CommunityTab"
+        component={CommunityStackNavigator}
         options={{
-          title: "Home",
+          title: "Community",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
+            <Feather name="users" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="MyGarageTab"
+        component={MyGarageStackNavigator}
+        options={{
+          title: "My Garage",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="truck" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="PartsFinderTab"
+        component={PartsFinderStackNavigator}
+        options={{
+          title: "Parts",
+          tabBarIcon: ({ color, size }) => (
+            <View
+              style={[
+                styles.centerTab,
+                { backgroundColor: theme.primary },
+              ]}
+            >
+              <Feather name="search" size={size - 2} color="#FFFFFF" />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="MarketplaceTab"
+        component={MarketplaceStackNavigator}
+        options={{
+          title: "Shop",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="shopping-bag" size={size} color={color} />
           ),
         }}
       />
@@ -66,3 +111,14 @@ export default function MainTabNavigator() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  centerTab: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+});

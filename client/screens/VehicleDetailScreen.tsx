@@ -1,0 +1,154 @@
+import React, { useState } from "react";
+import { View, StyleSheet, FlatList } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather } from "@expo/vector-icons";
+
+import { NoteCard } from "@/components/NoteCard";
+import { EmptyState } from "@/components/EmptyState";
+import { FAB } from "@/components/FAB";
+import { ThemedText } from "@/components/ThemedText";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import { SAMPLE_NOTES, type VehicleNote } from "@/constants/vehicles";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type RoutePropType = RouteProp<RootStackParamList, "VehicleDetail">;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+export default function VehicleDetailScreen() {
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const { theme } = useTheme();
+  const route = useRoute<RoutePropType>();
+  const navigation = useNavigation<NavigationProp>();
+  const { vehicle } = route.params;
+
+  const [notes] = useState<VehicleNote[]>(
+    SAMPLE_NOTES.filter((n) => n.vehicleId === vehicle.id)
+  );
+
+  const handleAddNote = () => {
+    navigation.navigate("AddNote", { vehicleId: vehicle.id });
+  };
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <View
+        style={[
+          styles.vehicleImage,
+          { backgroundColor: theme.backgroundSecondary },
+        ]}
+      >
+        <Feather name="truck" size={48} color={theme.textSecondary} />
+      </View>
+
+      <View
+        style={[
+          styles.infoCard,
+          {
+            backgroundColor: theme.backgroundDefault,
+            borderColor: theme.cardBorder,
+          },
+        ]}
+      >
+        <ThemedText type="h2">
+          {vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
+        </ThemedText>
+        <ThemedText type="body" style={{ color: theme.textSecondary }}>
+          {vehicle.year} {vehicle.make} {vehicle.model}
+        </ThemedText>
+        {vehicle.vin ? (
+          <View style={styles.vinRow}>
+            <Feather name="hash" size={14} color={theme.primary} />
+            <ThemedText type="small" style={{ color: theme.primary }}>
+              VIN: {vehicle.vin}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+
+      <ThemedText type="h3" style={styles.sectionTitle}>
+        Maintenance Notes
+      </ThemedText>
+    </View>
+  );
+
+  const renderNote = ({ item }: { item: VehicleNote }) => (
+    <NoteCard note={item} onPress={() => {}} />
+  );
+
+  const renderEmpty = () => (
+    <EmptyState
+      image={require("../../assets/images/empty-threads.png")}
+      title="No Notes Yet"
+      description="Start documenting your vehicle maintenance and modifications"
+      actionLabel="Add Note"
+      onAction={handleAddNote}
+    />
+  );
+
+  return (
+    <>
+      <FlatList
+        style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: headerHeight + Spacing.lg,
+            paddingBottom: insets.bottom + Spacing.xl + 80,
+          },
+          notes.length === 0 ? styles.emptyContainer : null,
+        ]}
+        data={notes}
+        renderItem={renderNote}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        showsVerticalScrollIndicator={false}
+      />
+      {notes.length > 0 ? (
+        <FAB icon="plus" onPress={handleAddNote} bottom={insets.bottom + 20} />
+      ) : null}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: Spacing.lg,
+  },
+  emptyContainer: {
+    flex: 1,
+  },
+  header: {
+    marginBottom: Spacing.lg,
+  },
+  vehicleImage: {
+    height: 180,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  infoCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.xl,
+  },
+  vinRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  sectionTitle: {
+    marginBottom: Spacing.md,
+  },
+});
