@@ -1,0 +1,76 @@
+You are building a production-ready, mobile-first automotive community platform with a shared backend used by BOTH:
+1) Mobile app (React Native + Expo)
+2) Web app (Next.js)
+
+Core product: a social hub for mechanics/enthusiasts/DIYers with chatrooms + forums, vehicle notes, parts finder, programming/datalogging info hub, and a trending products marketplace section (affiliate-style links), plus vendor submissions.
+
+HARD CONSTRAINTS
+- Shared backend: one database + one auth system for both apps.
+- Must be modular, scalable, and easy for a solo dev to extend.
+- Start with an MVP, then leave clearly marked extension points.
+- Must include robust security + moderation hooks.
+- Must include seed data for testing.
+- Must include a clean UI that feels “modern, contagious, trendy” without being cluttered.
+
+TECH STACK (use exactly this unless blocked)
+- Backend: Supabase (Postgres, Auth, Row Level Security, Storage, Edge Functions)
+- Mobile: Expo (TypeScript)
+- Web: Next.js (TypeScript)
+- UI: simple component system + consistent design tokens
+- Realtime: Supabase Realtime for chat
+- Search: Postgres full-text + optional vector search hook later
+- AI: create an abstraction layer “AIProvider” (initial stub), and a server-side endpoint for VIN decoding + part-query summarization.
+
+DELIVERABLES IN THIS REPLIT
+- /apps/mobile (Expo)
+- /apps/web (Next.js)
+- /packages/shared (types, API client, validators, UI tokens)
+- /supabase (SQL migrations, RLS policies, edge functions)
+- A README with: setup, env vars, local dev, deployment notes, and next steps.
+
+MVP FEATURES (build these first)
+A) Auth + Profiles
+- Sign up / login
+- Profile: handle, avatar, short bio, location (optional), specialties/tags
+- Reputation score stub (future)
+
+B) Community
+- Brand “Garages” (Ford, Dodge, Chevy, Jeep, etc.) + “General”, “Swap Shop”
+- Two modes:
+  1) Realtime chatrooms (Discord-ish)
+  2) Forums (threads + replies)
+- Basic moderation: report content, block user, admin delete
+
+C) Vehicle Notes
+- Users can create vehicle “Cards” identified by VIN OR year/make/model/nickname
+- Notes entries attach to a vehicle card (CRUD)
+- Notes are private by default; allow per-note sharing toggle later (stub)
+
+D) Parts Finder (MVP)
+- Input VIN or Y/M/M
+- System parses VIN (via server endpoint; use a stub decoder + clear place to plug real API)
+- User types a part request (“front left wheel bearing”)
+- AI endpoint returns: normalized part name, fitment notes, and a list of outbound purchase links
+- For links: implement a “search aggregator” stub that returns results from a static list + leaves hooks for real providers (RockAuto, AutoZone, O’Reilly, Amazon, eBay, etc.). Do NOT scrape; use official APIs later.
+
+E) Trending Products + Vendor Submission
+- Trending products list (curated/admin-approved)
+- Vendor form submission creates a pending item with images + links
+- Admin approval flow (simple role-based admin screen)
+
+NON-FUNCTIONAL REQUIREMENTS
+- Strong typing end-to-end
+- Input validation (zod or equivalent)
+- RLS policies for all user data
+- Rate limiting hooks for AI endpoints
+- Logging + error boundaries
+- Minimal but real test coverage for shared validators and one API route
+
+PLAN OUTPUT FORMAT
+1) Architecture diagram (ASCII is fine)
+2) DB schema (tables + relationships)
+3) RLS policy summary
+4) API contract (routes + payloads)
+5) Screen list for mobile + web
+6) Implementation steps as ordered tasks
+7) Then start generating code files.
