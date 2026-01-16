@@ -254,13 +254,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/:id", async (req: Request, res: Response) => {
     try {
       const product = await storage.getProduct(req.params.id);
-      if (!product || !product.isApproved) {
+      if (!product || (product.submissionStatus !== "approved" && product.submissionStatus !== "featured")) {
         return res.status(404).json({ error: "Product not found" });
       }
+      await storage.incrementProductViews(req.params.id);
       res.json(product);
     } catch (error) {
       console.error("Error fetching product:", error);
       res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  app.post("/api/products/:id/click", async (req: Request, res: Response) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      await storage.incrementProductClicks(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking click:", error);
+      res.status(500).json({ error: "Failed to track click" });
     }
   });
 
@@ -352,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updates: Record<string, unknown> = {};
-      const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved } = req.body;
+      const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, submissionStatus, featuredExpiration } = req.body;
 
       if (title !== undefined) updates.title = title;
       if (description !== undefined) updates.description = description;
@@ -369,7 +384,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (vendor !== undefined) updates.vendor = vendor;
       if (imageUrl !== undefined) updates.imageUrl = imageUrl;
       if (isSponsored !== undefined) updates.isSponsored = isSponsored;
-      if (isApproved !== undefined) updates.isApproved = isApproved;
+      if (submissionStatus !== undefined) {
+        const validStatuses = ["pending", "approved", "featured"];
+        if (!validStatuses.includes(submissionStatus)) {
+          return res.status(400).json({ error: "Invalid submission status" });
+        }
+        updates.submissionStatus = submissionStatus;
+      }
+      if (featuredExpiration !== undefined) {
+        updates.featuredExpiration = featuredExpiration ? new Date(featuredExpiration) : null;
+      }
 
       const updated = await storage.updateProduct(req.params.id, updates);
       res.json(updated);
