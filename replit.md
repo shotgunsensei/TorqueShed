@@ -209,6 +209,10 @@ Currently the backend serves:
   "torqueSpecs": [{ "component": "Caliper bracket bolts", "spec": "85-95 ft-lbs", "notes": "Use thread locker" }],
   "suggestedParts": [{ "name": "Brake pad set (front)", "category": "Brakes", "priority": "high", "estimatedCost": "$30-80" }],
   "purchaseLinks": [{ "provider": "RockAuto", "url": "https://www.rockauto.com", "type": "aftermarket" }],
+  "purchaseOptions": [
+    { "vendorName": "RockAuto", "priceRange": "$30-45", "affiliateUrl": "https://...", "disclosureFlag": true, "partName": "Brake pad set (front)", "type": "aftermarket" },
+    { "vendorName": "AutoZone", "priceRange": "$40-60", "affiliateUrl": null, "disclosureFlag": false, "partName": "Brake pad set (front)", "type": "aftermarket" }
+  ],
   "confidenceNote": "common_issue",
   "disclaimer": "This guidance is based on common brake system issues..."
 }
@@ -240,6 +244,14 @@ See `docs/MVP_PRD.md` for complete API specification.
 - **vehiclesWorkedOn** (text): Free text describing vehicles user has experience with
 - **yearsWrenching** (integer): Years of automotive experience (0-100)
 - **shopAffiliation** (varchar 200): Shop or brand affiliation if any
+
+## Monetization Ethics (TorqueAssist)
+- **Disclosure First**: All affiliate links display "Ad" badge and disclosure microcopy ("Links may earn TorqueShed a small commission")
+- **Multiple Vendors**: Always show 3+ vendor options per part, mixing affiliate and non-affiliate sources
+- **Relevance Over Payout**: Never sort by commission rate - sort by relevance to user's vehicle and issue
+- **No Auto-Redirect**: Links never auto-redirect; user must explicitly tap to visit vendor
+- **Transparency**: Non-affiliate vendors shown alongside affiliate ones; users see direct search options too
+- **User Trust**: Purchase options are helpful suggestions, not pressure to buy
 
 ## Recent Changes
 - Rebranded from "GearHead" to "TorqueShed"
