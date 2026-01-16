@@ -48,6 +48,15 @@ export const purchaseLinkSchema = z.object({
   type: z.enum(["oem", "aftermarket", "used"]),
 });
 
+export const purchaseOptionSchema = z.object({
+  vendorName: z.string(),
+  priceRange: z.string().nullable(),
+  affiliateUrl: z.string().nullable(),
+  disclosureFlag: z.boolean(),
+  partName: z.string(),
+  type: z.enum(["oem", "aftermarket", "used"]),
+});
+
 export const torqueAssistResponseSchema = z.object({
   vehicle: decodedVehicleSchema,
   normalizedIssue: z.string(),
@@ -65,6 +74,7 @@ export const torqueAssistResponseSchema = z.object({
   torqueSpecs: z.array(torqueSpecSchema).nullable(),
   suggestedParts: z.array(suggestedPartSchema),
   purchaseLinks: z.array(purchaseLinkSchema),
+  purchaseOptions: z.array(purchaseOptionSchema),
   confidenceNote: z.enum([
     "common_issue",
     "vehicle_specific",
@@ -80,6 +90,7 @@ export type DecodedVehicle = z.infer<typeof decodedVehicleSchema>;
 export type TorqueSpec = z.infer<typeof torqueSpecSchema>;
 export type SuggestedPart = z.infer<typeof suggestedPartSchema>;
 export type PurchaseLink = z.infer<typeof purchaseLinkSchema>;
+export type PurchaseOption = z.infer<typeof purchaseOptionSchema>;
 export type TorqueAssistResponse = z.infer<typeof torqueAssistResponseSchema>;
 
 export interface TorqueAssistError {

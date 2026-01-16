@@ -219,6 +219,62 @@ function generateStubLinks(make: string): Array<{ provider: string; url: string;
   ];
 }
 
+interface PartInfo {
+  name: string;
+  category: string;
+  priority: "high" | "medium" | "low";
+  estimatedCost: string | null;
+}
+
+function generatePurchaseOptions(parts: PartInfo[], make: string): Array<{
+  vendorName: string;
+  priceRange: string | null;
+  affiliateUrl: string | null;
+  disclosureFlag: boolean;
+  partName: string;
+  type: "oem" | "aftermarket" | "used";
+}> {
+  const vendorData: Array<{
+    name: string;
+    type: "oem" | "aftermarket" | "used";
+    hasAffiliate: boolean;
+    baseUrl: string | null;
+  }> = [
+    { name: "RockAuto", type: "aftermarket", hasAffiliate: true, baseUrl: "https://www.rockauto.com" },
+    { name: "AutoZone", type: "aftermarket", hasAffiliate: true, baseUrl: "https://www.autozone.com" },
+    { name: "O'Reilly Auto Parts", type: "aftermarket", hasAffiliate: false, baseUrl: "https://www.oreillyauto.com" },
+    { name: "Advance Auto Parts", type: "aftermarket", hasAffiliate: true, baseUrl: "https://www.advanceautoparts.com" },
+    { name: `${make} Parts Direct`, type: "oem", hasAffiliate: false, baseUrl: null },
+    { name: "Car-Part.com", type: "used", hasAffiliate: false, baseUrl: "https://www.car-part.com" },
+  ];
+
+  const options: Array<{
+    vendorName: string;
+    priceRange: string | null;
+    affiliateUrl: string | null;
+    disclosureFlag: boolean;
+    partName: string;
+    type: "oem" | "aftermarket" | "used";
+  }> = [];
+
+  for (const part of parts) {
+    const relevantVendors = vendorData.slice(0, 3);
+    
+    for (const vendor of relevantVendors) {
+      options.push({
+        vendorName: vendor.name,
+        priceRange: part.estimatedCost,
+        affiliateUrl: vendor.hasAffiliate ? vendor.baseUrl : null,
+        disclosureFlag: vendor.hasAffiliate,
+        partName: part.name,
+        type: vendor.type,
+      });
+    }
+  }
+
+  return options;
+}
+
 export function generateTorqueAssistResponse(request: TorqueAssistRequest): TorqueAssistResponse {
   let vehicle: DecodedVehicle;
   
@@ -253,6 +309,7 @@ export function generateTorqueAssistResponse(request: TorqueAssistRequest): Torq
       torqueSpecs: null,
       suggestedParts: [],
       purchaseLinks: generateStubLinks(vehicle.make),
+      purchaseOptions: [],
       confidenceNote: "general_guidance",
       disclaimer: "This is general guidance. For accurate diagnosis, consult a qualified mechanic or your vehicle's service manual.",
     };
@@ -269,6 +326,7 @@ export function generateTorqueAssistResponse(request: TorqueAssistRequest): Torq
     torqueSpecs: pattern.torqueSpecs,
     suggestedParts: pattern.parts,
     purchaseLinks: generateStubLinks(vehicle.make),
+    purchaseOptions: generatePurchaseOptions(pattern.parts, vehicle.make),
     confidenceNote: pattern.confidence,
     disclaimer: `This guidance is based on common ${pattern.normalizedName.toLowerCase()} issues for ${vehicle.year} ${vehicle.make} ${vehicle.model}. Always verify specifications with your vehicle's service manual.`,
   };
