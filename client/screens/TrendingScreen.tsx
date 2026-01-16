@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
 import { microcopy } from "@/constants/brand";
+import { getApiUrl } from "@/lib/query-client";
 
 interface Product {
   id: string;
@@ -29,27 +30,38 @@ interface Product {
   vendor: string | null;
   imageUrl: string | null;
   isSponsored: boolean;
-  isApproved: boolean;
+  submissionStatus: "pending" | "approved" | "featured";
+  featuredExpiration: string | null;
   createdAt: string;
 }
 
 const FALLBACK_PRODUCTS: Product[] = [
-  { id: "1", title: "K&N Cold Air Intake Kit", description: "High-flow performance air intake for improved horsepower and throttle response", whyItMatters: "More air = more power. Fits most trucks and SUVs.", price: "$349.99", priceRange: null, category: "Performance", vendor: "K&N Engineering", affiliateLink: "https://www.knfilters.com", imageUrl: null, isSponsored: false, isApproved: true, createdAt: new Date().toISOString() },
-  { id: "2", title: "Bilstein 5100 Shock Kit", description: "Premium monotube shocks for lifted trucks, adjustable ride height", whyItMatters: "Smoother ride, better control on and off road.", price: "$599.99", priceRange: null, category: "Suspension", vendor: "Bilstein", affiliateLink: "https://www.bilstein.com", imageUrl: null, isSponsored: true, isApproved: true, createdAt: new Date().toISOString() },
-  { id: "3", title: "Flowmaster Super 44 Muffler", description: "Aggressive deep tone exhaust with improved flow", whyItMatters: "That rumble you want without droning on highways.", price: "$179.99", priceRange: null, category: "Exhaust", vendor: "Flowmaster", affiliateLink: "https://www.flowmastermufflers.com", imageUrl: null, isSponsored: false, isApproved: true, createdAt: new Date().toISOString() },
-  { id: "4", title: "Rigid Industries LED Light Bar", description: "20-inch spot/flood combo LED bar, 20,000 lumens", whyItMatters: "See everything. Built tough for off-road abuse.", price: "$449.99", priceRange: null, category: "Lighting", vendor: "Rigid Industries", affiliateLink: "https://www.rigidindustries.com", imageUrl: null, isSponsored: true, isApproved: true, createdAt: new Date().toISOString() },
-  { id: "5", title: "WeatherTech Floor Liners", description: "Custom-fit floor protection for all weather conditions", whyItMatters: "Save your carpets from mud, snow, and spills.", price: "$189.99", priceRange: "$149 - $229", category: "Interior", vendor: "WeatherTech", affiliateLink: "https://www.weathertech.com", imageUrl: null, isSponsored: false, isApproved: true, createdAt: new Date().toISOString() },
-  { id: "6", title: "Borla Cat-Back Exhaust System", description: "Stainless steel performance exhaust system with deep tone", whyItMatters: "Quality sound and added horsepower. Lifetime warranty.", price: "$899.99", priceRange: null, category: "Exhaust", vendor: "Borla", affiliateLink: "https://www.borla.com", imageUrl: null, isSponsored: false, isApproved: true, createdAt: new Date().toISOString() },
+  { id: "1", title: "K&N Cold Air Intake Kit", description: "High-flow performance air intake for improved horsepower and throttle response", whyItMatters: "More air = more power. Fits most trucks and SUVs.", price: "$349.99", priceRange: null, category: "Performance", vendor: "K&N Engineering", affiliateLink: "https://www.knfilters.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
+  { id: "2", title: "Bilstein 5100 Shock Kit", description: "Premium monotube shocks for lifted trucks, adjustable ride height", whyItMatters: "Smoother ride, better control on and off road.", price: "$599.99", priceRange: null, category: "Suspension", vendor: "Bilstein", affiliateLink: "https://www.bilstein.com", imageUrl: null, isSponsored: true, submissionStatus: "featured", featuredExpiration: null, createdAt: new Date().toISOString() },
+  { id: "3", title: "Flowmaster Super 44 Muffler", description: "Aggressive deep tone exhaust with improved flow", whyItMatters: "That rumble you want without droning on highways.", price: "$179.99", priceRange: null, category: "Exhaust", vendor: "Flowmaster", affiliateLink: "https://www.flowmastermufflers.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
+  { id: "4", title: "Rigid Industries LED Light Bar", description: "20-inch spot/flood combo LED bar, 20,000 lumens", whyItMatters: "See everything. Built tough for off-road abuse.", price: "$449.99", priceRange: null, category: "Lighting", vendor: "Rigid Industries", affiliateLink: "https://www.rigidindustries.com", imageUrl: null, isSponsored: true, submissionStatus: "featured", featuredExpiration: null, createdAt: new Date().toISOString() },
+  { id: "5", title: "WeatherTech Floor Liners", description: "Custom-fit floor protection for all weather conditions", whyItMatters: "Save your carpets from mud, snow, and spills.", price: "$189.99", priceRange: "$149 - $229", category: "Interior", vendor: "WeatherTech", affiliateLink: "https://www.weathertech.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
+  { id: "6", title: "Borla Cat-Back Exhaust System", description: "Stainless steel performance exhaust system with deep tone", whyItMatters: "Quality sound and added horsepower. Lifetime warranty.", price: "$899.99", priceRange: null, category: "Exhaust", vendor: "Borla", affiliateLink: "https://www.borla.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
 ];
 
 function ProductCard({ item }: { item: Product }) {
   const { theme } = useTheme();
 
-  const handleViewDeal = () => {
+  const trackClick = async () => {
+    try {
+      const url = new URL(`/api/products/${item.id}/click`, getApiUrl());
+      await fetch(url.toString(), { method: "POST" });
+    } catch {}
+  };
+
+  const handleViewDeal = async () => {
     if (item.affiliateLink) {
+      await trackClick();
       Linking.openURL(item.affiliateLink);
     }
   };
+
+  const isFeatured = item.submissionStatus === "featured";
 
   return (
     <View
@@ -57,14 +69,20 @@ function ProductCard({ item }: { item: Product }) {
         styles.card,
         {
           backgroundColor: theme.backgroundSecondary,
-          borderColor: theme.cardBorder,
+          borderColor: isFeatured ? theme.accent : theme.cardBorder,
+          borderWidth: isFeatured ? 2 : 1,
         },
       ]}
       testID={`product-card-${item.id}`}
     >
       <View style={[styles.imagePlaceholder, { backgroundColor: theme.backgroundTertiary }]}>
         <Feather name="package" size={32} color={theme.textMuted} />
-        {item.isSponsored ? (
+        {isFeatured ? (
+          <View style={[styles.featuredBadge, { backgroundColor: theme.accent }]}>
+            <Feather name="star" size={10} color="#FFFFFF" />
+            <Text style={styles.featuredText}>Featured</Text>
+          </View>
+        ) : item.isSponsored ? (
           <View style={[styles.sponsoredBadge, { backgroundColor: theme.accent }]}>
             <Text style={styles.sponsoredText}>Sponsored</Text>
           </View>
@@ -223,6 +241,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
+  },
+  featuredBadge: {
+    position: "absolute",
+    top: Spacing.sm,
+    left: Spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  featuredText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
   sponsoredText: {
     color: "#000000",
