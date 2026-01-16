@@ -1,48 +1,131 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   Pressable,
+  Modal,
+  ScrollView,
+  Switch,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates, microcopy } from "@/constants/brand";
 
-interface SwapItem {
+export type ItemCondition = "New" | "Like New" | "Good" | "Fair" | "For Parts";
+
+export interface SwapItem {
   id: string;
   title: string;
   price: string;
-  location: string;
-  condition: "New" | "Used" | "Rebuilt";
-  seller: string;
+  location: string | null;
+  condition: ItemCondition;
+  seller: {
+    name: string;
+    successfulSwaps: number;
+    memberSince: string;
+  };
+  localPickup: boolean;
+  willShip: boolean;
   postedTime: string;
   hasImage: boolean;
+  contactMethod: "in-app";
 }
 
 const STUB_SWAP_ITEMS: SwapItem[] = [
-  { id: "1", title: "Coyote 5.0L Engine - Complete", price: "$4,500", location: "Austin, TX", condition: "Used", seller: "WrenchMonkey", postedTime: "2h ago", hasImage: true },
-  { id: "2", title: "Fox Body K-Member", price: "$350", location: "Dallas, TX", condition: "Rebuilt", seller: "FoxBodyFan", postedTime: "5h ago", hasImage: true },
-  { id: "3", title: "T56 Magnum 6-Speed", price: "$2,800", location: "Houston, TX", condition: "Used", seller: "GearheadGary", postedTime: "1d ago", hasImage: true },
-  { id: "4", title: "Ford 9\" Rear End - 3.55 Gears", price: "$1,200", location: "San Antonio, TX", condition: "Rebuilt", seller: "NineInch9", postedTime: "2d ago", hasImage: false },
-  { id: "5", title: "Tremec T45 5-Speed", price: "$800", location: "Phoenix, AZ", condition: "Used", seller: "TransGuy", postedTime: "3d ago", hasImage: true },
+  { 
+    id: "1", 
+    title: "Coyote 5.0L Engine - Complete", 
+    price: "$4,500", 
+    location: "Austin, TX", 
+    condition: "Good", 
+    seller: { name: "WrenchMonkey", successfulSwaps: 12, memberSince: "2023" }, 
+    localPickup: true,
+    willShip: false,
+    postedTime: "2h ago", 
+    hasImage: true,
+    contactMethod: "in-app",
+  },
+  { 
+    id: "2", 
+    title: "Fox Body K-Member", 
+    price: "$350", 
+    location: "Dallas, TX", 
+    condition: "Like New", 
+    seller: { name: "FoxBodyFan", successfulSwaps: 8, memberSince: "2022" }, 
+    localPickup: true,
+    willShip: true,
+    postedTime: "5h ago", 
+    hasImage: true,
+    contactMethod: "in-app",
+  },
+  { 
+    id: "3", 
+    title: "T56 Magnum 6-Speed", 
+    price: "$2,800", 
+    location: "Houston, TX", 
+    condition: "Good", 
+    seller: { name: "GearheadGary", successfulSwaps: 23, memberSince: "2021" }, 
+    localPickup: true,
+    willShip: false,
+    postedTime: "1d ago", 
+    hasImage: true,
+    contactMethod: "in-app",
+  },
+  { 
+    id: "4", 
+    title: "Ford 9\" Rear End - 3.55 Gears", 
+    price: "$1,200", 
+    location: "San Antonio, TX", 
+    condition: "Fair", 
+    seller: { name: "NineInch9", successfulSwaps: 5, memberSince: "2024" }, 
+    localPickup: true,
+    willShip: true,
+    postedTime: "2d ago", 
+    hasImage: false,
+    contactMethod: "in-app",
+  },
+  { 
+    id: "5", 
+    title: "Tremec T45 5-Speed", 
+    price: "$800", 
+    location: null, 
+    condition: "For Parts", 
+    seller: { name: "TransGuy", successfulSwaps: 0, memberSince: "2024" }, 
+    localPickup: false,
+    willShip: true,
+    postedTime: "3d ago", 
+    hasImage: true,
+    contactMethod: "in-app",
+  },
 ];
 
-function SwapItemCard({ item }: { item: SwapItem }) {
+const CONDITION_OPTIONS: ItemCondition[] = ["New", "Like New", "Good", "Fair", "For Parts"];
+
+function SwapItemCard({ item, onReport }: { item: SwapItem; onReport: (item: SwapItem) => void }) {
   const { theme } = useTheme();
 
   const getConditionColor = () => {
     switch (item.condition) {
       case "New": return theme.success;
-      case "Used": return theme.primary;
-      case "Rebuilt": return theme.warning;
+      case "Like New": return theme.success;
+      case "Good": return theme.primary;
+      case "Fair": return theme.accent;
+      case "For Parts": return theme.textMuted;
     }
+  };
+
+  const handleReport = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onReport(item);
   };
 
   return (
@@ -55,6 +138,7 @@ function SwapItemCard({ item }: { item: SwapItem }) {
           opacity: pressed ? 0.9 : 1,
         },
       ]}
+      testID={`swap-item-${item.id}`}
     >
       <View style={styles.cardContent}>
         <View style={[styles.imagePlaceholder, { backgroundColor: theme.backgroundTertiary }]}>
@@ -65,9 +149,14 @@ function SwapItemCard({ item }: { item: SwapItem }) {
           )}
         </View>
         <View style={styles.cardDetails}>
-          <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Pressable onPress={handleReport} hitSlop={8} testID={`report-${item.id}`}>
+              <Feather name="flag" size={14} color={theme.textMuted} />
+            </Pressable>
+          </View>
           <Text style={[styles.cardPrice, { color: theme.primary }]}>
             {item.price}
           </Text>
@@ -77,35 +166,99 @@ function SwapItemCard({ item }: { item: SwapItem }) {
                 {item.condition}
               </Text>
             </View>
-            <Text style={[styles.locationText, { color: theme.textMuted }]}>
-              {item.location}
-            </Text>
+            {item.localPickup ? (
+              <View style={styles.pickupBadge}>
+                <Feather name="map-pin" size={10} color={theme.textSecondary} />
+                <Text style={[styles.pickupText, { color: theme.textSecondary }]}>
+                  {item.location || "Local Pickup"}
+                </Text>
+              </View>
+            ) : null}
+            {item.willShip ? (
+              <View style={styles.pickupBadge}>
+                <Feather name="truck" size={10} color={theme.textSecondary} />
+                <Text style={[styles.pickupText, { color: theme.textSecondary }]}>Ships</Text>
+              </View>
+            ) : null}
           </View>
           <View style={styles.sellerRow}>
             <Feather name="user" size={12} color={theme.textMuted} />
             <Text style={[styles.sellerText, { color: theme.textSecondary }]}>
-              {item.seller}
+              {item.seller.name}
             </Text>
+            {item.seller.successfulSwaps > 0 ? (
+              <View style={[styles.swapsBadge, { backgroundColor: theme.success + "20" }]}>
+                <Feather name="check-circle" size={10} color={theme.success} />
+                <Text style={[styles.swapsText, { color: theme.success }]}>
+                  {item.seller.successfulSwaps} swaps
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.swapsBadge, { backgroundColor: theme.backgroundTertiary }]}>
+                <Text style={[styles.swapsText, { color: theme.textMuted }]}>
+                  New seller
+                </Text>
+              </View>
+            )}
             <Text style={[styles.timeText, { color: theme.textMuted }]}>
               {item.postedTime}
             </Text>
           </View>
         </View>
       </View>
+      <View style={[styles.contactBar, { backgroundColor: theme.backgroundTertiary, borderTopColor: theme.cardBorder }]}>
+        <Feather name="message-circle" size={14} color={theme.primary} />
+        <Text style={[styles.contactText, { color: theme.primary }]}>
+          Contact Seller
+        </Text>
+        <Feather name="lock" size={12} color={theme.textMuted} style={styles.lockIcon} />
+        <Text style={[styles.secureText, { color: theme.textMuted }]}>
+          In-app only
+        </Text>
+      </View>
     </Pressable>
   );
 }
 
+const REPORT_REASONS = [
+  { id: "scam", label: "Suspected scam" },
+  { id: "misrepresented", label: "Item misrepresented" },
+  { id: "prohibited", label: "Prohibited item" },
+  { id: "spam", label: "Spam or duplicate" },
+  { id: "other", label: "Other" },
+];
+
 export default function SwapShopScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<SwapItem | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+
+  const handleReport = (item: SwapItem) => {
+    setSelectedItem(item);
+    setSelectedReason(null);
+    setReportModalVisible(true);
+  };
+
+  const handleSubmitReport = () => {
+    if (!selectedReason) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setReportModalVisible(false);
+    Alert.alert(
+      "Report Submitted",
+      "Thanks for helping keep Swap Shop safe. We'll review this listing.",
+      [{ text: "OK" }]
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         data={STUB_SWAP_ITEMS}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <SwapItemCard item={item} />}
+        renderItem={({ item }) => <SwapItemCard item={item} onReport={handleReport} />}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: tabBarHeight + Spacing.lg },
@@ -113,14 +266,104 @@ export default function SwapShopScreen() {
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={
-          <Pressable
-            style={[styles.postButton, { backgroundColor: theme.primary }]}
-          >
-            <Feather name="plus" size={20} color="#FFFFFF" />
-            <Text style={styles.postButtonText}>{microcopy.post} Item</Text>
-          </Pressable>
+          <View>
+            <View style={[styles.trustBanner, { backgroundColor: theme.success + "15", borderColor: theme.success + "30" }]}>
+              <Feather name="shield" size={16} color={theme.success} />
+              <Text style={[styles.trustBannerText, { color: theme.textSecondary }]}>
+                All contact is in-app only. No personal info shared.
+              </Text>
+            </View>
+            <Pressable
+              style={[styles.postButton, { backgroundColor: theme.primary }]}
+              testID="button-post-item"
+            >
+              <Feather name="plus" size={20} color="#FFFFFF" />
+              <Text style={styles.postButtonText}>{microcopy.post} Item</Text>
+            </Pressable>
+          </View>
         }
       />
+
+      <Modal
+        visible={reportModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Report Listing
+              </Text>
+              <Pressable onPress={() => setReportModalVisible(false)} hitSlop={8}>
+                <Feather name="x" size={24} color={theme.textMuted} />
+              </Pressable>
+            </View>
+            
+            {selectedItem ? (
+              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                {selectedItem.title}
+              </Text>
+            ) : null}
+
+            <Text style={[styles.modalLabel, { color: theme.text }]}>
+              Why are you reporting this?
+            </Text>
+
+            <View style={styles.reasonList}>
+              {REPORT_REASONS.map((reason) => (
+                <Pressable
+                  key={reason.id}
+                  style={[
+                    styles.reasonOption,
+                    {
+                      backgroundColor: selectedReason === reason.id ? theme.primary + "15" : theme.backgroundSecondary,
+                      borderColor: selectedReason === reason.id ? theme.primary : theme.cardBorder,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedReason(reason.id);
+                  }}
+                  testID={`reason-${reason.id}`}
+                >
+                  <View style={[
+                    styles.radioCircle,
+                    {
+                      borderColor: selectedReason === reason.id ? theme.primary : theme.textMuted,
+                      backgroundColor: selectedReason === reason.id ? theme.primary : "transparent",
+                    },
+                  ]}>
+                    {selectedReason === reason.id ? (
+                      <View style={styles.radioInner} />
+                    ) : null}
+                  </View>
+                  <Text style={[styles.reasonText, { color: theme.text }]}>
+                    {reason.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              style={[
+                styles.submitButton,
+                {
+                  backgroundColor: selectedReason ? theme.error : theme.backgroundTertiary,
+                },
+              ]}
+              onPress={handleSubmitReport}
+              disabled={!selectedReason}
+              testID="button-submit-report"
+            >
+              <Text style={[styles.submitButtonText, { color: selectedReason ? "#FFFFFF" : theme.textMuted }]}>
+                Submit Report
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -131,6 +374,19 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: Spacing.lg,
+  },
+  trustBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  trustBannerText: {
+    ...Typography.caption,
+    flex: 1,
   },
   postButton: {
     flexDirection: "row",
@@ -155,7 +411,6 @@ const styles = StyleSheet.create({
   },
   imagePlaceholder: {
     width: 100,
-    height: 100,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -163,9 +418,16 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
   },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+  },
   cardTitle: {
     ...Typography.h4,
     marginBottom: Spacing.xxs,
+    flex: 1,
   },
   cardPrice: {
     ...Typography.h3,
@@ -174,6 +436,7 @@ const styles = StyleSheet.create({
   cardMeta: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: Spacing.sm,
     marginBottom: Spacing.xs,
   },
@@ -186,22 +449,124 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     fontWeight: "600",
   },
-  locationText: {
+  pickupBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  pickupText: {
     ...Typography.caption,
   },
   sellerRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: Spacing.xs,
   },
   sellerText: {
     ...Typography.caption,
   },
+  swapsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    gap: 3,
+  },
+  swapsText: {
+    ...Typography.caption,
+    fontSize: 10,
+    fontWeight: "600",
+  },
   timeText: {
     ...Typography.caption,
     marginLeft: "auto",
   },
+  contactBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderTopWidth: 1,
+    gap: Spacing.xs,
+  },
+  contactText: {
+    ...Typography.caption,
+    fontWeight: "600",
+  },
+  lockIcon: {
+    marginLeft: "auto",
+  },
+  secureText: {
+    ...Typography.caption,
+    fontSize: 10,
+  },
   separator: {
     height: Spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: BorderRadius.lg,
+    borderTopRightRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  modalTitle: {
+    ...Typography.h3,
+  },
+  modalSubtitle: {
+    ...Typography.body,
+    marginBottom: Spacing.lg,
+  },
+  modalLabel: {
+    ...Typography.h4,
+    marginBottom: Spacing.md,
+  },
+  reasonList: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  reasonOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.md,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
+  reasonText: {
+    ...Typography.body,
+  },
+  submitButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+  },
+  submitButtonText: {
+    ...Typography.h4,
   },
 });
