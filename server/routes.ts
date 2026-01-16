@@ -2,6 +2,13 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import { storage } from "./storage";
 import { setupWebSocket, getGarageUserCount } from "./websocket";
+import { 
+  validateRequest, 
+  checkRateLimit, 
+  getCachedResponse, 
+  cacheResponse, 
+  generateTorqueAssistResponse 
+} from "./torque-assist";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/garages", async (_req: Request, res: Response) => {
@@ -99,6 +106,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating report:", error);
       res.status(500).json({ error: "Failed to create report" });
+    }
+  });
+
+  app.post("/api/torque-assist", async (req: Request, res: Response) => {
+    try {
+      const clientId = req.ip || "unknown";
+      
+      if (!checkRateLimit(clientId)) {
+        return res.status(429).json({ 
+          error: { 
+            code: "RATE_LIMITED", 
+            message: "Too many requests. Please wait a moment before trying again." 
+          } 
+        });
+      }
+      
+      const validation = validateRequest(req.body);
+      
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
+      
+      const cached = getCachedResponse(validation.data);
+      if (cached) {
+        return res.json(cached);
+      }
+      
+      const response = generateTorqueAssistResponse(validation.data);
+      cacheResponse(validation.data, response);
+      
+      res.json(response);
+    } catch (error) {
+      console.error("Error in TorqueAssist:", error);
+      res.status(500).json({ 
+        error: { 
+          code: "INTERNAL_ERROR", 
+          message: "An error occurred processing your request" 
+        } 
+      });
     }
   });
 
