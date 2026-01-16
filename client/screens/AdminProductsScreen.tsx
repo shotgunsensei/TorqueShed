@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -19,7 +20,7 @@ import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
-import { getApiUrl, apiRequest } from "@/lib/query-client";
+import { getApiUrl } from "@/lib/query-client";
 
 interface Product {
   id: string;
@@ -33,7 +34,10 @@ interface Product {
   vendor: string | null;
   imageUrl: string | null;
   isSponsored: boolean;
-  isApproved: boolean;
+  submissionStatus: "pending" | "approved" | "featured";
+  featuredExpiration: string | null;
+  views: number;
+  clicks: number;
 }
 
 const PRODUCT_CATEGORIES = [
@@ -48,6 +52,8 @@ const PRODUCT_CATEGORIES = [
   "Electronics",
   "Maintenance",
 ];
+
+const SUBMISSION_STATUSES = ["pending", "approved", "featured"] as const;
 
 const ADMIN_USER_ID = "admin-user-001";
 
@@ -69,6 +75,8 @@ export default function AdminProductsScreen() {
     affiliateLink: "",
     vendor: "",
     isSponsored: false,
+    submissionStatus: "pending" as "pending" | "approved" | "featured",
+    featuredExpiration: "",
   });
 
   const { data: products, isLoading } = useQuery<Product[]>({
@@ -92,7 +100,10 @@ export default function AdminProductsScreen() {
           "Content-Type": "application/json",
           "x-admin-user-id": ADMIN_USER_ID,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          featuredExpiration: data.featuredExpiration || null,
+        }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -113,7 +124,7 @@ export default function AdminProductsScreen() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> & { isApproved?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
       const url = new URL(`/api/admin/products/${id}`, getApiUrl());
       const response = await fetch(url.toString(), {
         method: "PATCH",
@@ -121,7 +132,10 @@ export default function AdminProductsScreen() {
           "Content-Type": "application/json",
           "x-admin-user-id": ADMIN_USER_ID,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          featuredExpiration: data.featuredExpiration || null,
+        }),
       });
       if (!response.ok) throw new Error("Failed to update product");
       return response.json();
@@ -163,6 +177,8 @@ export default function AdminProductsScreen() {
       affiliateLink: "",
       vendor: "",
       isSponsored: false,
+      submissionStatus: "pending",
+      featuredExpiration: "",
     });
   };
 
@@ -178,6 +194,8 @@ export default function AdminProductsScreen() {
       affiliateLink: product.affiliateLink || "",
       vendor: product.vendor || "",
       isSponsored: product.isSponsored,
+      submissionStatus: product.submissionStatus || "pending",
+      featuredExpiration: product.featuredExpiration || "",
     });
     setModalVisible(true);
   };
@@ -215,11 +233,47 @@ export default function AdminProductsScreen() {
     );
   };
 
-  const toggleApproval = (product: Product) => {
+  const cycleStatus = (product: Product) => {
+    const statusOrder: ("pending" | "approved" | "featured")[] = ["pending", "approved", "featured"];
+    const currentIndex = statusOrder.indexOf(product.submissionStatus || "pending");
+    const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
     updateMutation.mutate({
       id: product.id,
-      data: { isApproved: !product.isApproved },
+      data: { submissionStatus: nextStatus },
     });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "featured":
+        return theme.accent;
+      case "approved":
+        return theme.success;
+      default:
+        return theme.textMuted;
+    }
+  };
+
+  const getStatusIcon = (status: string): "star" | "check-circle" | "clock" => {
+    switch (status) {
+      case "featured":
+        return "star";
+      case "approved":
+        return "check-circle";
+      default:
+        return "clock";
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return date.toLocaleDateString();
+  };
+
+  const isExpired = (dateStr: string | null) => {
+    if (!dateStr) return false;
+    return new Date(dateStr) < new Date();
   };
 
   const renderProduct = ({ item }: { item: Product }) => (
@@ -248,29 +302,35 @@ export default function AdminProductsScreen() {
             <View
               style={[
                 styles.badge,
-                { backgroundColor: item.isApproved ? theme.success + "30" : theme.error + "30" },
+                { backgroundColor: getStatusColor(item.submissionStatus || "pending") + "30" },
               ]}
             >
+              <Feather
+                name={getStatusIcon(item.submissionStatus || "pending")}
+                size={10}
+                color={getStatusColor(item.submissionStatus || "pending")}
+                style={{ marginRight: 4 }}
+              />
               <Text
                 style={[
                   styles.badgeText,
-                  { color: item.isApproved ? theme.success : theme.error },
+                  { color: getStatusColor(item.submissionStatus || "pending") },
                 ]}
               >
-                {item.isApproved ? "Approved" : "Hidden"}
+                {(item.submissionStatus || "pending").charAt(0).toUpperCase() + (item.submissionStatus || "pending").slice(1)}
               </Text>
             </View>
           </View>
         </View>
         <View style={styles.actions}>
           <Pressable
-            onPress={() => toggleApproval(item)}
+            onPress={() => cycleStatus(item)}
             style={[styles.actionButton, { backgroundColor: theme.backgroundTertiary }]}
           >
             <Feather
-              name={item.isApproved ? "eye-off" : "eye"}
+              name={getStatusIcon(item.submissionStatus || "pending")}
               size={16}
-              color={theme.textSecondary}
+              color={getStatusColor(item.submissionStatus || "pending")}
             />
           </Pressable>
           <Pressable
@@ -287,6 +347,49 @@ export default function AdminProductsScreen() {
           </Pressable>
         </View>
       </View>
+
+      <View style={styles.metricsRow}>
+        <View style={styles.metric}>
+          <Feather name="eye" size={12} color={theme.textMuted} />
+          <Text style={[styles.metricText, { color: theme.textMuted }]}>
+            {item.views || 0} views
+          </Text>
+        </View>
+        <View style={styles.metric}>
+          <Feather name="mouse-pointer" size={12} color={theme.textMuted} />
+          <Text style={[styles.metricText, { color: theme.textMuted }]}>
+            {item.clicks || 0} clicks
+          </Text>
+        </View>
+        {item.views > 0 ? (
+          <View style={styles.metric}>
+            <Feather name="percent" size={12} color={theme.textMuted} />
+            <Text style={[styles.metricText, { color: theme.textMuted }]}>
+              {((item.clicks / item.views) * 100).toFixed(1)}% CTR
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {item.submissionStatus === "featured" && item.featuredExpiration ? (
+        <View style={[styles.expirationRow, { borderTopColor: theme.border }]}>
+          <Feather
+            name="calendar"
+            size={12}
+            color={isExpired(item.featuredExpiration) ? theme.error : theme.accent}
+          />
+          <Text
+            style={[
+              styles.expirationText,
+              { color: isExpired(item.featuredExpiration) ? theme.error : theme.accent },
+            ]}
+          >
+            {isExpired(item.featuredExpiration) ? "Expired: " : "Featured until: "}
+            {formatDate(item.featuredExpiration)}
+          </Text>
+        </View>
+      ) : null}
+
       {item.whyItMatters ? (
         <Text style={[styles.whyItMatters, { color: theme.textMuted }]} numberOfLines={2}>
           {item.whyItMatters}
@@ -413,6 +516,50 @@ export default function AdminProductsScreen() {
               ))}
             </ScrollView>
 
+            <Text style={[styles.label, { color: theme.text }]}>Submission Status</Text>
+            <View style={styles.statusRow}>
+              {SUBMISSION_STATUSES.map((status) => (
+                <Pressable
+                  key={status}
+                  onPress={() => setFormData({ ...formData, submissionStatus: status })}
+                  style={[
+                    styles.statusChip,
+                    {
+                      backgroundColor: formData.submissionStatus === status ? getStatusColor(status) : theme.backgroundSecondary,
+                      borderColor: formData.submissionStatus === status ? getStatusColor(status) : theme.border,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={getStatusIcon(status)}
+                    size={14}
+                    color={formData.submissionStatus === status ? "#FFFFFF" : getStatusColor(status)}
+                  />
+                  <Text
+                    style={[
+                      styles.statusChipText,
+                      { color: formData.submissionStatus === status ? "#FFFFFF" : theme.text },
+                    ]}
+                  >
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {formData.submissionStatus === "featured" ? (
+              <>
+                <Text style={[styles.label, { color: theme.text }]}>Featured Expiration (YYYY-MM-DD)</Text>
+                <TextInput
+                  value={formData.featuredExpiration}
+                  onChangeText={(text) => setFormData({ ...formData, featuredExpiration: text })}
+                  style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                  placeholder="2025-12-31"
+                  placeholderTextColor={theme.textMuted}
+                />
+              </>
+            ) : null}
+
             <Text style={[styles.label, { color: theme.text }]}>Price</Text>
             <TextInput
               value={formData.price}
@@ -510,6 +657,8 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   badge: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -528,6 +677,32 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+  },
+  metricsRow: {
+    flexDirection: "row",
+    gap: Spacing.lg,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+  },
+  metric: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xxs,
+  },
+  metricText: {
+    ...Typography.caption,
+  },
+  expirationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  expirationText: {
+    ...Typography.caption,
+    fontWeight: "500",
   },
   whyItMatters: {
     ...Typography.small,
@@ -624,6 +799,25 @@ const styles = StyleSheet.create({
   categoryChipText: {
     ...Typography.small,
     fontWeight: "500",
+  },
+  statusRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  statusChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  statusChipText: {
+    ...Typography.small,
+    fontWeight: "600",
   },
   toggleRow: {
     flexDirection: "row",
