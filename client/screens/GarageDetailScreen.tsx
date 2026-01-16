@@ -1,59 +1,87 @@
-import React, { useState } from "react";
-import { View, StyleSheet, FlatList, Pressable, TextInput, Platform, KeyboardAvoidingView } from "react-native";
+import React, { useState, useCallback, useMemo } from "react";
+import { View, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { MessageBubble } from "@/components/MessageBubble";
 import { EmptyState } from "@/components/EmptyState";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius, Typography } from "@/constants/theme";
-import { SAMPLE_MESSAGES, SAMPLE_THREADS } from "@/constants/garages";
-import { microcopy, placeholders } from "@/constants/brand";
+import { useChat } from "@/hooks/useChat";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import { SAMPLE_THREADS } from "@/constants/garages";
+import { placeholders } from "@/constants/brand";
 import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
 
 type RoutePropType = RouteProp<GaragesStackParamList, "GarageDetail">;
+
+const TEMP_USER_ID = "user-" + Math.random().toString(36).substring(2, 9);
+const TEMP_USER_NAME = "Guest" + Math.floor(Math.random() * 1000);
 
 export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RoutePropType>();
-  const { garageId, garageName } = route.params;
+  const { garageId } = route.params;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState(SAMPLE_MESSAGES);
+  const [messageInput, setMessageInput] = useState("");
 
-  const threads = SAMPLE_THREADS.filter((t) => t.garageId === garageId);
+  const {
+    messages,
+    isLoading,
+    connectionStatus,
+    typingUsers,
+    sendMessage,
+    sendTyping,
+  } = useChat({
+    garageId,
+    userId: TEMP_USER_ID,
+    userName: TEMP_USER_NAME,
+  });
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    const newMessage = {
-      id: Date.now().toString(),
-      userId: "current",
-      userName: "You",
-      message: message.trim(),
-      timestamp: new Date(),
-      isOwn: true,
-    };
-    setMessages((prev) => [...prev, newMessage]);
-    setMessage("");
-  };
+  const threads = useMemo(
+    () => SAMPLE_THREADS.filter((t) => t.garageId === garageId),
+    [garageId]
+  );
 
-  const renderMessage = ({ item }: { item: typeof SAMPLE_MESSAGES[0] }) => (
+  const handleSend = useCallback(() => {
+    if (!messageInput.trim()) return;
+    sendMessage(messageInput.trim());
+    setMessageInput("");
+  }, [messageInput, sendMessage]);
+
+  const handleInputChange = useCallback((text: string) => {
+    setMessageInput(text);
+    sendTyping();
+  }, [sendTyping]);
+
+  const displayMessages = useMemo(() => {
+    return messages.map((msg) => ({
+      id: msg.id,
+      userId: msg.userId,
+      userName: msg.userName || "Unknown",
+      message: msg.content,
+      timestamp: new Date(msg.createdAt),
+      isOwn: msg.userId === TEMP_USER_ID,
+    }));
+  }, [messages]);
+
+  const renderMessage = useCallback(({ item }: { item: typeof displayMessages[0] }) => (
     <MessageBubble
       message={item.message}
       userName={item.userName}
       timestamp={item.timestamp}
       isOwn={item.isOwn}
     />
-  );
+  ), []);
 
-  const renderThread = ({ item }: { item: typeof SAMPLE_THREADS[0] }) => (
+  const renderThread = useCallback(({ item }: { item: typeof SAMPLE_THREADS[0] }) => (
     <Pressable
       style={({ pressed }) => [
         styles.threadCard,
@@ -86,7 +114,7 @@ export default function GarageDetailScreen() {
         </View>
       </View>
     </Pressable>
-  );
+  ), [theme]);
 
   const renderEmptyThreads = () => (
     <EmptyState
@@ -100,17 +128,34 @@ export default function GarageDetailScreen() {
 
   const renderEmptyChat = () => (
     <View style={styles.emptyChatContainer}>
-      <ThemedText type="body" style={{ color: theme.textSecondary }}>
-        Be the first to say something!
-      </ThemedText>
+      {isLoading ? (
+        <ActivityIndicator size="large" color={theme.primary} />
+      ) : (
+        <ThemedText type="body" style={{ color: theme.textSecondary }}>
+          Be the first to say something!
+        </ThemedText>
+      )}
     </View>
   );
+
+  const renderTypingIndicator = () => {
+    if (typingUsers.length === 0) return null;
+    const names = typingUsers.slice(0, 2).join(", ");
+    const suffix = typingUsers.length > 2 ? ` and ${typingUsers.length - 2} others` : "";
+    return (
+      <View style={styles.typingIndicator}>
+        <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+          {names}{suffix} typing...
+        </ThemedText>
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <View
         style={[styles.segmentContainer, { paddingTop: headerHeight + Spacing.md }]}
@@ -120,6 +165,14 @@ export default function GarageDetailScreen() {
           selectedIndex={selectedIndex}
           onIndexChange={setSelectedIndex}
         />
+        {connectionStatus !== "connected" && selectedIndex === 0 ? (
+          <View style={styles.connectionStatus}>
+            <View style={[styles.statusDot, { backgroundColor: connectionStatus === "connecting" ? theme.accent : theme.error }]} />
+            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+              {connectionStatus === "connecting" ? "Connecting..." : "Reconnecting..."}
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
 
       {selectedIndex === 0 ? (
@@ -128,13 +181,14 @@ export default function GarageDetailScreen() {
             style={styles.chatList}
             contentContainerStyle={[
               styles.chatContent,
-              messages.length === 0 ? styles.emptyContent : null,
+              displayMessages.length === 0 ? styles.emptyContent : null,
             ]}
-            data={messages.slice().reverse()}
+            data={displayMessages.toReversed()}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
-            inverted={messages.length > 0}
+            inverted={displayMessages.length > 0}
             ListEmptyComponent={renderEmptyChat}
+            ListHeaderComponent={renderTypingIndicator}
             showsVerticalScrollIndicator={false}
           />
           <View
@@ -157,26 +211,28 @@ export default function GarageDetailScreen() {
               ]}
               placeholder={placeholders.message}
               placeholderTextColor={theme.textMuted}
-              value={message}
-              onChangeText={setMessage}
+              value={messageInput}
+              onChangeText={handleInputChange}
               multiline
               maxLength={2000}
+              testID="input-message"
             />
             <Pressable
               onPress={handleSend}
-              disabled={!message.trim()}
+              disabled={!messageInput.trim()}
               style={({ pressed }) => [
                 styles.sendButton,
                 {
-                  backgroundColor: message.trim() ? theme.primary : theme.backgroundTertiary,
+                  backgroundColor: messageInput.trim() ? theme.primary : theme.backgroundTertiary,
                   opacity: pressed ? 0.8 : 1,
                 },
               ]}
+              testID="button-send"
             >
               <Feather
                 name="send"
                 size={20}
-                color={message.trim() ? "#FFFFFF" : theme.textMuted}
+                color={messageInput.trim() ? "#FFFFFF" : theme.textMuted}
               />
             </Pressable>
           </View>
@@ -208,6 +264,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },
+  connectionStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: Spacing.xs,
+    gap: Spacing.xs,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   chatList: {
     flex: 1,
   },
@@ -217,6 +285,10 @@ const styles = StyleSheet.create({
   emptyContent: {
     flex: 1,
     justifyContent: "center",
+  },
+  typingIndicator: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
   },
   inputContainer: {
     flexDirection: "row",
