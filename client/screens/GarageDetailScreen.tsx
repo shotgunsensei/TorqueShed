@@ -69,6 +69,8 @@ export default function GarageDetailScreen() {
       message: msg.content,
       timestamp: new Date(msg.createdAt),
       isOwn: msg.userId === TEMP_USER_ID,
+      focusAreas: (msg as any).userFocusAreas || [],
+      yearsWrenching: (msg as any).userYearsWrenching || null,
     }));
   }, [messages]);
 
@@ -78,6 +80,8 @@ export default function GarageDetailScreen() {
       userName={item.userName}
       timestamp={item.timestamp}
       isOwn={item.isOwn}
+      focusAreas={item.focusAreas}
+      yearsWrenching={item.yearsWrenching}
     />
   ), []);
 

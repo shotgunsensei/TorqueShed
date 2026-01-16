@@ -11,6 +11,8 @@ interface MessageBubbleProps {
   timestamp: Date;
   isOwn: boolean;
   showAvatar?: boolean;
+  focusAreas?: string[];
+  yearsWrenching?: number | null;
 }
 
 export function MessageBubble({
@@ -19,12 +21,29 @@ export function MessageBubble({
   timestamp,
   isOwn,
   showAvatar = true,
+  focusAreas = [],
+  yearsWrenching,
 }: MessageBubbleProps) {
   const { theme } = useTheme();
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+
+  const getCredibilityBadge = () => {
+    if (!yearsWrenching && focusAreas.length === 0) return null;
+    
+    const parts: string[] = [];
+    if (yearsWrenching && yearsWrenching > 0) {
+      parts.push(`${yearsWrenching}yr`);
+    }
+    if (focusAreas.length > 0) {
+      parts.push(focusAreas.slice(0, 2).join(", "));
+    }
+    return parts.join(" | ");
+  };
+
+  const credibilityBadge = getCredibilityBadge();
 
   return (
     <View style={[styles.container, isOwn ? styles.ownContainer : null]}>
@@ -44,12 +63,24 @@ export function MessageBubble({
 
       <View style={styles.bubbleWrapper}>
         {!isOwn ? (
-          <ThemedText
-            type="caption"
-            style={[styles.userName, { color: theme.textSecondary }]}
-          >
-            {userName}
-          </ThemedText>
+          <View style={styles.userInfo}>
+            <ThemedText
+              type="caption"
+              style={[styles.userName, { color: theme.textSecondary }]}
+            >
+              {userName}
+            </ThemedText>
+            {credibilityBadge ? (
+              <View style={[styles.credibilityBadge, { backgroundColor: theme.backgroundTertiary }]}>
+                <ThemedText
+                  type="small"
+                  style={{ color: theme.textMuted }}
+                >
+                  {credibilityBadge}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
         ) : null}
 
         <View
@@ -106,9 +137,20 @@ const styles = StyleSheet.create({
   bubbleWrapper: {
     maxWidth: "75%",
   },
-  userName: {
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 2,
+    flexWrap: "wrap",
+  },
+  userName: {
     marginLeft: Spacing.xs,
+  },
+  credibilityBadge: {
+    marginLeft: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 1,
+    borderRadius: BorderRadius.xs,
   },
   bubble: {
     paddingHorizontal: Spacing.md,

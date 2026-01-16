@@ -48,7 +48,7 @@ export interface IStorage {
   getGarages(): Promise<Garage[]>;
   getGarage(id: string): Promise<Garage | undefined>;
   
-  getChatMessages(garageId: string, limit?: number, before?: string): Promise<(ChatMessage & { userName: string })[]>;
+  getChatMessages(garageId: string, limit?: number, before?: string): Promise<(ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage & { userName: string }>;
   deleteChatMessage(id: string, deletedBy: string): Promise<void>;
   
@@ -117,7 +117,7 @@ export class DatabaseStorage implements IStorage {
     return garage || undefined;
   }
 
-  async getChatMessages(garageId: string, limit = 50, before?: string): Promise<(ChatMessage & { userName: string })[]> {
+  async getChatMessages(garageId: string, limit = 50, before?: string): Promise<(ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[]> {
     let query = db
       .select({
         id: chatMessages.id,
@@ -128,6 +128,8 @@ export class DatabaseStorage implements IStorage {
         deletedBy: chatMessages.deletedBy,
         createdAt: chatMessages.createdAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+        userFocusAreas: users.focusAreas,
+        userYearsWrenching: users.yearsWrenching,
       })
       .from(chatMessages)
       .leftJoin(users, eq(chatMessages.userId, users.id))
@@ -140,7 +142,11 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
 
     const messages = await query;
-    return messages as (ChatMessage & { userName: string })[];
+    return messages.map(m => ({
+      ...m,
+      userFocusAreas: (m.userFocusAreas as FocusArea[]) || [],
+      userYearsWrenching: m.userYearsWrenching || null,
+    })) as (ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[];
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage & { userName: string }> {
