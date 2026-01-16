@@ -119,7 +119,7 @@ export default function TrendingScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Hot Deals
+            Shop the Best Gear
           </Text>
         }
       />

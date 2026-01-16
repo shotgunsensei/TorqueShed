@@ -25,7 +25,7 @@ export default function PartsStackNavigator() {
         name="Parts"
         component={PartsScreen}
         options={{
-          headerTitle: "Parts Finder",
+          headerTitle: "TorqueAssist",
           headerRight: () => (
             <Pressable
               onPress={() => (navigation as any).navigate("Profile")}

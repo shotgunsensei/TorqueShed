@@ -83,12 +83,12 @@ TorqueShed (formerly GearHead) is a mobile-first automotive community platform c
 ```
 RootStackNavigator
 ├── MainTabNavigator
-│   ├── GaragesTab → GaragesScreen (Brand communities)
+│   ├── GaragesTab → GaragesScreen (Bays - brand communities)
 │   ├── SwapShopTab → SwapShopScreen (P2P marketplace)
 │   ├── NotesTab → NotesScreen (Vehicle tracking)
-│   ├── PartsTab → PartsScreen (VIN/YMM parts lookup)
-│   └── TrendingTab → TrendingScreen (Curated products)
-├── GarageDetail (Chat + Forums)
+│   ├── PartsTab → PartsScreen (TorqueAssist - parts lookup)
+│   └── TrendingTab → TrendingScreen (Tool & Gear)
+├── GarageDetail (Chat + Threads)
 ├── VehicleDetail (Notes list)
 ├── AddVehicle (Modal)
 ├── AddNote (Modal)
@@ -107,7 +107,7 @@ RootStackNavigator
 - **Primary**: #FF6B35 (Racing Orange)
 - **Secondary**: #0D0F12 (Industrial Black / neutral-950)
 - **Accent**: #F59E0B (Caution Yellow)
-- **Garage Brand Colors**:
+- **Bay Brand Colors**:
   - Ford: #003478 (Ford Blue)
   - Dodge: #C8102E (Dodge Red)
   - Chevy: #F2A900 (Chevy Gold)
@@ -128,14 +128,14 @@ RootStackNavigator
 ## Key Features
 
 ### MVP (Current)
-1. **Garages Hub**: Browse brand-specific garage communities (Ford, Dodge, Chevy, Jeep, General, Swap Shop)
-2. **Realtime Chat**: Message other enthusiasts in garage chatrooms
-3. **Forum Threads**: Create and reply to discussion threads
+1. **Bays**: Browse brand-specific bays (Ford, Dodge, Chevy, Jeep, General, Swap Shop)
+2. **Realtime Chat**: Message other enthusiasts in bay chatrooms
+3. **Threads**: Create and reply to discussion threads within bays
 4. **Notes**: Track your vehicles with VIN or Y/M/M, document maintenance
 5. **Vehicle Notes**: Document maintenance and modifications
-6. **Parts Finder**: Search for parts by VIN or vehicle info
+6. **TorqueAssist**: AI-assisted parts search by VIN or vehicle info
 7. **Swap Shop**: P2P marketplace for buying/selling/trading parts
-8. **Trending**: Browse curated trending automotive products
+8. **Tool & Gear**: Browse curated automotive tools and gear
 9. **Vendor Submission**: Submit products for admin approval
 
 ### Post-MVP
@@ -201,7 +201,7 @@ See `docs/MVP_PRD.md` for complete API specification.
 ## Recent Changes
 - Rebranded from "GearHead" to "TorqueShed"
 - Created comprehensive brand system in `client/constants/brand.ts`
-- New 5-tab navigation: Garages, Swap Shop, Notes, Parts, Trending
+- New 5-tab navigation: Bays, Swap Shop, Notes, TorqueAssist, Tool & Gear
 - All screens use local brand imports (no monorepo shared package)
 - Complete PRD with database schema and event flows
 - Dark theme with Racing Orange (#FF6B35) primary color
@@ -210,6 +210,7 @@ See `docs/MVP_PRD.md` for complete API specification.
 - Created useWebSocket and useChat hooks for mobile client
 - Added ReportModal component for content reporting
 - Added profanity filter stub (client/lib/profanity-filter.ts)
+- **Terminology update**: Garages → Bays, Parts Finder → TorqueAssist, Trending → Tool & Gear, Forums → Threads
 
 ## User Preferences
 - Bold, industrial design aesthetic

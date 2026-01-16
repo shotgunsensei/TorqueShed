@@ -25,7 +25,7 @@ export default function TrendingStackNavigator() {
         name="Trending"
         component={TrendingScreen}
         options={{
-          headerTitle: "Trending",
+          headerTitle: "Tool & Gear",
           headerRight: () => (
             <Pressable
               onPress={() => (navigation as any).navigate("Profile")}

@@ -30,11 +30,11 @@ interface GarageItem {
 }
 
 const STUB_GARAGES: GarageItem[] = [
-  { id: "ford", name: "Ford Garage", brandColor: "#003478", memberCount: 1247, onlineCount: 42, latestMessageTime: "2m ago", hotThreads: 3 },
-  { id: "dodge", name: "Dodge Garage", brandColor: "#C8102E", memberCount: 892, onlineCount: 28, latestMessageTime: "5m ago", hotThreads: 2 },
-  { id: "chevy", name: "Chevy Garage", brandColor: "#F2A900", memberCount: 1089, onlineCount: 35, latestMessageTime: "1m ago", hotThreads: 4 },
-  { id: "jeep", name: "Jeep Garage", brandColor: "#006341", memberCount: 756, onlineCount: 21, latestMessageTime: "8m ago", hotThreads: 1 },
-  { id: "general", name: "General Garage", brandColor: "#6B6B6B", memberCount: 2341, onlineCount: 67, latestMessageTime: "Just now", hotThreads: 5 },
+  { id: "ford", name: "Ford Bay", brandColor: "#003478", memberCount: 1247, onlineCount: 42, latestMessageTime: "2m ago", hotThreads: 3 },
+  { id: "dodge", name: "Dodge Bay", brandColor: "#C8102E", memberCount: 892, onlineCount: 28, latestMessageTime: "5m ago", hotThreads: 2 },
+  { id: "chevy", name: "Chevy Bay", brandColor: "#F2A900", memberCount: 1089, onlineCount: 35, latestMessageTime: "1m ago", hotThreads: 4 },
+  { id: "jeep", name: "Jeep Bay", brandColor: "#006341", memberCount: 756, onlineCount: 21, latestMessageTime: "8m ago", hotThreads: 1 },
+  { id: "general", name: "General Bay", brandColor: "#6B6B6B", memberCount: 2341, onlineCount: 67, latestMessageTime: "Just now", hotThreads: 5 },
   { id: "swap-shop", name: "Swap Shop", brandColor: "#FF6B35", memberCount: 1532, onlineCount: 48, latestMessageTime: "3m ago", hotThreads: 2 },
 ];
 

@@ -161,7 +161,7 @@ export default function GarageDetailScreen() {
         style={[styles.segmentContainer, { paddingTop: headerHeight + Spacing.md }]}
       >
         <SegmentedControl
-          segments={["Chat", "Forums"]}
+          segments={["Chat", "Threads"]}
           selectedIndex={selectedIndex}
           onIndexChange={setSelectedIndex}
         />

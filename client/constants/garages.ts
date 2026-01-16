@@ -12,7 +12,7 @@ export interface Garage {
 export const GARAGES: Garage[] = [
   {
     id: "ford",
-    name: "Ford Garage",
+    name: "Ford Bay",
     brandKey: "ford",
     memberCount: 12453,
     activeNow: 89,
@@ -20,7 +20,7 @@ export const GARAGES: Garage[] = [
   },
   {
     id: "dodge",
-    name: "Dodge Garage",
+    name: "Dodge Bay",
     brandKey: "dodge",
     memberCount: 8921,
     activeNow: 67,
@@ -28,7 +28,7 @@ export const GARAGES: Garage[] = [
   },
   {
     id: "chevy",
-    name: "Chevy Garage",
+    name: "Chevy Bay",
     brandKey: "chevy",
     memberCount: 10234,
     activeNow: 72,
@@ -36,7 +36,7 @@ export const GARAGES: Garage[] = [
   },
   {
     id: "jeep",
-    name: "Jeep Garage",
+    name: "Jeep Bay",
     brandKey: "jeep",
     memberCount: 15678,
     activeNow: 124,
@@ -44,7 +44,7 @@ export const GARAGES: Garage[] = [
   },
   {
     id: "general",
-    name: "General",
+    name: "General Bay",
     brandKey: "general",
     memberCount: 23456,
     activeNow: 156,

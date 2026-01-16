@@ -181,16 +181,16 @@ export const emptyStates = {
   },
   parts: {
     title: 'Find the Right Part',
-    message: 'Enter your vehicle info and the part you need - we\'ll search multiple vendors to find the best deal.',
+    message: 'Enter your vehicle info and the part you need - TorqueAssist will search multiple vendors to find the best deal.',
     action: 'Search Parts',
   },
-  garage: {
-    title: 'Join a Garage',
-    message: 'Connect with other enthusiasts in brand-specific communities.',
-    action: 'Browse Garages',
+  bay: {
+    title: 'Join a Bay',
+    message: 'Connect with other enthusiasts in brand-specific bays.',
+    action: 'Browse Bays',
   },
-  forum: {
-    title: 'No Discussions Yet',
+  threads: {
+    title: 'No Threads Yet',
     message: 'Start a thread and get the conversation going.',
     action: 'New Thread',
   },

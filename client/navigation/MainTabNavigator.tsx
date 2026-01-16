@@ -59,7 +59,7 @@ export default function MainTabNavigator() {
         name="GaragesTab"
         component={GaragesStackNavigator}
         options={{
-          title: "Garages",
+          title: "Bays",
           tabBarIcon: ({ color, size }) => (
             <Feather name="message-circle" size={size} color={color} />
           ),
@@ -89,7 +89,7 @@ export default function MainTabNavigator() {
         name="PartsTab"
         component={PartsStackNavigator}
         options={{
-          title: "Parts",
+          title: "TorqueAssist",
           tabBarIcon: ({ color, size }) => (
             <Feather name="tool" size={size} color={color} />
           ),
@@ -99,9 +99,9 @@ export default function MainTabNavigator() {
         name="TrendingTab"
         component={TrendingStackNavigator}
         options={{
-          title: "Trending",
+          title: "Tool & Gear",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="trending-up" size={size} color={color} />
+            <Feather name="box" size={size} color={color} />
           ),
         }}
       />
