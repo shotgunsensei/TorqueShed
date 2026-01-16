@@ -6,6 +6,7 @@ import ProfileScreen from "@/screens/ProfileScreen";
 import AddVehicleScreen from "@/screens/AddVehicleScreen";
 import AddNoteScreen from "@/screens/AddNoteScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
+import AdminProductsScreen from "@/screens/AdminProductsScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type RootStackParamList = {
@@ -14,6 +15,7 @@ export type RootStackParamList = {
   AddVehicle: undefined;
   AddNote: { vehicleId: string };
   SubmitProduct: undefined;
+  AdminProducts: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,6 +59,13 @@ export default function RootStackNavigator() {
         options={{
           presentation: "modal",
           headerTitle: "Submit Product",
+        }}
+      />
+      <Stack.Screen
+        name="AdminProducts"
+        component={AdminProductsScreen}
+        options={{
+          headerTitle: "Manage Products",
         }}
       />
     </Stack.Navigator>
