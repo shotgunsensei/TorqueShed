@@ -2,21 +2,21 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 
-import CommunityStackNavigator from "@/navigation/CommunityStackNavigator";
-import MyGarageStackNavigator from "@/navigation/MyGarageStackNavigator";
-import PartsFinderStackNavigator from "@/navigation/PartsFinderStackNavigator";
-import MarketplaceStackNavigator from "@/navigation/MarketplaceStackNavigator";
-import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
+import GaragesStackNavigator from "@/navigation/GaragesStackNavigator";
+import SwapShopStackNavigator from "@/navigation/SwapShopStackNavigator";
+import NotesStackNavigator from "@/navigation/NotesStackNavigator";
+import PartsStackNavigator from "@/navigation/PartsStackNavigator";
+import TrendingStackNavigator from "@/navigation/TrendingStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
-  CommunityTab: undefined;
-  MyGarageTab: undefined;
-  PartsFinderTab: undefined;
-  MarketplaceTab: undefined;
-  ProfileTab: undefined;
+  GaragesTab: undefined;
+  SwapTab: undefined;
+  NotesTab: undefined;
+  PartsTab: undefined;
+  TrendingTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -26,7 +26,7 @@ export default function MainTabNavigator() {
 
   return (
     <Tab.Navigator
-      initialRouteName="CommunityTab"
+      initialRouteName="GaragesTab"
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -49,62 +49,59 @@ export default function MainTabNavigator() {
             />
           ) : null,
         headerShown: false,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontFamily: "Inter_500Medium",
+        },
       }}
     >
       <Tab.Screen
-        name="CommunityTab"
-        component={CommunityStackNavigator}
+        name="GaragesTab"
+        component={GaragesStackNavigator}
         options={{
-          title: "Community",
+          title: "Garages",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="users" size={size} color={color} />
+            <Feather name="message-circle" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="MyGarageTab"
-        component={MyGarageStackNavigator}
+        name="SwapTab"
+        component={SwapShopStackNavigator}
         options={{
-          title: "My Garage",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="truck" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="PartsFinderTab"
-        component={PartsFinderStackNavigator}
-        options={{
-          title: "Parts",
-          tabBarIcon: ({ color, size }) => (
-            <View
-              style={[
-                styles.centerTab,
-                { backgroundColor: theme.primary },
-              ]}
-            >
-              <Feather name="search" size={size - 2} color="#FFFFFF" />
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="MarketplaceTab"
-        component={MarketplaceStackNavigator}
-        options={{
-          title: "Shop",
+          title: "Swap Shop",
           tabBarIcon: ({ color, size }) => (
             <Feather name="shopping-bag" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
+        name="NotesTab"
+        component={NotesStackNavigator}
         options={{
-          title: "Profile",
+          title: "Notes",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
+            <Feather name="file-text" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="PartsTab"
+        component={PartsStackNavigator}
+        options={{
+          title: "Parts",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="tool" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="TrendingTab"
+        component={TrendingStackNavigator}
+        options={{
+          title: "Trending",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="trending-up" size={size} color={color} />
           ),
         }}
       />
@@ -112,13 +109,4 @@ export default function MainTabNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
-  centerTab: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-});
+const styles = StyleSheet.create({});

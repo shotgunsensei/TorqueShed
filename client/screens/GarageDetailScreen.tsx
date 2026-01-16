@@ -1,37 +1,34 @@
 import React, { useState } from "react";
-import { View, StyleSheet, FlatList, Pressable } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, TextInput, Platform, KeyboardAvoidingView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { MessageBubble } from "@/components/MessageBubble";
 import { EmptyState } from "@/components/EmptyState";
 import { ThemedText } from "@/components/ThemedText";
-import { Input } from "@/components/Input";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { SAMPLE_MESSAGES, SAMPLE_THREADS } from "@/constants/garages";
-import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { microcopy, placeholders } from "@gearhead/shared";
+import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
 
-type RoutePropType = RouteProp<RootStackParamList, "GarageDetail">;
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RoutePropType = RouteProp<GaragesStackParamList, "GarageDetail">;
 
 export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RoutePropType>();
-  const navigation = useNavigation<NavigationProp>();
-  const { garage } = route.params;
+  const { garageId, garageName } = route.params;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState(SAMPLE_MESSAGES);
 
-  const threads = SAMPLE_THREADS.filter((t) => t.garageId === garage.id);
+  const threads = SAMPLE_THREADS.filter((t) => t.garageId === garageId);
 
   const handleSend = () => {
     if (!message.trim()) return;
@@ -58,11 +55,12 @@ export default function GarageDetailScreen() {
 
   const renderThread = ({ item }: { item: typeof SAMPLE_THREADS[0] }) => (
     <Pressable
-      style={[
+      style={({ pressed }) => [
         styles.threadCard,
         {
           backgroundColor: theme.backgroundDefault,
           borderColor: theme.cardBorder,
+          opacity: pressed ? 0.9 : 1,
         },
       ]}
       onPress={() => {}}
@@ -109,7 +107,11 @@ export default function GarageDetailScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
       <View
         style={[styles.segmentContainer, { paddingTop: headerHeight + Spacing.md }]}
       >
@@ -145,14 +147,38 @@ export default function GarageDetailScreen() {
               },
             ]}
           >
-            <Input
-              placeholder="Type a message..."
+            <TextInput
+              style={[
+                styles.messageInput,
+                {
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                },
+              ]}
+              placeholder={placeholders.message}
+              placeholderTextColor={theme.textMuted}
               value={message}
               onChangeText={setMessage}
-              style={styles.messageInput}
-              rightIcon="send"
-              onRightIconPress={handleSend}
+              multiline
+              maxLength={2000}
             />
+            <Pressable
+              onPress={handleSend}
+              disabled={!message.trim()}
+              style={({ pressed }) => [
+                styles.sendButton,
+                {
+                  backgroundColor: message.trim() ? theme.primary : theme.backgroundTertiary,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="send"
+                size={20}
+                color={message.trim() ? "#FFFFFF" : theme.textMuted}
+              />
+            </Pressable>
           </View>
         </>
       ) : (
@@ -170,7 +196,7 @@ export default function GarageDetailScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -193,12 +219,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   inputContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
+    gap: Spacing.sm,
   },
   messageInput: {
-    marginBottom: 0,
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 16,
+    fontFamily: "Inter_400Regular",
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   threadList: {
     flex: 1,

@@ -13,10 +13,12 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_NOTES, type VehicleNote } from "@/constants/vehicles";
+import { emptyStates, microcopy } from "@gearhead/shared";
+import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
-type RoutePropType = RouteProp<RootStackParamList, "VehicleDetail">;
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RoutePropType = RouteProp<NotesStackParamList, "VehicleDetail">;
+type NavigationProp = NativeStackNavigationProp<NotesStackParamList & RootStackParamList>;
 
 export default function VehicleDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -24,14 +26,14 @@ export default function VehicleDetailScreen() {
   const { theme } = useTheme();
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
-  const { vehicle } = route.params;
+  const { vehicleId, vehicleName } = route.params;
 
   const [notes] = useState<VehicleNote[]>(
-    SAMPLE_NOTES.filter((n) => n.vehicleId === vehicle.id)
+    SAMPLE_NOTES.filter((n) => n.vehicleId === vehicleId)
   );
 
   const handleAddNote = () => {
-    navigation.navigate("AddNote", { vehicleId: vehicle.id });
+    navigation.navigate("AddNote", { vehicleId });
   };
 
   const renderHeader = () => (
@@ -54,20 +56,10 @@ export default function VehicleDetailScreen() {
           },
         ]}
       >
-        <ThemedText type="h2">
-          {vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
-        </ThemedText>
+        <ThemedText type="h2">{vehicleName}</ThemedText>
         <ThemedText type="body" style={{ color: theme.textSecondary }}>
-          {vehicle.year} {vehicle.make} {vehicle.model}
+          Vehicle ID: {vehicleId}
         </ThemedText>
-        {vehicle.vin ? (
-          <View style={styles.vinRow}>
-            <Feather name="hash" size={14} color={theme.primary} />
-            <ThemedText type="small" style={{ color: theme.primary }}>
-              VIN: {vehicle.vin}
-            </ThemedText>
-          </View>
-        ) : null}
       </View>
 
       <ThemedText type="h3" style={styles.sectionTitle}>
@@ -83,9 +75,9 @@ export default function VehicleDetailScreen() {
   const renderEmpty = () => (
     <EmptyState
       image={require("../../assets/images/empty-threads.png")}
-      title="No Notes Yet"
-      description="Start documenting your vehicle maintenance and modifications"
-      actionLabel="Add Note"
+      title={emptyStates.notes.title}
+      description={emptyStates.notes.message}
+      actionLabel={emptyStates.notes.action}
       onAction={handleAddNote}
     />
   );
@@ -141,12 +133,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     marginBottom: Spacing.xl,
-  },
-  vinRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
   },
   sectionTitle: {
     marginBottom: Spacing.md,

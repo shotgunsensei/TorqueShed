@@ -2,20 +2,15 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import MainTabNavigator from "@/navigation/MainTabNavigator";
-import GarageDetailScreen from "@/screens/GarageDetailScreen";
-import VehicleDetailScreen from "@/screens/VehicleDetailScreen";
+import ProfileScreen from "@/screens/ProfileScreen";
 import AddVehicleScreen from "@/screens/AddVehicleScreen";
 import AddNoteScreen from "@/screens/AddNoteScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
-import { GarageBadge } from "@/components/GarageBadge";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
-import type { Garage } from "@/constants/garages";
-import type { Vehicle } from "@/constants/vehicles";
 
 export type RootStackParamList = {
   Main: undefined;
-  GarageDetail: { garage: Garage };
-  VehicleDetail: { vehicle: Vehicle };
+  Profile: undefined;
   AddVehicle: undefined;
   AddNote: { vehicleId: string };
   SubmitProduct: undefined;
@@ -34,21 +29,11 @@ export default function RootStackNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="GarageDetail"
-        component={GarageDetailScreen}
-        options={({ route }) => ({
-          headerTitle: route.params.garage.name,
-          headerLeft: undefined,
-        })}
-      />
-      <Stack.Screen
-        name="VehicleDetail"
-        component={VehicleDetailScreen}
-        options={({ route }) => ({
-          headerTitle:
-            route.params.vehicle.nickname ||
-            `${route.params.vehicle.make} ${route.params.vehicle.model}`,
-        })}
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          headerTitle: "Profile",
+        }}
       />
       <Stack.Screen
         name="AddVehicle"
