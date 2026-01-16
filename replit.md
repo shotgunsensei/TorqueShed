@@ -1,277 +1,7 @@
 # TorqueShed - Automotive Community Platform
 
 ## Overview
-TorqueShed (formerly GearHead) is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers with chatrooms, forums, vehicle tracking, parts finding, and a curated marketplace. Tagline: "The Garage for Real People"
-
-## Tech Stack
-- **Mobile**: React Native + Expo (TypeScript)
-- **Backend**: Express.js (TypeScript)
-- **Database**: PostgreSQL (schema defined in docs/MVP_PRD.md)
-- **UI**: Custom component system with automotive-themed design
-
-## Project Structure
-
-```
-├── client/                  # React Native Expo app
-│   ├── App.tsx             # Root component with font loading
-│   ├── components/         # Reusable UI components
-│   │   ├── Button.tsx      # Primary button with animation
-│   │   ├── Card.tsx        # Elevated card component
-│   │   ├── EmptyState.tsx  # Empty state with illustration
-│   │   ├── FAB.tsx         # Floating action button
-│   │   ├── GarageBadge.tsx # Brand color badge
-│   │   ├── GarageCard.tsx  # Garage community card
-│   │   ├── Input.tsx       # Text input with icons
-│   │   ├── MessageBubble.tsx # Chat message bubble
-│   │   ├── NoteCard.tsx    # Vehicle note card
-│   │   ├── ProductCard.tsx # Marketplace product card
-│   │   ├── SegmentedControl.tsx # Tab segment control
-│   │   ├── ThemedText.tsx  # Themed typography
-│   │   ├── ThemedView.tsx  # Themed container
-│   │   └── VehicleCard.tsx # Vehicle list card
-│   ├── constants/          # App constants
-│   │   ├── brand.ts        # TorqueShed branding, themes, copy
-│   │   ├── theme.ts        # Colors, spacing, typography
-│   │   ├── garages.ts      # Garage data and sample messages
-│   │   ├── vehicles.ts     # Vehicle data structures
-│   │   └── products.ts     # Product data structures
-│   ├── hooks/              # Custom React hooks
-│   │   ├── useTheme.ts     # Theme hook
-│   │   ├── useScreenOptions.ts # Navigation options
-│   │   ├── useColorScheme.ts # System color scheme
-│   │   ├── useWebSocket.ts # WebSocket connection for realtime chat
-│   │   └── useChat.ts      # Chat state management with WebSocket
-│   ├── navigation/         # React Navigation setup
-│   │   ├── RootStackNavigator.tsx  # Root stack with modals
-│   │   ├── MainTabNavigator.tsx    # Bottom tab navigator
-│   │   ├── GaragesStackNavigator.tsx # Community stack
-│   │   ├── NotesStackNavigator.tsx   # Vehicle notes stack
-│   │   ├── PartsStackNavigator.tsx   # Parts finder stack
-│   │   ├── SwapShopStackNavigator.tsx # P2P marketplace stack
-│   │   ├── TrendingStackNavigator.tsx # Curated products stack
-│   │   └── ProfileStackNavigator.tsx
-│   ├── screens/            # App screens
-│   │   ├── GaragesScreen.tsx       # Brand garage list
-│   │   ├── GarageDetailScreen.tsx  # Chat + Forums
-│   │   ├── NotesScreen.tsx         # Vehicle list
-│   │   ├── VehicleDetailScreen.tsx # Vehicle notes
-│   │   ├── AddVehicleScreen.tsx    # Add vehicle modal
-│   │   ├── AddNoteScreen.tsx       # Add note modal
-│   │   ├── PartsScreen.tsx         # Parts search (VIN/YMM)
-│   │   ├── SwapShopScreen.tsx      # P2P marketplace
-│   │   ├── TrendingScreen.tsx      # Curated products
-│   │   ├── SubmitProductScreen.tsx # Vendor submission
-│   │   └── ProfileScreen.tsx       # User profile
-│   └── lib/                # Utilities
-│       └── query-client.ts # React Query setup
-├── server/                 # Express backend
-│   ├── index.ts           # Server entry point
-│   ├── routes.ts          # API routes
-│   └── templates/         # HTML templates
-├── packages/              # Shared packages (reference only)
-│   └── shared/            # Brand tokens, themes, UI primitives
-├── assets/                # Static assets
-│   └── images/            # App icons and illustrations
-├── docs/                  # Documentation
-│   └── MVP_PRD.md         # Product requirements document
-├── app.json               # Expo configuration
-└── design_guidelines.md   # UI/UX design specifications
-```
-
-## Navigation Structure
-
-```
-RootStackNavigator
-├── MainTabNavigator
-│   ├── GaragesTab → GaragesScreen (Bays - brand communities)
-│   ├── SwapShopTab → SwapShopScreen (P2P marketplace)
-│   ├── NotesTab → NotesScreen (Vehicle tracking)
-│   ├── PartsTab → PartsScreen (TorqueAssist - parts lookup)
-│   └── TrendingTab → TrendingScreen (Tool & Gear)
-├── GarageDetail (Chat + Threads)
-├── VehicleDetail (Notes list)
-├── AddVehicle (Modal)
-├── AddNote (Modal)
-├── SubmitProduct (Modal)
-└── Profile (User settings)
-```
-
-## Design System
-
-### Brand Identity
-- **Name**: TorqueShed
-- **Tagline**: "The Garage for Real People"
-- **Legal**: TorqueShed, LLC
-
-### Colors
-- **Primary**: #FF6B35 (Racing Orange)
-- **Secondary**: #0D0F12 (Industrial Black / neutral-950)
-- **Accent**: #F59E0B (Caution Yellow)
-- **Bay Brand Colors**:
-  - Ford: #003478 (Ford Blue)
-  - Dodge: #C8102E (Dodge Red)
-  - Chevy: #F2A900 (Chevy Gold)
-  - Jeep: #006341 (Jeep Green)
-  - General: #6B6B6B (General Gray)
-  - Swap Shop: #FF6B35 (Primary Orange)
-
-### Typography
-- **Headings**: Montserrat (Bold/SemiBold)
-- **Body**: Inter (Regular/Medium)
-
-### Components
-- Cards with 1px border and subtle shadow
-- Animated press feedback on all interactive elements
-- FAB for primary actions
-- Segmented control for mode switching
-
-## Key Features
-
-### MVP (Current)
-1. **Bays**: Browse brand-specific bays (Ford, Dodge, Chevy, Jeep, General, Swap Shop)
-2. **Realtime Chat**: Message other enthusiasts in bay chatrooms
-3. **Threads**: Create and reply to discussion threads within bays
-4. **Notes**: Track your vehicles with VIN or Y/M/M, document maintenance
-5. **Vehicle Notes**: Document maintenance and modifications
-6. **TorqueAssist**: Vehicle-aware diagnostic and parts assistant with structured guidance
-7. **Swap Shop**: P2P marketplace for buying/selling/trading parts
-8. **Tool & Gear**: Browse curated automotive tools and gear
-9. **Vendor Submission**: Submit products for admin approval
-
-### Post-MVP
-- Real VIN decoding API integration
-- AI-powered part recommendations
-- Push notifications
-- Image attachments
-- OAuth login (Apple/Google)
-- Full moderation dashboard
-
-## Development
-
-### Running the App
-The app runs via two workflows:
-- **Start Backend**: Express server on port 5000
-- **Start Frontend**: Expo dev server on port 8081
-
-### Testing on Device
-1. Install Expo Go on your phone
-2. Scan the QR code from the Replit URL bar
-3. App loads directly in Expo Go
-
-### Adding Features
-1. Create screen in `client/screens/`
-2. Add to appropriate stack navigator
-3. Update type definitions in navigator file
-4. Follow existing component patterns
-5. Use brand constants from `client/constants/brand.ts`
-
-## API Routes (Backend)
-
-Currently the backend serves:
-- Static Expo manifests for mobile builds
-- Landing page at root URL
-- API routes under `/api/*`
-- WebSocket at `/ws/chat` for realtime chat
-
-### REST Endpoints
-- `GET /api/garages` - List all garage communities with active user count
-- `GET /api/garages/:id` - Get specific garage details
-- `GET /api/garages/:id/messages` - Get chat messages with pagination (?limit=50&before=msgId), includes user credibility (focusAreas, yearsWrenching)
-- `POST /api/garages/:id/messages` - Send a new message (body: userId, content)
-- `GET /api/users/:id/profile` - Get public user profile (excludes password)
-- `PATCH /api/users/:id/profile` - Update user profile (body: bio, location, focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation)
-- `POST /api/reports` - Submit a content report (body: reporterId, reportedUserId, contentType, contentId, reason, details)
-- `POST /api/torque-assist` - Get diagnostic guidance and parts suggestions
-
-### TorqueAssist API
-
-**Request:**
-```json
-{
-  "vehicle": {
-    "type": "vin" | "ymm",
-    "vin": "1FTEW1EP7KFC12345",  // if type=vin
-    "year": 2020,                // if type=ymm
-    "make": "Ford",              // if type=ymm
-    "model": "F-150"             // if type=ymm
-  },
-  "issue": "brakes squeaking when stopping"
-}
-```
-
-**Response:**
-```json
-{
-  "vehicle": { "year": 2020, "make": "Ford", "model": "F-150", "trim": null, "engine": "V8 5.0L", "transmission": "Automatic", "drivetrain": "4WD" },
-  "normalizedIssue": "Brake System Issue",
-  "likelyCauses": [{ "cause": "Worn brake pads", "probability": "high", "explanation": "..." }],
-  "recommendedChecks": [{ "step": 1, "action": "Visually inspect brake pads", "tools": ["Flashlight"], "difficulty": "beginner" }],
-  "torqueSpecs": [{ "component": "Caliper bracket bolts", "spec": "85-95 ft-lbs", "notes": "Use thread locker" }],
-  "suggestedParts": [{ "name": "Brake pad set (front)", "category": "Brakes", "priority": "high", "estimatedCost": "$30-80" }],
-  "purchaseLinks": [{ "provider": "RockAuto", "url": "https://www.rockauto.com", "type": "aftermarket" }],
-  "purchaseOptions": [
-    { "vendorName": "RockAuto", "priceRange": "$30-45", "affiliateUrl": "https://...", "disclosureFlag": true, "partName": "Brake pad set (front)", "type": "aftermarket" },
-    { "vendorName": "AutoZone", "priceRange": "$40-60", "affiliateUrl": null, "disclosureFlag": false, "partName": "Brake pad set (front)", "type": "aftermarket" }
-  ],
-  "confidenceNote": "common_issue",
-  "disclaimer": "This guidance is based on common brake system issues..."
-}
-```
-
-**Rate Limiting:** 10 requests per minute per client
-**Caching:** 5 minute TTL for identical requests
-
-### WebSocket Events (ws/chat)
-- `join_garage` - Join a garage chatroom
-- `leave_garage` - Leave a garage chatroom
-- `send_message` - Send a message to the garage
-- `typing` - Broadcast typing indicator
-- Incoming: `new_message`, `user_joined`, `user_left`, `user_typing`
-
-See `docs/MVP_PRD.md` for complete API specification.
-
-## Database Schema (PostgreSQL + Drizzle ORM)
-- **users** - User accounts with username, password, avatar, bio, location, and credibility fields (focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation)
-- **garages** - Garage communities (ford, dodge, chevy, jeep, general, swap-shop)
-- **garage_members** - User-garage membership (many-to-many)
-- **chat_messages** - Realtime chat messages with soft delete
-- **vehicles** - User vehicles with VIN or Y/M/M
-- **vehicle_notes** - Maintenance and modification notes
-- **reports** - Content moderation reports
-
-### User Credibility Fields
-- **focusAreas** (JSON array): Up to 10 predefined areas - Engine, Electrical, Suspension, Diesel, Tuning, Fabrication, Diagnostics, HVAC, Brakes, Drivetrain
-- **vehiclesWorkedOn** (text): Free text describing vehicles user has experience with
-- **yearsWrenching** (integer): Years of automotive experience (0-100)
-- **shopAffiliation** (varchar 200): Shop or brand affiliation if any
-
-## Monetization Ethics (TorqueAssist)
-- **Disclosure First**: All affiliate links display "Ad" badge and disclosure microcopy ("Links may earn TorqueShed a small commission")
-- **Multiple Vendors**: Always show 3+ vendor options per part, mixing affiliate and non-affiliate sources
-- **Relevance Over Payout**: Never sort by commission rate - sort by relevance to user's vehicle and issue
-- **No Auto-Redirect**: Links never auto-redirect; user must explicitly tap to visit vendor
-- **Transparency**: Non-affiliate vendors shown alongside affiliate ones; users see direct search options too
-- **User Trust**: Purchase options are helpful suggestions, not pressure to buy
-
-## Recent Changes
-- Rebranded from "GearHead" to "TorqueShed"
-- Created comprehensive brand system in `client/constants/brand.ts`
-- New 5-tab navigation: Bays, Swap Shop, Notes, TorqueAssist, Tool & Gear
-- All screens use local brand imports (no monorepo shared package)
-- Complete PRD with database schema and event flows
-- Dark theme with Racing Orange (#FF6B35) primary color
-- Added PostgreSQL database with Drizzle ORM schema
-- Implemented WebSocket server for realtime chat
-- Created useWebSocket and useChat hooks for mobile client
-- Added ReportModal component for content reporting
-- Added profanity filter stub (client/lib/profanity-filter.ts)
-- **Terminology update**: Garages → Bays, Parts Finder → TorqueAssist, Trending → Tool & Gear, Forums → Threads
-- **TorqueAssist MVP**: Full vehicle-aware diagnostic assistant with structured JSON responses, rate limiting, caching, and "Ask the Bay" integration
-- **User Profile Credibility**: Added profile fields for expertise (focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation) with editable UI
-- **Credibility Signals in Chat**: MessageBubble displays user expertise (years wrenching, focus areas) next to usernames for credibility context
-- **Bay Activity Signals**: Added online count per Bay with green dot indicator, hot threads badge with zap icon
-- **Hot Threads Section**: Threads tab now shows "Hot Threads" section with top 3 threads by score (replies + recency)
-- **Thread Visual Distinctions**: New threads show orange left border + "New" badge; solved threads show green "Solved" badge with checkmark
+TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers. It offers features like chatrooms, forums, vehicle tracking, parts finding, and a curated marketplace. The platform's vision is to be "The Garage for Real People," fostering a strong community around automotive interests. Key capabilities include brand-specific communities ("Bays"), real-time chat, discussion threads, vehicle maintenance tracking ("Notes"), a diagnostic and parts assistant ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), and a curated section for tools and gear ("Tool & Gear").
 
 ## User Preferences
 - Bold, industrial design aesthetic
@@ -279,3 +9,36 @@ See `docs/MVP_PRD.md` for complete API specification.
 - No emojis in the app
 - Mobile-first with iOS 26 liquid glass inspiration
 - Dark theme by default (neutral-950 background)
+
+## System Architecture
+
+### UI/UX Design
+The platform features a custom component system with an automotive-themed design. The brand identity is "TorqueShed" with "The Garage for Real People" as its tagline. The primary color is Racing Orange (#FF6B35), with Industrial Black (#0D0F12) as a secondary and Caution Yellow (#F59E0B) as an accent. Bay-specific brand colors are used for major automotive brands. Typography uses Montserrat for headings and Inter for body text. UI components include cards with subtle shadows, animated press feedback, Floating Action Buttons (FABs), and segmented controls.
+
+### Technical Implementation
+The platform uses a mobile-first approach with a React Native + Expo frontend written in TypeScript. The backend is an Express.js server, also in TypeScript, and data is stored in a PostgreSQL database.
+
+**Key Features:**
+- **Bays**: Brand-specific community chatrooms (Ford, Dodge, Chevy, Jeep, General) and a dedicated Swap Shop Bay.
+- **Realtime Chat & Threads**: Live chat communication and discussion threads within Bays. Messages display user credibility signals (years wrenching, focus areas).
+- **Notes**: Vehicle tracking with VIN/YMM, allowing users to document maintenance and modifications.
+- **TorqueAssist**: A vehicle-aware diagnostic and parts assistant providing structured guidance, likely causes, recommended checks, torque specs, and suggested parts. It includes ethical monetization practices with transparent affiliate links.
+- **Swap Shop**: A peer-to-peer marketplace for buying, selling, and trading automotive parts.
+- **Tool & Gear**: A curated marketplace for automotive tools and gear, with a vendor submission process for admin approval.
+- **User Profiles**: Detailed profiles with credibility fields such as `focusAreas`, `vehiclesWorkedOn`, `yearsWrenching`, and `shopAffiliation`.
+- **Content Moderation**: Reporting system for inappropriate content.
+
+### System Design Choices
+- **Navigation**: Utilizes React Navigation with a `RootStackNavigator` encompassing a `MainTabNavigator` (Garages, SwapShop, Notes, Parts, Trending) and various modal screens for adding vehicles, notes, submitting products, and user profiles.
+- **Data Management**: React Query is used for client-side data fetching and caching. WebSocket at `/ws/chat` for real-time communication.
+- **Database Schema**: PostgreSQL with Drizzle ORM managing users, garages, garage members, chat messages, vehicles, vehicle notes, and reports. User credibility fields are stored in the `users` table.
+- **API**: A RESTful API under `/api/*` for managing garages, messages, user profiles, reports, TorqueAssist queries, and products. Rate limiting (10 requests/min/client) and caching (5 min TTL) are implemented for TorqueAssist.
+- **Monetization Ethics**: TorqueAssist features ethical monetization with transparent disclosure of affiliate links, offering multiple vendors (mixing affiliate and non-affiliate), prioritizing relevance over commission, and requiring explicit user action for external links.
+- **Tool & Gear Monetization**: Curated product discovery with `whyItMatters` context boxes, sponsored product badges (yellow "Sponsored" in top-left), "View Deal" CTAs, admin-only CRUD via x-admin-user-id header authentication. Products table includes: title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved.
+
+## External Dependencies
+- **React Native + Expo**: For mobile application development.
+- **Express.js**: For the backend server.
+- **PostgreSQL**: As the primary database.
+- **Drizzle ORM**: For interacting with the PostgreSQL database.
+- **WebSockets**: For real-time chat functionality.
