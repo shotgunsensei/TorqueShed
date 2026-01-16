@@ -38,7 +38,9 @@ TorqueShed (formerly GearHead) is a mobile-first automotive community platform c
 │   ├── hooks/              # Custom React hooks
 │   │   ├── useTheme.ts     # Theme hook
 │   │   ├── useScreenOptions.ts # Navigation options
-│   │   └── useColorScheme.ts # System color scheme
+│   │   ├── useColorScheme.ts # System color scheme
+│   │   ├── useWebSocket.ts # WebSocket connection for realtime chat
+│   │   └── useChat.ts      # Chat state management with WebSocket
 │   ├── navigation/         # React Navigation setup
 │   │   ├── RootStackNavigator.tsx  # Root stack with modals
 │   │   ├── MainTabNavigator.tsx    # Bottom tab navigator
@@ -169,8 +171,32 @@ Currently the backend serves:
 - Static Expo manifests for mobile builds
 - Landing page at root URL
 - API routes under `/api/*`
+- WebSocket at `/ws/chat` for realtime chat
+
+### REST Endpoints
+- `GET /api/garages` - List all garage communities with active user count
+- `GET /api/garages/:id` - Get specific garage details
+- `GET /api/garages/:id/messages` - Get chat messages with pagination (?limit=50&before=msgId)
+- `POST /api/garages/:id/messages` - Send a new message (body: userId, content)
+- `POST /api/reports` - Submit a content report (body: reporterId, reportedUserId, contentType, contentId, reason, details)
+
+### WebSocket Events (ws/chat)
+- `join_garage` - Join a garage chatroom
+- `leave_garage` - Leave a garage chatroom
+- `send_message` - Send a message to the garage
+- `typing` - Broadcast typing indicator
+- Incoming: `new_message`, `user_joined`, `user_left`, `user_typing`
 
 See `docs/MVP_PRD.md` for complete API specification.
+
+## Database Schema (PostgreSQL + Drizzle ORM)
+- **users** - User accounts with username, password, avatar, bio, location
+- **garages** - Garage communities (ford, dodge, chevy, jeep, general, swap-shop)
+- **garage_members** - User-garage membership (many-to-many)
+- **chat_messages** - Realtime chat messages with soft delete
+- **vehicles** - User vehicles with VIN or Y/M/M
+- **vehicle_notes** - Maintenance and modification notes
+- **reports** - Content moderation reports
 
 ## Recent Changes
 - Rebranded from "GearHead" to "TorqueShed"
@@ -179,6 +205,11 @@ See `docs/MVP_PRD.md` for complete API specification.
 - All screens use local brand imports (no monorepo shared package)
 - Complete PRD with database schema and event flows
 - Dark theme with Racing Orange (#FF6B35) primary color
+- Added PostgreSQL database with Drizzle ORM schema
+- Implemented WebSocket server for realtime chat
+- Created useWebSocket and useChat hooks for mobile client
+- Added ReportModal component for content reporting
+- Added profanity filter stub (client/lib/profanity-filter.ts)
 
 ## User Preferences
 - Bold, industrial design aesthetic
