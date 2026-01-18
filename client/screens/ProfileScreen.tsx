@@ -42,8 +42,6 @@ interface UserProfile {
   createdAt: string;
 }
 
-const MOCK_USER_ID = "demo-user-123";
-
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -58,30 +56,8 @@ export default function ProfileScreen() {
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<FocusArea[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const { data: profile, isLoading } = useQuery<UserProfile>({
-    queryKey: ["/api/users", MOCK_USER_ID, "profile"],
-    queryFn: async () => {
-      const url = new URL(`/api/users/${MOCK_USER_ID}/profile`, getApiUrl());
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        if (response.status === 404) {
-          return {
-            id: MOCK_USER_ID,
-            username: "TorqueShed User",
-            avatarUrl: null,
-            bio: null,
-            location: null,
-            focusAreas: [],
-            vehiclesWorkedOn: null,
-            yearsWrenching: null,
-            shopAffiliation: null,
-            createdAt: new Date().toISOString(),
-          };
-        }
-        throw new Error("Failed to fetch profile");
-      }
-      return response.json();
-    },
+  const { data: profile, isLoading, error } = useQuery<UserProfile>({
+    queryKey: ["/api/users/me/profile"],
   });
 
   useEffect(() => {
@@ -97,10 +73,10 @@ export default function ProfileScreen() {
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<UserProfile>) => {
-      return apiRequest("PATCH", `/api/users/${MOCK_USER_ID}/profile`, updates);
+      return apiRequest("PATCH", "/api/users/me/profile", updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users", MOCK_USER_ID, "profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me/profile"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setHasChanges(false);
     },

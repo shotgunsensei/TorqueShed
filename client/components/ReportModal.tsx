@@ -42,7 +42,6 @@ export function ReportModal({
   const reportMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/reports", {
-        reporterId: null,
         reportedUserId,
         contentType,
         contentId,
