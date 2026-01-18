@@ -464,7 +464,7 @@ async function buildWebVersion(domain) {
       NODE_ENV: "production",
     };
     
-    const webBuildProcess = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web"], {
+    const webBuildProcess = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web", "--base-url", "/app"], {
       stdio: ["ignore", "pipe", "pipe"],
       env,
     });
