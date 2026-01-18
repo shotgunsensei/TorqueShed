@@ -172,6 +172,24 @@ function configureExpoAndLanding(app: express.Application) {
 
   log("Serving static Expo files with dynamic manifest routing");
 
+  // Serve web app at /app route
+  const webIndexPath = path.resolve(process.cwd(), "static-build", "web", "index.html");
+  
+  app.get("/app", (req: Request, res: Response) => {
+    if (fs.existsSync(webIndexPath)) {
+      return res.sendFile(webIndexPath);
+    }
+    // Fallback: redirect to Expo web dev server in development
+    const devDomain = process.env.REPLIT_DEV_DOMAIN;
+    if (devDomain) {
+      return res.redirect(`https://${devDomain}:8081`);
+    }
+    res.status(503).send("Web app not available. Please try again later.");
+  });
+  
+  // Serve web app static assets
+  app.use("/app", express.static(path.resolve(process.cwd(), "static-build", "web")));
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) {
       return next();
