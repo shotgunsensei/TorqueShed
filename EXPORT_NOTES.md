@@ -30,8 +30,7 @@ These are required to run the project:
 ### Core Source Code
 - `client/` - React Native/Expo frontend code
 - `server/` - Express.js backend code
-- `shared/` - Shared types and schemas
-- `packages/` - Monorepo shared packages
+- `shared/` - Server-only shared code (Drizzle schema, TorqueAssist types)
 - `scripts/` - Build scripts
 
 ### Configuration
@@ -60,7 +59,7 @@ These are required to run the project:
 
 Before exporting or deploying, verify:
 
-- [ ] All source code is committed (client/, server/, shared/, packages/)
+- [ ] All source code is committed (client/, server/, shared/)
 - [ ] package.json and package-lock.json are included
 - [ ] Configuration files are included (tsconfig.json, app.json, etc.)
 - [ ] Assets folder is included

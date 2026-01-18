@@ -37,6 +37,24 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - **Monetization Ethics**: TorqueAssist features ethical monetization with transparent disclosure of affiliate links, offering multiple vendors (mixing affiliate and non-affiliate), prioritizing relevance over commission, and requiring explicit user action for external links.
 - **Tool & Gear Monetization**: Curated product discovery with `whyItMatters` context boxes, sponsored product badges (yellow "Sponsored" in top-left), "View Deal" CTAs, admin-only CRUD via x-admin-user-id header authentication. Products table includes: title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved.
 
+## Project Structure
+
+### Folder Layout
+- `client/` - React Native + Expo frontend (TypeScript)
+- `server/` - Express.js backend (TypeScript)
+- `shared/` - Server-only shared code (Drizzle schema, TorqueAssist types)
+- `assets/` - Static assets (images, fonts)
+- `scripts/` - Build scripts
+
+### Path Aliases
+- `@/*` → `./client/*` (frontend imports)
+- `@shared/*` → `./shared/*` (server-only, NOT for client use)
+
+### Important Notes
+- The `shared/` folder contains Drizzle ORM schema and is server-only
+- Client types are defined locally in `client/` (e.g., `client/hooks/useWebSocket.ts`, `client/constants/products.ts`)
+- Do not import from `@shared/*` in client code
+
 ## External Dependencies
 - **React Native + Expo**: For mobile application development.
 - **Express.js**: For the backend server.
