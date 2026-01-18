@@ -47,8 +47,7 @@ These are required to run the project:
 - `design_guidelines.md` - Design system documentation
 
 ### Database
-- `shared/schema.ts` - Drizzle ORM schema (migrations auto-generated)
-- `supabase/` - Supabase configuration (if using Supabase)
+- `shared/schema.ts` - Drizzle ORM schema (migrations auto-generated via `npm run db:push`)
 
 ### Documentation
 - `replit.md` - Project documentation
@@ -76,13 +75,21 @@ Before exporting or deploying, verify:
 The following environment variables must be set in your deployment environment:
 
 - `DATABASE_URL` - PostgreSQL connection string
+- `APP_JWT_SECRET` - JWT signing/verification key for authentication
 - `SESSION_SECRET` - Session encryption key
-- `SUPABASE_JWT_SECRET` - Supabase JWT verification key
 - `NODE_ENV` - Set to "production" for deployments
 - `PORT` - Server port (defaults to 5000)
 
 Optional:
 - `REDIS_URL` - For distributed rate limiting (multi-instance deployments)
+
+## Authentication
+
+This project uses a custom JWT-based authentication system:
+- Tokens are signed with `APP_JWT_SECRET` using HS256 algorithm
+- Tokens expire after 7 days
+- WebSocket connections require a valid JWT token in the query string
+- Protected API routes use the `requireAuth` middleware
 
 ## Build Commands
 
