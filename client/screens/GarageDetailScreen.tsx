@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useChat } from "@/hooks/useChat";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
 import { placeholders, microcopy } from "@/constants/brand";
@@ -34,6 +35,7 @@ export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { isDesktop } = useResponsive();
   const route = useRoute<RoutePropType>();
   const { garageId } = route.params;
 
@@ -195,6 +197,12 @@ export default function GarageDetailScreen() {
     );
   };
 
+  const desktopContentStyle = isDesktop ? {
+    maxWidth: 800,
+    alignSelf: "center" as const,
+    width: "100%" as const,
+  } : {};
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
@@ -202,7 +210,11 @@ export default function GarageDetailScreen() {
       keyboardVerticalOffset={0}
     >
       <View
-        style={[styles.segmentContainer, { paddingTop: headerHeight + Spacing.md }]}
+        style={[
+          styles.segmentContainer,
+          { paddingTop: isDesktop ? Spacing.xl : headerHeight + Spacing.md },
+          desktopContentStyle,
+        ]}
       >
         <SegmentedControl
           segments={["Chat", "Threads"]}
@@ -220,7 +232,7 @@ export default function GarageDetailScreen() {
       </View>
 
       {selectedIndex === 0 ? (
-        <>
+        <View style={[styles.chatWrapper, desktopContentStyle]}>
           <FlatList
             style={styles.chatList}
             contentContainerStyle={[
@@ -280,41 +292,43 @@ export default function GarageDetailScreen() {
               />
             </Pressable>
           </View>
-        </>
+        </View>
       ) : (
-        <FlatList
-          style={styles.threadList}
-          contentContainerStyle={[
-            styles.threadContent,
-            { paddingBottom: insets.bottom + Spacing.xl },
-            threads.length === 0 ? styles.emptyContent : null,
-          ]}
-          data={threads}
-          renderItem={renderThread}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={renderEmptyThreads}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            hotThreads.length > 0 ? (
-              <View style={styles.hotSection}>
-                <View style={styles.hotSectionHeader}>
-                  <Feather name="zap" size={16} color={theme.primary} />
-                  <ThemedText type="h4" style={{ color: theme.primary }}>
-                    {microcopy.hotThreads}
+        <View style={[styles.chatWrapper, desktopContentStyle]}>
+          <FlatList
+            style={styles.threadList}
+            contentContainerStyle={[
+              styles.threadContent,
+              { paddingBottom: insets.bottom + Spacing.xl },
+              threads.length === 0 ? styles.emptyContent : null,
+            ]}
+            data={threads}
+            renderItem={renderThread}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={renderEmptyThreads}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              hotThreads.length > 0 ? (
+                <View style={styles.hotSection}>
+                  <View style={styles.hotSectionHeader}>
+                    <Feather name="zap" size={16} color={theme.primary} />
+                    <ThemedText type="h4" style={{ color: theme.primary }}>
+                      {microcopy.hotThreads}
+                    </ThemedText>
+                  </View>
+                  {hotThreads.map((thread) => (
+                    <View key={`hot-${thread.id}`}>
+                      {renderThread({ item: thread, isHot: true })}
+                    </View>
+                  ))}
+                  <ThemedText type="h4" style={styles.allThreadsHeader}>
+                    All Threads
                   </ThemedText>
                 </View>
-                {hotThreads.map((thread) => (
-                  <View key={`hot-${thread.id}`}>
-                    {renderThread({ item: thread, isHot: true })}
-                  </View>
-                ))}
-                <ThemedText type="h4" style={styles.allThreadsHeader}>
-                  All Threads
-                </ThemedText>
-              </View>
-            ) : null
-          }
-        />
+              ) : null
+            }
+          />
+        </View>
       )}
     </KeyboardAvoidingView>
   );
@@ -322,6 +336,9 @@ export default function GarageDetailScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  chatWrapper: {
     flex: 1,
   },
   segmentContainer: {
