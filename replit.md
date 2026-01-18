@@ -29,7 +29,8 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - **Content Moderation**: Reporting system for inappropriate content.
 
 ### System Design Choices
-- **Navigation**: Utilizes React Navigation with a `RootStackNavigator` encompassing a `MainTabNavigator` (Garages, SwapShop, Notes, Parts, Trending) and various modal screens for adding vehicles, notes, submitting products, and user profiles.
+- **Responsive Web Layout**: The app supports both mobile and desktop viewports. On desktop (width >= 1024px), a sidebar navigation replaces bottom tabs. Screens use responsive grid layouts (1 column on mobile, 2-3 columns on tablet, 3-4 columns on desktop). The `useResponsive` hook provides breakpoint detection.
+- **Navigation**: Utilizes React Navigation with a `RootStackNavigator` encompassing a `ResponsiveNavigator` that switches between bottom tabs (mobile) and sidebar navigation (desktop). Modal screens for adding vehicles, notes, submitting products, and user profiles.
 - **Data Management**: React Query is used for client-side data fetching and caching. WebSocket at `/ws/chat` for real-time communication.
 - **Database Schema**: PostgreSQL with Drizzle ORM managing users, garages, garage members, chat messages, vehicles, vehicle notes, and reports. User credibility fields are stored in the `users` table.
 - **API**: A RESTful API under `/api/*` for managing garages, messages, user profiles, reports, TorqueAssist queries, and products. Rate limiting (10 requests/min/client) and caching (5 min TTL) are implemented for TorqueAssist.
