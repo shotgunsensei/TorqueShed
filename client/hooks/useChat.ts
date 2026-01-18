@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket, type ChatMessage } from "./useWebSocket";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UseChatOptions {
   garageId: string;
-  userId: string;
-  userName: string;
 }
 
-export function useChat({ garageId, userId, userName }: UseChatOptions) {
+export function useChat({ garageId }: UseChatOptions) {
   const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
 
@@ -34,7 +34,7 @@ export function useChat({ garageId, userId, userName }: UseChatOptions) {
   }, []);
 
   const handleUserTyping = useCallback((typingUserId: string, typingUserName: string) => {
-    if (typingUserId === userId) return;
+    if (currentUser && typingUserId === currentUser.id) return;
     
     setTypingUsers((prev) => {
       const next = new Map(prev);
@@ -49,12 +49,10 @@ export function useChat({ garageId, userId, userName }: UseChatOptions) {
         return next;
       });
     }, 3000);
-  }, [userId]);
+  }, [currentUser]);
 
   const { status, sendMessage: wsSendMessage, sendTyping } = useWebSocket({
     garageId,
-    userId,
-    userName,
     onMessage: handleNewMessage,
     onTyping: handleUserTyping,
   });

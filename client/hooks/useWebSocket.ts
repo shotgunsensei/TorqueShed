@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { getApiUrl } from "@/lib/query-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface ChatMessage {
   id: string;
@@ -16,12 +17,10 @@ interface WSMessage {
   payload: unknown;
 }
 
-type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error" | "unauthenticated";
 
 interface UseWebSocketOptions {
   garageId: string;
-  userId: string;
-  userName: string;
   onMessage?: (message: ChatMessage) => void;
   onUserJoined?: (userId: string, userName: string) => void;
   onUserLeft?: (userId: string, userName: string) => void;
@@ -29,17 +28,23 @@ interface UseWebSocketOptions {
 }
 
 export function useWebSocket(options: UseWebSocketOptions) {
-  const { garageId, userId, userName, onMessage, onUserJoined, onUserLeft, onTyping } = options;
+  const { garageId, onMessage, onUserJoined, onUserLeft, onTyping } = options;
+  const { accessToken, isAuthenticated } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
+    if (!isAuthenticated || !accessToken) {
+      setStatus("unauthenticated");
+      return;
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
       const baseUrl = getApiUrl();
-      const wsUrl = baseUrl.replace(/^https?:\/\//, "wss://") + "ws/chat";
+      const wsUrl = baseUrl.replace(/^https?:\/\//, "wss://") + `ws/chat?token=${encodeURIComponent(accessToken)}`;
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -47,10 +52,6 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
       ws.onopen = () => {
         setStatus("connected");
-        ws.send(JSON.stringify({
-          type: "join_garage",
-          payload: { garageId, userId, userName },
-        }));
       };
 
       ws.onmessage = (event) => {
@@ -58,6 +59,12 @@ export function useWebSocket(options: UseWebSocketOptions) {
           const message: WSMessage = JSON.parse(event.data);
           
           switch (message.type) {
+            case "authenticated":
+              ws.send(JSON.stringify({
+                type: "join_garage",
+                payload: { garageId },
+              }));
+              break;
             case "new_message":
               onMessage?.(message.payload as ChatMessage);
               break;
@@ -73,15 +80,20 @@ export function useWebSocket(options: UseWebSocketOptions) {
               const typingPayload = message.payload as { userId: string; userName: string };
               onTyping?.(typingPayload.userId, typingPayload.userName);
               break;
+            case "error":
+              console.error("WebSocket error from server:", message.payload);
+              break;
           }
         } catch (error) {
           console.error("Failed to parse WebSocket message:", error);
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setStatus("disconnected");
-        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        if (event.code !== 4001 && isAuthenticated) {
+          reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        }
       };
 
       ws.onerror = () => {
@@ -91,7 +103,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
       console.error("WebSocket connection error:", error);
       setStatus("error");
     }
-  }, [garageId, userId, userName, onMessage, onUserJoined, onUserLeft, onTyping]);
+  }, [garageId, accessToken, isAuthenticated, onMessage, onUserJoined, onUserLeft, onTyping]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -108,10 +120,10 @@ export function useWebSocket(options: UseWebSocketOptions) {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: "send_message",
-        payload: { garageId, userId, content },
+        payload: { garageId, content },
       }));
     }
-  }, [garageId, userId]);
+  }, [garageId]);
 
   const sendTyping = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

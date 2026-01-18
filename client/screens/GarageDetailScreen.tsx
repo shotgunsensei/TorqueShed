@@ -13,6 +13,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useChat } from "@/hooks/useChat";
 import { useResponsive } from "@/hooks/useResponsive";
+import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
 import { placeholders, microcopy } from "@/constants/brand";
@@ -28,14 +29,12 @@ function calculateHotScore(thread: Thread): number {
 
 type RoutePropType = RouteProp<GaragesStackParamList, "GarageDetail">;
 
-const TEMP_USER_ID = "user-" + Math.random().toString(36).substring(2, 9);
-const TEMP_USER_NAME = "Guest" + Math.floor(Math.random() * 1000);
-
 export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { isDesktop } = useResponsive();
+  const { currentUser } = useAuth();
   const route = useRoute<RoutePropType>();
   const { garageId } = route.params;
 
@@ -51,8 +50,6 @@ export default function GarageDetailScreen() {
     sendTyping,
   } = useChat({
     garageId,
-    userId: TEMP_USER_ID,
-    userName: TEMP_USER_NAME,
   });
 
   const allThreads = useMemo(
@@ -88,11 +85,11 @@ export default function GarageDetailScreen() {
       userName: msg.userName || "Unknown",
       message: msg.content,
       timestamp: new Date(msg.createdAt),
-      isOwn: msg.userId === TEMP_USER_ID,
+      isOwn: currentUser ? msg.userId === currentUser.id : false,
       focusAreas: (msg as any).userFocusAreas || [],
       yearsWrenching: (msg as any).userYearsWrenching || null,
     }));
-  }, [messages]);
+  }, [messages, currentUser]);
 
   const renderMessage = useCallback(({ item }: { item: typeof displayMessages[0] }) => (
     <MessageBubble

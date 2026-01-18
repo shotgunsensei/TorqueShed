@@ -1,13 +1,15 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
+import { URL } from "url";
 import { storage } from "./storage";
+import { verifyJWT } from "./middleware/auth";
 import type { ChatMessage } from "@shared/schema";
 
-interface ChatClient {
+interface AuthenticatedClient {
   ws: WebSocket;
-  garageId: string;
   userId: string;
   userName: string;
+  garageId: string | null;
 }
 
 interface WSMessage {
@@ -15,25 +17,58 @@ interface WSMessage {
   payload: unknown;
 }
 
+interface JoinGaragePayload {
+  garageId: string;
+}
+
 interface SendMessagePayload {
   garageId: string;
-  userId: string;
   content: string;
 }
 
-interface JoinGaragePayload {
-  garageId: string;
-  userId: string;
-  userName: string;
-}
-
-const clients: Map<WebSocket, ChatClient> = new Map();
+const clients: Map<WebSocket, AuthenticatedClient> = new Map();
 
 export function setupWebSocket(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: "/ws/chat" });
 
-  wss.on("connection", (ws: WebSocket) => {
-    console.log("WebSocket client connected");
+  wss.on("connection", async (ws: WebSocket, req) => {
+    const url = new URL(req.url || "", `http://${req.headers.host}`);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
+      console.log("WebSocket connection rejected: Missing token");
+      ws.close(4001, "Authentication required");
+      return;
+    }
+
+    const payload = verifyJWT(token);
+    if (!payload) {
+      console.log("WebSocket connection rejected: Invalid token");
+      ws.close(4001, "Invalid or expired token");
+      return;
+    }
+
+    const user = await storage.getUser(payload.sub);
+    if (!user) {
+      console.log("WebSocket connection rejected: User not found");
+      ws.close(4001, "User not found");
+      return;
+    }
+
+    const client: AuthenticatedClient = {
+      ws,
+      userId: user.id,
+      userName: user.username,
+      garageId: null,
+    };
+    clients.set(ws, client);
+
+    console.log(`WebSocket client authenticated: ${user.username} (${user.id})`);
+
+    ws.send(JSON.stringify({ 
+      type: "authenticated", 
+      payload: { userId: user.id, userName: user.username } 
+    }));
 
     ws.on("message", async (data: Buffer) => {
       try {
@@ -46,15 +81,15 @@ export function setupWebSocket(server: Server): WebSocketServer {
     });
 
     ws.on("close", () => {
-      const client = clients.get(ws);
-      if (client) {
-        broadcastToGarage(wss, client.garageId, {
+      const existingClient = clients.get(ws);
+      if (existingClient && existingClient.garageId) {
+        broadcastToGarage(wss, existingClient.garageId, {
           type: "user_left",
-          payload: { userId: client.userId, userName: client.userName },
+          payload: { userId: existingClient.userId, userName: existingClient.userName },
         }, ws);
-        clients.delete(ws);
       }
-      console.log("WebSocket client disconnected");
+      clients.delete(ws);
+      console.log(`WebSocket client disconnected: ${client.userName}`);
     });
 
     ws.on("error", (error: Error) => {
@@ -67,19 +102,28 @@ export function setupWebSocket(server: Server): WebSocketServer {
 }
 
 async function handleMessage(ws: WebSocket, message: WSMessage, wss: WebSocketServer) {
+  const client = clients.get(ws);
+  if (!client) {
+    ws.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+    return;
+  }
+
   switch (message.type) {
     case "join_garage": {
       const payload = message.payload as JoinGaragePayload;
-      clients.set(ws, {
-        ws,
-        garageId: payload.garageId,
-        userId: payload.userId,
-        userName: payload.userName,
-      });
+      
+      if (client.garageId && client.garageId !== payload.garageId) {
+        broadcastToGarage(wss, client.garageId, {
+          type: "user_left",
+          payload: { userId: client.userId, userName: client.userName },
+        }, ws);
+      }
+
+      client.garageId = payload.garageId;
       
       broadcastToGarage(wss, payload.garageId, {
         type: "user_joined",
-        payload: { userId: payload.userId, userName: payload.userName },
+        payload: { userId: client.userId, userName: client.userName },
       }, ws);
       
       ws.send(JSON.stringify({ type: "joined", payload: { garageId: payload.garageId } }));
@@ -87,33 +131,36 @@ async function handleMessage(ws: WebSocket, message: WSMessage, wss: WebSocketSe
     }
 
     case "leave_garage": {
-      const client = clients.get(ws);
-      if (client) {
+      if (client.garageId) {
         broadcastToGarage(wss, client.garageId, {
           type: "user_left",
           payload: { userId: client.userId, userName: client.userName },
         }, ws);
-        clients.delete(ws);
+        client.garageId = null;
       }
       break;
     }
 
     case "send_message": {
       const payload = message.payload as SendMessagePayload;
-      const client = clients.get(ws);
       
-      if (!client || client.garageId !== payload.garageId) {
+      if (!client.garageId) {
+        ws.send(JSON.stringify({ type: "error", payload: { message: "Not in a garage" } }));
+        return;
+      }
+
+      if (client.garageId !== payload.garageId) {
         ws.send(JSON.stringify({ type: "error", payload: { message: "Not in this garage" } }));
         return;
       }
 
       const newMessage = await storage.createChatMessage({
-        garageId: payload.garageId,
-        userId: payload.userId,
+        garageId: client.garageId,
+        userId: client.userId,
         content: payload.content,
       });
 
-      broadcastToGarage(wss, payload.garageId, {
+      broadcastToGarage(wss, client.garageId, {
         type: "new_message",
         payload: newMessage,
       });
@@ -121,8 +168,7 @@ async function handleMessage(ws: WebSocket, message: WSMessage, wss: WebSocketSe
     }
 
     case "typing": {
-      const client = clients.get(ws);
-      if (client) {
+      if (client.garageId) {
         broadcastToGarage(wss, client.garageId, {
           type: "user_typing",
           payload: { userId: client.userId, userName: client.userName },
