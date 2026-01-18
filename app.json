@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "GearHead",
-    "slug": "gearhead",
+    "name": "TorqueShed",
+    "slug": "torqueshed",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "gearhead",
+    "scheme": "torqueshed",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gearhead.app"
+      "bundleIdentifier": "com.torqueshed.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.gearhead.app"
+      "package": "com.torqueshed.app"
     },
     "web": {
       "output": "single",
