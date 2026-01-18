@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
+import { ZodError } from "zod";
 
 const app = express();
 const log = console.log;
@@ -249,19 +250,62 @@ function configureExpoAndLanding(app: express.Application) {
 }
 
 function setupErrorHandler(app: express.Application) {
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    const error = err as {
-      status?: number;
-      statusCode?: number;
-      message?: string;
-    };
+  app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    let status = 500;
+    let message = "Internal Server Error";
 
-    const status = error.status || error.statusCode || 500;
-    const message = error.message || "Internal Server Error";
+    // Handle Zod validation errors
+    if (err instanceof ZodError) {
+      status = 400;
+      const issues = err.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
+      message = `Validation error: ${issues}`;
+    }
+    // Handle errors with status codes
+    else if (err && typeof err === "object") {
+      const errorObj = err as {
+        status?: number;
+        statusCode?: number;
+        code?: string;
+        message?: string;
+      };
 
+      // Check for specific status codes
+      if (errorObj.status) {
+        status = errorObj.status;
+      } else if (errorObj.statusCode) {
+        status = errorObj.statusCode;
+      } else if (errorObj.code === "UNAUTHORIZED") {
+        status = 401;
+      } else if (errorObj.code === "FORBIDDEN") {
+        status = 403;
+      } else if (errorObj.code === "NOT_FOUND") {
+        status = 404;
+      }
+
+      if (errorObj.message) {
+        message = errorObj.message;
+      }
+    }
+    // Handle Error instances
+    else if (err instanceof Error) {
+      message = err.message;
+    }
+
+    // Structured logging
+    console.error(
+      JSON.stringify({
+        type: "error",
+        path: req.path,
+        method: req.method,
+        status,
+        message,
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    // Send response and return (no rethrow)
     res.status(status).json({ message });
-
-    throw err;
+    return;
   });
 }
 
