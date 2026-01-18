@@ -124,12 +124,16 @@ function DesktopNavigator() {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<keyof typeof TAB_SCREENS>("GaragesTab");
 
+  const handleTabPress = (key: string) => {
+    setActiveTab(key as keyof typeof TAB_SCREENS);
+  };
+
   const ActiveScreen = TAB_SCREENS[activeTab];
 
   return (
     <View style={[styles.desktopContainer, { backgroundColor: theme.backgroundRoot }]}>
-      <DesktopSidebar activeTab={activeTab} onTabPress={(key) => setActiveTab(key as keyof typeof TAB_SCREENS)} />
-      <View style={styles.mainContent}>
+      <DesktopSidebar activeTab={activeTab} onTabPress={handleTabPress} />
+      <View style={styles.mainContent} key={activeTab}>
         <ActiveScreen />
       </View>
     </View>

@@ -9,7 +9,6 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 
@@ -101,7 +100,6 @@ export default function GaragesScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
   const headerHeight = useHeaderHeight();
   const { isDesktop, width } = useResponsive();
 
@@ -130,7 +128,7 @@ export default function GaragesScreen() {
           styles.listContent,
           {
             paddingTop: isDesktop ? Spacing.xl : headerHeight + Spacing.lg,
-            paddingBottom: isDesktop ? Spacing.xl : tabBarHeight + Spacing.lg,
+            paddingBottom: isDesktop ? Spacing.xl : insets.bottom + 80 + Spacing.lg,
             maxWidth: isDesktop ? 1200 : undefined,
             alignSelf: isDesktop ? "center" : undefined,
             width: isDesktop ? "100%" : undefined,

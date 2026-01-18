@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
@@ -147,7 +146,7 @@ function ProductCard({ item }: { item: Product }) {
 
 export default function TrendingScreen() {
   const { theme } = useTheme();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const { isDesktop, width } = useResponsive();
 
   const numColumns = isDesktop ? (width >= 1280 ? 4 : 3) : 2;
@@ -175,7 +174,7 @@ export default function TrendingScreen() {
           contentContainerStyle={[
             styles.listContent,
             {
-              paddingBottom: isDesktop ? Spacing.xl : tabBarHeight + Spacing.lg,
+              paddingBottom: isDesktop ? Spacing.xl : insets.bottom + 80 + Spacing.lg,
               maxWidth: isDesktop ? 1400 : undefined,
               alignSelf: isDesktop ? "center" : undefined,
               width: isDesktop ? "100%" : undefined,
