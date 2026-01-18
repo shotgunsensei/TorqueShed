@@ -32,6 +32,7 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +42,36 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Build outputs
+build/
+server_dist/
+static-build/
+
+# Logs
+*.log
+logs/
+
+# Replit / Editor / Runtime state
+.git/
+.config/
+.local/
+.cache/
+.replit
+replit.nix
+.upm/
+.pythonlibs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
