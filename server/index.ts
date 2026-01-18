@@ -1,5 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import { v4 as uuidv4 } from "uuid";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
@@ -7,6 +9,35 @@ import { ZodError } from "zod";
 
 const app = express();
 const log = console.log;
+
+// Server start time for uptime calculation
+const SERVER_START_TIME = Date.now();
+
+// Commit hash for health checks (set via env or read from .git)
+const COMMIT_HASH = process.env.COMMIT_HASH || getCommitHash();
+
+function getCommitHash(): string {
+  try {
+    const headPath = path.resolve(process.cwd(), ".git", "HEAD");
+    const head = fs.readFileSync(headPath, "utf-8").trim();
+    if (head.startsWith("ref: ")) {
+      const refPath = path.resolve(process.cwd(), ".git", head.slice(5));
+      return fs.readFileSync(refPath, "utf-8").trim().slice(0, 7);
+    }
+    return head.slice(0, 7);
+  } catch {
+    return "unknown";
+  }
+}
+
+// Extend Express Request to include requestId
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+    }
+  }
+}
 
 // Configure trust proxy for proper client IP detection behind reverse proxies
 // (Replit, Vercel, Fly.io, Render, Heroku, etc. all use proxies)
@@ -24,6 +55,31 @@ declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
+}
+
+// Request size limits to prevent abuse
+const REQUEST_BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || "1mb";
+
+function setupSecurity(app: express.Application) {
+  // Helmet for security headers with Expo-compatible settings
+  app.use(
+    helmet({
+      // Allow inline scripts for Expo web and landing page
+      contentSecurityPolicy: false,
+      // Allow cross-origin requests for Expo
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    })
+  );
+  log("Helmet security headers enabled");
+}
+
+function setupRequestId(app: express.Application) {
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    const existingId = req.header("x-request-id");
+    req.requestId = existingId && existingId.length > 0 ? existingId.slice(0, 36) : uuidv4();
+    next();
+  });
 }
 
 function setupCors(app: express.Application) {
@@ -68,41 +124,36 @@ function setupCors(app: express.Application) {
 function setupBodyParsing(app: express.Application) {
   app.use(
     express.json({
+      limit: REQUEST_BODY_LIMIT,
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       },
     }),
   );
 
-  app.use(express.urlencoded({ extended: false }));
+  app.use(express.urlencoded({ extended: false, limit: REQUEST_BODY_LIMIT }));
+  log(`Request body limit: ${REQUEST_BODY_LIMIT}`);
 }
 
 function setupRequestLogging(app: express.Application) {
   app.use((req, res, next) => {
     const start = Date.now();
-    const path = req.path;
-    let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
+    const reqPath = req.path;
 
-    const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
+    // Set response header with request ID for tracing
+    if (req.requestId) {
+      res.setHeader("x-request-id", req.requestId);
+    }
 
     res.on("finish", () => {
-      if (!path.startsWith("/api")) return;
+      // Skip logging for non-API routes and health checks
+      if (!reqPath.startsWith("/api") && reqPath !== "/healthz") return;
 
       const duration = Date.now() - start;
 
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
+      // Structured log format: [requestId] METHOD /path STATUS in DURATIONms
+      const reqId = req.requestId ? req.requestId.slice(0, 8) : "--------";
+      const logLine = `[${reqId}] ${req.method} ${reqPath} ${res.statusCode} ${duration}ms`;
       log(logLine);
     });
 
@@ -261,6 +312,63 @@ function configureExpoAndLanding(app: express.Application) {
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 
+function setupHealthCheck(app: express.Application) {
+  app.get("/healthz", async (_req: Request, res: Response) => {
+    const uptimeSeconds = Math.floor((Date.now() - SERVER_START_TIME) / 1000);
+    const uptimeFormatted = formatUptime(uptimeSeconds);
+
+    // Optional: check database connectivity
+    let dbStatus = "not_checked";
+    if (process.env.DATABASE_URL) {
+      try {
+        const pg = await import("pg");
+        const testPool = new pg.default.Pool({ 
+          connectionString: process.env.DATABASE_URL,
+          max: 1,
+          idleTimeoutMillis: 1000,
+          connectionTimeoutMillis: 3000,
+        });
+        const client = await testPool.connect();
+        await client.query("SELECT 1");
+        client.release();
+        await testPool.end();
+        dbStatus = "connected";
+      } catch (err) {
+        dbStatus = "error";
+        // Log error in development for debugging
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[healthz] DB check failed:", err);
+        }
+      }
+    }
+
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: uptimeFormatted,
+      uptimeSeconds,
+      commit: COMMIT_HASH,
+      env: process.env.NODE_ENV || "development",
+      database: dbStatus,
+    });
+  });
+}
+
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${secs}s`);
+
+  return parts.join(" ");
+}
+
 function setupErrorHandler(app: express.Application) {
   app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     let status = 500;
@@ -322,14 +430,29 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  // Security middleware (must be first)
+  setupSecurity(app);
+  setupRequestId(app);
+
+  // CORS (before body parsing)
   setupCors(app);
+
+  // Body parsing with size limits
   setupBodyParsing(app);
+
+  // Request logging
   setupRequestLogging(app);
 
+  // Health check endpoint (before Expo routing)
+  setupHealthCheck(app);
+
+  // Expo and landing page routing
   configureExpoAndLanding(app);
 
+  // API routes
   const server = await registerRoutes(app);
 
+  // Error handler (must be last)
   setupErrorHandler(app);
 
   const port = parseInt(process.env.PORT || "5000", 10);
@@ -341,6 +464,7 @@ function setupErrorHandler(app: express.Application) {
     },
     () => {
       log(`express server serving on port ${port}`);
+      log(`Health check available at /healthz`);
     },
   );
 })();
