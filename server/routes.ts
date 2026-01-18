@@ -4,7 +4,7 @@ import { storage, type ProfileUpdate } from "./storage";
 import { setupWebSocket, getGarageUserCount } from "./websocket";
 import { 
   validateRequest, 
-  checkRateLimit, 
+  checkRateLimitAsync, 
   getCachedResponse, 
   cacheResponse, 
   generateTorqueAssistResponse 
@@ -204,9 +204,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/torque-assist", async (req: Request, res: Response) => {
     try {
+      // req.ip correctly uses X-Forwarded-For when trust proxy is enabled
       const clientId = req.ip || "unknown";
       
-      if (!checkRateLimit(clientId)) {
+      const allowed = await checkRateLimitAsync(clientId);
+      if (!allowed) {
         return res.status(429).json({ 
           error: { 
             code: "RATE_LIMITED", 

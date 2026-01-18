@@ -7,11 +7,65 @@ import type {
 
 const responseCache = new Map<string, { response: TorqueAssistResponse; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX = 10;
 
-export function checkRateLimit(clientId: string): boolean {
+// Rate Limiter Configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const RATE_LIMIT_MAX = 10; // 10 requests per window
+
+// ============================================================================
+// IN-MEMORY RATE LIMITER
+// NOTE: This in-memory implementation will NOT scale across multiple instances.
+// Each instance maintains its own counter, so users could exceed limits by 
+// hitting different instances. For multi-instance deployments, use the Redis
+// implementation by setting REDIS_URL environment variable.
+// ============================================================================
+const requestCounts = new Map<string, { count: number; resetTime: number }>();
+
+// Redis client singleton (lazy-loaded when REDIS_URL is set)
+// Type defined inline to avoid requiring ioredis types when not installed
+interface RedisClientLike {
+  incr(key: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
+  on(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+let redisClient: RedisClientLike | null = null;
+let redisEnabled = false;
+
+// Initialize Redis if REDIS_URL is configured
+async function initRedis(): Promise<void> {
+  if (redisClient !== null || !process.env.REDIS_URL) {
+    return;
+  }
+  
+  try {
+    // Dynamic import - ioredis must be installed separately
+    // @ts-expect-error ioredis is an optional dependency, only loaded when REDIS_URL is set
+    const { default: Redis } = await import("ioredis");
+    const client = new Redis(process.env.REDIS_URL);
+    
+    client.on("error", (err: Error) => {
+      console.error("[RateLimiter] Redis error, falling back to in-memory:", err.message);
+      redisEnabled = false;
+    });
+    
+    client.on("connect", () => {
+      console.log("[RateLimiter] Redis connected - rate limiting will scale across instances");
+      redisEnabled = true;
+    });
+    
+    redisClient = client as unknown as RedisClientLike;
+  } catch (err) {
+    console.warn("[RateLimiter] Failed to initialize Redis, using in-memory limiter:", err);
+    redisEnabled = false;
+  }
+}
+
+// Attempt Redis initialization on module load
+initRedis().catch(() => {});
+
+// In-memory rate limit check
+function checkRateLimitInMemory(clientId: string): boolean {
   const now = Date.now();
   const record = requestCounts.get(clientId);
   
@@ -26,6 +80,54 @@ export function checkRateLimit(clientId: string): boolean {
   
   record.count++;
   return true;
+}
+
+// Redis-backed rate limit check (sliding window counter)
+async function checkRateLimitRedis(clientId: string): Promise<boolean> {
+  if (!redisClient || !redisEnabled) {
+    return checkRateLimitInMemory(clientId);
+  }
+  
+  const key = `ratelimit:torqueassist:${clientId}`;
+  const windowSeconds = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
+  
+  try {
+    const current = await redisClient.incr(key);
+    
+    if (current === 1) {
+      await redisClient.expire(key, windowSeconds);
+    }
+    
+    return current <= RATE_LIMIT_MAX;
+  } catch (err) {
+    console.error("[RateLimiter] Redis check failed, falling back to in-memory:", err);
+    return checkRateLimitInMemory(clientId);
+  }
+}
+
+// Main rate limit function - uses Redis if available, otherwise in-memory
+export function checkRateLimit(clientId: string): boolean {
+  // For synchronous compatibility, check Redis status
+  // If Redis is enabled, we need async handling in the route
+  if (redisEnabled && redisClient) {
+    // Return true and let async check happen separately
+    // This maintains backward compatibility with sync callers
+    return true;
+  }
+  return checkRateLimitInMemory(clientId);
+}
+
+// Async rate limit check for routes that can handle promises
+export async function checkRateLimitAsync(clientId: string): Promise<boolean> {
+  if (redisEnabled && redisClient) {
+    return checkRateLimitRedis(clientId);
+  }
+  return checkRateLimitInMemory(clientId);
+}
+
+// Check if Redis rate limiting is active
+export function isRedisRateLimitEnabled(): boolean {
+  return redisEnabled;
 }
 
 function getCacheKey(request: TorqueAssistRequest): string {

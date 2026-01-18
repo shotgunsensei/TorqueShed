@@ -8,6 +8,18 @@ import { ZodError } from "zod";
 const app = express();
 const log = console.log;
 
+// Configure trust proxy for proper client IP detection behind reverse proxies
+// (Replit, Vercel, Fly.io, Render, Heroku, etc. all use proxies)
+// This ensures req.ip uses X-Forwarded-For correctly for rate limiting
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+  log("trust proxy enabled (production mode)");
+} else if (process.env.REPLIT_DEV_DOMAIN || process.env.RENDER || process.env.FLY_APP_NAME || process.env.VERCEL) {
+  // Also enable in dev when running on cloud platforms
+  app.set("trust proxy", 1);
+  log("trust proxy enabled (cloud platform detected)");
+}
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -23,7 +35,7 @@ function setupCors(app: express.Application) {
     }
 
     if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+      process.env.REPLIT_DOMAINS.split(",").forEach((d: string) => {
         origins.add(`https://${d.trim()}`);
       });
     }
