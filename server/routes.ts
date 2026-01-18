@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
+import bcrypt from "bcrypt";
 import { storage, type ProfileUpdate } from "./storage";
 import { setupWebSocket, getGarageUserCount } from "./websocket";
 import { 
@@ -10,9 +11,117 @@ import {
   generateTorqueAssistResponse 
 } from "./torque-assist";
 import { FOCUS_AREAS, PRODUCT_CATEGORIES, type FocusArea } from "@shared/schema";
-import { requireAdmin, type AuthenticatedRequest } from "./middleware/auth";
+import { requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
+
+const BCRYPT_ROUNDS = 12;
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || typeof username !== "string" || username.trim().length < 3) {
+        return res.status(400).json({ 
+          error: "Bad Request", 
+          message: "Username must be at least 3 characters" 
+        });
+      }
+      
+      if (!password || typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ 
+          error: "Bad Request", 
+          message: "Password must be at least 8 characters" 
+        });
+      }
+
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser) {
+        return res.status(409).json({ 
+          error: "Conflict", 
+          message: "Username already exists" 
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      
+      const user = await storage.createUser({
+        username: username.trim(),
+        password: hashedPassword,
+      });
+
+      const token = signJWT({ sub: user.id, role: user.role || "user" });
+      
+      if (!token) {
+        return res.status(500).json({ 
+          error: "Internal Server Error", 
+          message: "Failed to generate token. Check APP_JWT_SECRET configuration." 
+        });
+      }
+
+      res.status(201).json({
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+        },
+        token,
+      });
+    } catch (error) {
+      console.error("Error during signup:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to create user" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ 
+          error: "Bad Request", 
+          message: "Username and password are required" 
+        });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ 
+          error: "Unauthorized", 
+          message: "Invalid username or password" 
+        });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ 
+          error: "Unauthorized", 
+          message: "Invalid username or password" 
+        });
+      }
+
+      const token = signJWT({ sub: user.id, role: user.role || "user" });
+      
+      if (!token) {
+        return res.status(500).json({ 
+          error: "Internal Server Error", 
+          message: "Failed to generate token. Check APP_JWT_SECRET configuration." 
+        });
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+        },
+        token,
+      });
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to login" });
+    }
+  });
+
   app.get("/api/garages", async (_req: Request, res: Response) => {
     try {
       const garages = await storage.getGarages();

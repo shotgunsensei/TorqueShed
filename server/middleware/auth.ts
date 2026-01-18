@@ -66,13 +66,13 @@ export function verifyJWT(token: string): JWTPayload | null {
   }
 }
 
-export function signJWT(payload: { sub: string; role?: string }, expiresIn: string = "7d"): string | null {
+export function signJWT(payload: { sub: string; role?: string }, expiresInSeconds: number = 60 * 60 * 24 * 7): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
 
   return jwt.sign(payload, secret, {
     algorithm: "HS256",
-    expiresIn,
+    expiresIn: expiresInSeconds,
   });
 }
 
