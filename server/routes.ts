@@ -220,6 +220,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      });
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   app.get("/api/users/me/profile", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const profile = await storage.getPublicProfile(req.userId!);

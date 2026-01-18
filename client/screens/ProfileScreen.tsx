@@ -11,8 +11,9 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 
 const FOCUS_AREAS = [
   "Engine",
@@ -46,6 +47,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
 
   const [bio, setBio] = useState("");
@@ -146,7 +148,7 @@ export default function ProfileScreen() {
           <Feather name="camera" size={16} color="#FFFFFF" />
         </Pressable>
         <ThemedText type="h2" style={styles.username}>
-          {profile?.username || "TorqueShed User"}
+          {currentUser?.username || profile?.username || "TorqueShed User"}
         </ThemedText>
       </View>
 
@@ -299,7 +301,10 @@ export default function ProfileScreen() {
             styles.logoutItem,
             { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
           ]}
-          onPress={() => {}}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            logout();
+          }}
         >
           <View style={styles.menuItemLeft}>
             <Feather name="log-out" size={20} color={theme.error} />

@@ -1,4 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
+
+const TOKEN_KEY = "torqueshed_auth_token";
 
 /**
  * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
@@ -16,6 +20,17 @@ export function getApiUrl(): string {
   return url.href;
 }
 
+async function getStoredToken(): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") {
+      return localStorage.getItem(TOKEN_KEY);
+    }
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -30,10 +45,19 @@ export async function apiRequest(
 ): Promise<Response> {
   const baseUrl = getApiUrl();
   const url = new URL(route, baseUrl);
+  const token = await getStoredToken();
+
+  const headers: Record<string, string> = {};
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -50,8 +74,15 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const baseUrl = getApiUrl();
     const url = new URL(queryKey.join("/") as string, baseUrl);
+    const token = await getStoredToken();
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
     const res = await fetch(url, {
+      headers,
       credentials: "include",
     });
 
