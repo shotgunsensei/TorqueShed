@@ -13,6 +13,7 @@ import SignupScreen from "@/screens/SignupScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
+import { screenTitles } from "@/constants/brand";
 
 export type RootStackParamList = {
   Login: undefined;
@@ -66,7 +67,7 @@ export default function RootStackNavigator() {
             name="Profile"
             component={ProfileScreen}
             options={{
-              headerTitle: "Profile",
+              headerTitle: screenTitles.profile,
             }}
           />
           <Stack.Screen
@@ -74,7 +75,7 @@ export default function RootStackNavigator() {
             component={AddVehicleScreen}
             options={{
               presentation: "modal",
-              headerTitle: "Add Vehicle",
+              headerTitle: screenTitles.addVehicle,
             }}
           />
           <Stack.Screen
@@ -82,7 +83,7 @@ export default function RootStackNavigator() {
             component={AddNoteScreen}
             options={{
               presentation: "modal",
-              headerTitle: "Add Note",
+              headerTitle: screenTitles.addNote,
             }}
           />
           <Stack.Screen
@@ -90,14 +91,14 @@ export default function RootStackNavigator() {
             component={SubmitProductScreen}
             options={{
               presentation: "modal",
-              headerTitle: "Submit Product",
+              headerTitle: screenTitles.submitProduct,
             }}
           />
           <Stack.Screen
             name="AdminProducts"
             component={AdminProductsScreen}
             options={{
-              headerTitle: "Manage Products",
+              headerTitle: screenTitles.adminProducts,
             }}
           />
         </>

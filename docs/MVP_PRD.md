@@ -1,7 +1,7 @@
-# GearHead - MVP Product Requirements Document
+# TorqueShed - MVP Product Requirements Document
 
 ## Overview
-GearHead is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers with chatrooms, forums, vehicle tracking, parts finding, and a curated marketplace.
+TorqueShed is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers with chatrooms, forums, vehicle tracking, parts finding, and a curated marketplace. The tagline is "The Garage for Real People."
 
 ---
 

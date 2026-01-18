@@ -8,6 +8,7 @@ import NotesScreen from "@/screens/NotesScreen";
 import VehicleDetailScreen from "@/screens/VehicleDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
+import { screenTitles } from "@/constants/brand";
 
 export type NotesStackParamList = {
   Notes: undefined;
@@ -27,7 +28,7 @@ export default function NotesStackNavigator() {
         name="Notes"
         component={NotesScreen}
         options={{
-          headerTitle: "My Vehicles",
+          headerTitle: screenTitles.notes,
           headerRight: () => (
             <Pressable
               onPress={() => (navigation as any).navigate("Profile")}

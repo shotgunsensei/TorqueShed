@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import CommunityScreen from "@/screens/CommunityScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+import { brand } from "@/constants/brand";
 
 export type CommunityStackParamList = {
   Community: undefined;
@@ -20,7 +21,7 @@ export default function CommunityStackNavigator() {
         name="Community"
         component={CommunityScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="GearHead" />,
+          headerTitle: () => <HeaderTitle title={brand.name} />,
         }}
       />
     </Stack.Navigator>

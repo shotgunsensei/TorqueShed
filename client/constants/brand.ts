@@ -5,6 +5,21 @@ export const brand = {
   supportEmail: 'support@torqueshed.com',
 } as const;
 
+export const screenTitles = {
+  home: 'TorqueShed',
+  bays: 'Bays',
+  notes: 'Notes',
+  torqueAssist: 'TorqueAssist',
+  toolGear: 'Tool & Gear',
+  swapShop: 'Swap Shop',
+  profile: 'Profile',
+  settings: 'Settings',
+  adminProducts: 'Manage Products',
+  submitProduct: 'Submit Product',
+  addVehicle: 'Add Vehicle',
+  addNote: 'Add Note',
+} as const;
+
 export const garageBrandColors = {
   ford: '#003478',
   dodge: '#C8102E',

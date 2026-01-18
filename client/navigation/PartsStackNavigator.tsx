@@ -7,6 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 import PartsScreen from "@/screens/PartsScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
+import { screenTitles } from "@/constants/brand";
 
 export type PartsStackParamList = {
   Parts: undefined;
@@ -25,7 +26,7 @@ export default function PartsStackNavigator() {
         name="Parts"
         component={PartsScreen}
         options={{
-          headerTitle: "TorqueAssist",
+          headerTitle: screenTitles.torqueAssist,
           headerRight: () => (
             <Pressable
               onPress={() => (navigation as any).navigate("Profile")}

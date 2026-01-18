@@ -7,6 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 import TrendingScreen from "@/screens/TrendingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
+import { screenTitles } from "@/constants/brand";
 
 export type TrendingStackParamList = {
   Trending: undefined;
@@ -25,7 +26,7 @@ export default function TrendingStackNavigator() {
         name="Trending"
         component={TrendingScreen}
         options={{
-          headerTitle: "Tool & Gear",
+          headerTitle: screenTitles.toolGear,
           headerRight: () => (
             <Pressable
               onPress={() => (navigation as any).navigate("Profile")}

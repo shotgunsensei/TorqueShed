@@ -7,6 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 import SwapShopScreen from "@/screens/SwapShopScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
+import { screenTitles } from "@/constants/brand";
 
 export type SwapShopStackParamList = {
   SwapShop: undefined;
@@ -25,7 +26,7 @@ export default function SwapShopStackNavigator() {
         name="SwapShop"
         component={SwapShopScreen}
         options={{
-          headerTitle: "Swap Shop",
+          headerTitle: screenTitles.swapShop,
           headerRight: () => (
             <Pressable
               onPress={() => (navigation as any).navigate("Profile")}

@@ -1,7 +1,9 @@
-# GearHead Supabase Migrations
+# TorqueShed Supabase Migrations (DEPRECATED)
+
+> **Note:** These files are historical examples and are NOT used by the current project. TorqueShed now uses Drizzle ORM with PostgreSQL. See `DEPRECATED.md` for details.
 
 ## Overview
-These SQL migrations set up the complete database schema for GearHead with Row Level Security (RLS) policies.
+These SQL migrations were created during early development when Supabase was considered. They are preserved for reference only.
 
 ## Migration Files
 
