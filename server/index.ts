@@ -174,17 +174,43 @@ function configureExpoAndLanding(app: express.Application) {
 
   // Serve web app at /app route
   const webIndexPath = path.resolve(process.cwd(), "static-build", "web", "index.html");
+  const isDevelopment = process.env.NODE_ENV !== "production";
   
   app.get("/app", (req: Request, res: Response) => {
+    // Check for static web build first
     if (fs.existsSync(webIndexPath)) {
       return res.sendFile(webIndexPath);
     }
-    // Fallback: redirect to Expo web dev server in development
-    const devDomain = process.env.REPLIT_DEV_DOMAIN;
-    if (devDomain) {
-      return res.redirect(`https://${devDomain}:8081`);
+    // Only redirect to dev server in development mode
+    if (isDevelopment) {
+      const devDomain = process.env.REPLIT_DEV_DOMAIN;
+      if (devDomain) {
+        return res.redirect(`https://${devDomain}:8081`);
+      }
     }
-    res.status(503).send("Web app not available. Please try again later.");
+    // In production without a web build, show helpful message
+    res.status(503).send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>TorqueShed - Web App</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, sans-serif; background: #0D0F12; color: #E5E7EB; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; text-align: center; }
+            .container { padding: 40px; }
+            h1 { color: #FF6B35; margin-bottom: 16px; }
+            p { color: #9CA3AF; }
+            a { color: #FF6B35; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Web App Coming Soon</h1>
+            <p>The web version is being prepared. In the meantime, use the <a href="/">mobile app</a> via Expo Go.</p>
+          </div>
+        </body>
+      </html>
+    `);
   });
   
   // Serve web app static assets

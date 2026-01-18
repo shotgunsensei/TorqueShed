@@ -70,6 +70,7 @@ function prepareDirectories(timestamp) {
     path.join("static-build", timestamp, "_expo", "static", "js", "android"),
     path.join("static-build", "ios"),
     path.join("static-build", "android"),
+    path.join("static-build", "web"),
   ];
 
   for (const dir of dirs) {
@@ -453,6 +454,64 @@ function updateBundleUrls(timestamp, baseUrl) {
   console.log("Updated bundle URLs");
 }
 
+async function buildWebVersion(domain) {
+  console.log("Building web version...");
+  
+  return new Promise((resolve, reject) => {
+    const env = {
+      ...process.env,
+      EXPO_PUBLIC_DOMAIN: domain,
+      NODE_ENV: "production",
+    };
+    
+    const webBuildProcess = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
+    });
+    
+    let stdout = "";
+    let stderr = "";
+    
+    webBuildProcess.stdout.on("data", (data) => {
+      const output = data.toString();
+      stdout += output;
+      console.log(`[Web Build] ${output.trim()}`);
+    });
+    
+    webBuildProcess.stderr.on("data", (data) => {
+      const output = data.toString();
+      stderr += output;
+      // Don't log warnings as errors
+      if (!output.includes("warn") && !output.includes("deprecated")) {
+        console.log(`[Web Build] ${output.trim()}`);
+      }
+    });
+    
+    webBuildProcess.on("close", (code) => {
+      if (code === 0) {
+        console.log("Web build completed successfully");
+        resolve();
+      } else {
+        console.warn(`Web build exited with code ${code}, continuing without web build`);
+        // Don't fail the entire build if web fails - mobile is more important
+        resolve();
+      }
+    });
+    
+    webBuildProcess.on("error", (error) => {
+      console.warn(`Web build error: ${error.message}, continuing without web build`);
+      resolve();
+    });
+    
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      webBuildProcess.kill();
+      console.warn("Web build timeout, continuing without web build");
+      resolve();
+    }, 300000);
+  });
+}
+
 function updateManifests(manifests, timestamp, baseUrl, assetsByHash) {
   const updateForPlatform = (platform, manifest) => {
     if (!manifest.launchAsset || !manifest.extra) {
@@ -544,6 +603,9 @@ async function main() {
 
   console.log("Updating manifests and creating landing page...");
   updateManifests(manifests, timestamp, baseUrl, assetsByHash);
+
+  // Build web version (non-blocking - continues even if web build fails)
+  await buildWebVersion(domain);
 
   console.log("Build complete! Deploy to:", baseUrl);
 
