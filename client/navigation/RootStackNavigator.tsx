@@ -1,7 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import MainTabNavigator from "@/navigation/MainTabNavigator";
+import ResponsiveNavigator from "@/navigation/ResponsiveNavigator";
 import ProfileScreen from "@/screens/ProfileScreen";
 import AddVehicleScreen from "@/screens/AddVehicleScreen";
 import AddNoteScreen from "@/screens/AddNoteScreen";
@@ -27,7 +27,7 @@ export default function RootStackNavigator() {
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
         name="Main"
-        component={MainTabNavigator}
+        component={ResponsiveNavigator}
         options={{ headerShown: false }}
       />
       <Stack.Screen
