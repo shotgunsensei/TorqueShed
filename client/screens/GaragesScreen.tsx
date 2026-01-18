@@ -14,6 +14,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand, emptyStates, microcopy } from "@/constants/brand";
 import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
@@ -102,6 +103,9 @@ export default function GaragesScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const headerHeight = useHeaderHeight();
+  const { isDesktop, width } = useResponsive();
+
+  const numColumns = isDesktop ? (width >= 1280 ? 3 : 2) : 1;
 
   const handleGaragePress = (garage: GarageItem) => {
     navigation.navigate("GarageDetail", {
@@ -113,21 +117,32 @@ export default function GaragesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
+        key={`garages-${numColumns}`}
         data={STUB_GARAGES}
         keyExtractor={(item) => item.id}
+        numColumns={numColumns}
         renderItem={({ item }) => (
-          <GarageCard item={item} onPress={() => handleGaragePress(item)} />
+          <View style={numColumns > 1 ? { flex: 1, padding: Spacing.xs } : undefined}>
+            <GarageCard item={item} onPress={() => handleGaragePress(item)} />
+          </View>
         )}
         contentContainerStyle={[
           styles.listContent,
-          { paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg },
+          {
+            paddingTop: isDesktop ? Spacing.xl : headerHeight + Spacing.lg,
+            paddingBottom: isDesktop ? Spacing.xl : tabBarHeight + Spacing.lg,
+            maxWidth: isDesktop ? 1200 : undefined,
+            alignSelf: isDesktop ? "center" : undefined,
+            width: isDesktop ? "100%" : undefined,
+          },
         ]}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={
-          <Text style={[styles.tagline, { color: theme.textSecondary }]}>
-            {brand.tagline}
-          </Text>
+          <View style={numColumns > 1 ? styles.gridHeader : undefined}>
+            <Text style={[styles.tagline, { color: theme.textSecondary }]}>
+              {brand.tagline}
+            </Text>
+          </View>
         }
       />
     </View>
@@ -215,5 +230,9 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: Spacing.md,
+  },
+  gridHeader: {
+    width: "100%",
+    marginBottom: Spacing.md,
   },
 });
