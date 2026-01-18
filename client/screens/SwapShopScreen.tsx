@@ -12,8 +12,9 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+
+import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
@@ -231,7 +232,7 @@ const REPORT_REASONS = [
 export default function SwapShopScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useSafeTabBarHeight();
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SwapItem | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);

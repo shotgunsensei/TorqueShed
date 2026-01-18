@@ -54,6 +54,7 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - The `shared/` folder contains Drizzle ORM schema and is server-only
 - Client types are defined locally in `client/` (e.g., `client/hooks/useWebSocket.ts`, `client/constants/products.ts`)
 - Do not import from `@shared/*` in client code
+- Use `useSafeTabBarHeight()` hook instead of `useBottomTabBarHeight()` for screens that need tab bar padding - it safely returns 0 on desktop where sidebar navigation is used instead of bottom tabs
 
 ## External Dependencies
 - **React Native + Expo**: For mobile application development.

@@ -9,8 +9,9 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+
+import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
@@ -121,7 +122,7 @@ function EmptyVehicles({ onAdd }: { onAdd: () => void }) {
 export default function NotesScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useSafeTabBarHeight();
 
   const handleVehiclePress = (vehicle: VehicleItem) => {
     navigation.navigate("VehicleDetail", {

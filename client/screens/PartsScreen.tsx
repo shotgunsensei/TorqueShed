@@ -10,8 +10,9 @@ import {
   Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
+
+import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
@@ -106,7 +107,7 @@ const priorityColors: Record<string, string> = {
 export default function PartsScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useSafeTabBarHeight();
   const navigation = useNavigation<any>();
 
   const [selectedIndex, setSelectedIndex] = useState(0);
