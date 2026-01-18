@@ -7,12 +7,26 @@ export interface AuthenticatedRequest extends Request {
   userRole?: string;
 }
 
-interface JWTPayload {
+export interface JWTPayload {
   sub: string;
-  email?: string;
   role?: string;
   exp?: number;
   iat?: number;
+}
+
+const JWT_SECRET_KEY = "APP_JWT_SECRET";
+
+function getJwtSecret(): string | null {
+  const secret = process.env[JWT_SECRET_KEY];
+  if (!secret) {
+    console.error(JSON.stringify({
+      type: "auth_error",
+      message: `${JWT_SECRET_KEY} not configured`,
+      timestamp: new Date().toISOString(),
+    }));
+    return null;
+  }
+  return secret;
 }
 
 function extractToken(req: Request): string | null {
@@ -27,17 +41,9 @@ function extractToken(req: Request): string | null {
   return parts[1];
 }
 
-function verifyJWT(token: string): JWTPayload | null {
-  const secret = process.env.SUPABASE_JWT_SECRET;
-  
-  if (!secret) {
-    console.error(JSON.stringify({
-      type: "auth_error",
-      message: "SUPABASE_JWT_SECRET not configured",
-      timestamp: new Date().toISOString(),
-    }));
-    return null;
-  }
+export function verifyJWT(token: string): JWTPayload | null {
+  const secret = getJwtSecret();
+  if (!secret) return null;
 
   try {
     const decoded = jwt.verify(token, secret, {
@@ -58,6 +64,16 @@ function verifyJWT(token: string): JWTPayload | null {
     }));
     return null;
   }
+}
+
+export function signJWT(payload: { sub: string; role?: string }, expiresIn: string = "7d"): string | null {
+  const secret = getJwtSecret();
+  if (!secret) return null;
+
+  return jwt.sign(payload, secret, {
+    algorithm: "HS256",
+    expiresIn,
+  });
 }
 
 export function requireAuth(
@@ -86,6 +102,7 @@ export function requireAuth(
   }
 
   req.userId = payload.sub;
+  req.userRole = payload.role;
   next();
 }
 
