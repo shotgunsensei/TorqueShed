@@ -14,6 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
 import { microcopy } from "@/constants/brand";
 import { getApiUrl } from "@/lib/query-client";
@@ -147,6 +148,9 @@ function ProductCard({ item }: { item: Product }) {
 export default function TrendingScreen() {
   const { theme } = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
+  const { isDesktop, width } = useResponsive();
+
+  const numColumns = isDesktop ? (width >= 1280 ? 4 : 3) : 2;
 
   const { data: products, isLoading, error } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -162,14 +166,20 @@ export default function TrendingScreen() {
         </View>
       ) : (
         <FlatList
+          key={`products-${numColumns}`}
           data={displayProducts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ProductCard item={item} />}
-          numColumns={2}
+          numColumns={numColumns}
           columnWrapperStyle={styles.row}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: tabBarHeight + Spacing.lg },
+            {
+              paddingBottom: isDesktop ? Spacing.xl : tabBarHeight + Spacing.lg,
+              maxWidth: isDesktop ? 1400 : undefined,
+              alignSelf: isDesktop ? "center" : undefined,
+              width: isDesktop ? "100%" : undefined,
+            },
           ]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
