@@ -10,6 +10,7 @@ import {
   generateTorqueAssistResponse 
 } from "./torque-assist";
 import { FOCUS_AREAS, PRODUCT_CATEGORIES, type FocusArea } from "@shared/schema";
+import { requireAdmin, type AuthenticatedRequest } from "./middleware/auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/garages", async (_req: Request, res: Response) => {
@@ -279,29 +280,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin-only product management routes
-  const requireAdmin = async (req: Request, res: Response, next: () => void) => {
-    const adminUserId = req.headers["x-admin-user-id"] as string;
-    if (!adminUserId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    const user = await storage.getUser(adminUserId);
-    if (!user || user.role !== "admin") {
-      return res.status(403).json({ error: "Forbidden - Admin access required" });
-    }
-    next();
-  };
-
-  app.get("/api/admin/products", async (req: Request, res: Response) => {
+  // Admin-only product management routes (using JWT auth middleware)
+  app.get("/api/admin/products", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const adminUserId = req.headers["x-admin-user-id"] as string;
-      if (!adminUserId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const user = await storage.getUser(adminUserId);
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ error: "Forbidden" });
-      }
       const productList = await storage.getAllProducts();
       res.json(productList);
     } catch (error) {
@@ -310,17 +291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/products", async (req: Request, res: Response) => {
+  app.post("/api/admin/products", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const adminUserId = req.headers["x-admin-user-id"] as string;
-      if (!adminUserId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const user = await storage.getUser(adminUserId);
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
+      const adminUserId = req.userId!;
       const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored } = req.body;
       
       if (!title || typeof title !== "string" || title.length > 255) {
@@ -350,17 +323,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/admin/products/:id", async (req: Request, res: Response) => {
+  app.patch("/api/admin/products/:id", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const adminUserId = req.headers["x-admin-user-id"] as string;
-      if (!adminUserId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const user = await storage.getUser(adminUserId);
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
       const existing = await storage.getProduct(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Product not found" });
@@ -403,17 +367,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/products/:id", async (req: Request, res: Response) => {
+  app.delete("/api/admin/products/:id", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const adminUserId = req.headers["x-admin-user-id"] as string;
-      if (!adminUserId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const user = await storage.getUser(adminUserId);
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
       const existing = await storage.getProduct(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Product not found" });

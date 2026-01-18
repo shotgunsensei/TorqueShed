@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,10 +17,33 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
+import * as SecureStore from "expo-secure-store";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
+
+async function getAuthToken(): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") {
+      const stored = localStorage.getItem("supabase.auth.token");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.currentSession?.access_token || null;
+      }
+      return null;
+    }
+    const token = await SecureStore.getItemAsync("supabase_access_token");
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthHeaders(token: string | null): Record<string, string> {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
 
 interface Product {
   id: string;
@@ -55,14 +78,13 @@ const PRODUCT_CATEGORIES = [
 
 const SUBMISSION_STATUSES = ["pending", "approved", "featured"] as const;
 
-const ADMIN_USER_ID = "admin-user-001";
-
 export default function AdminProductsScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
 
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
@@ -79,16 +101,23 @@ export default function AdminProductsScreen() {
     featuredExpiration: "",
   });
 
-  const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ["/api/admin/products"],
+  useEffect(() => {
+    getAuthToken().then(setAuthToken);
+  }, []);
+
+  const { data: products, isLoading, error: productsError } = useQuery<Product[]>({
+    queryKey: ["/api/admin/products", authToken],
     queryFn: async () => {
       const url = new URL("/api/admin/products", getApiUrl());
       const response = await fetch(url.toString(), {
-        headers: { "x-admin-user-id": ADMIN_USER_ID },
+        headers: getAuthHeaders(authToken),
       });
+      if (response.status === 401) throw new Error("Unauthorized - Please sign in");
+      if (response.status === 403) throw new Error("Forbidden - Admin access required");
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
     },
+    enabled: !!authToken,
   });
 
   const createMutation = useMutation({
@@ -98,13 +127,15 @@ export default function AdminProductsScreen() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-user-id": ADMIN_USER_ID,
+          ...getAuthHeaders(authToken),
         },
         body: JSON.stringify({
           ...data,
           featuredExpiration: data.featuredExpiration || null,
         }),
       });
+      if (response.status === 401) throw new Error("Unauthorized - Please sign in");
+      if (response.status === 403) throw new Error("Forbidden - Admin access required");
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to create product");
@@ -130,13 +161,15 @@ export default function AdminProductsScreen() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-user-id": ADMIN_USER_ID,
+          ...getAuthHeaders(authToken),
         },
         body: JSON.stringify({
           ...data,
           featuredExpiration: data.featuredExpiration || null,
         }),
       });
+      if (response.status === 401) throw new Error("Unauthorized - Please sign in");
+      if (response.status === 403) throw new Error("Forbidden - Admin access required");
       if (!response.ok) throw new Error("Failed to update product");
       return response.json();
     },
@@ -148,6 +181,9 @@ export default function AdminProductsScreen() {
       setEditingProduct(null);
       resetForm();
     },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -155,14 +191,19 @@ export default function AdminProductsScreen() {
       const url = new URL(`/api/admin/products/${id}`, getApiUrl());
       const response = await fetch(url.toString(), {
         method: "DELETE",
-        headers: { "x-admin-user-id": ADMIN_USER_ID },
+        headers: getAuthHeaders(authToken),
       });
+      if (response.status === 401) throw new Error("Unauthorized - Please sign in");
+      if (response.status === 403) throw new Error("Forbidden - Admin access required");
       if (!response.ok) throw new Error("Failed to delete product");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message);
     },
   });
 
