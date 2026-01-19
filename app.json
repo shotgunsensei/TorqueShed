@@ -45,6 +45,11 @@
     "experiments": {
       "reactCompiler": true,
       "baseUrl": "/app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a2205213-6319-43ae-a6cb-1bbf84da1597"
+      }
     }
   }
 }
