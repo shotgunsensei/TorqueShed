@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -86,6 +86,35 @@ export default function ProfileScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", "/api/users/me");
+    },
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      logout();
+    },
+    onError: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Error", "Failed to delete account. Please try again.");
+    },
+  });
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account? This action cannot be undone. All your vehicles, notes, and messages will be permanently deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteMutation.mutate(),
+        },
+      ]
+    );
+  };
 
   const handleSave = () => {
     const years = yearsWrenching ? parseInt(yearsWrenching, 10) : null;
@@ -316,6 +345,26 @@ export default function ProfileScreen() {
             </ThemedText>
           </View>
         </Pressable>
+
+        <Pressable
+          style={[
+            styles.menuItem,
+            styles.deleteItem,
+            { backgroundColor: theme.backgroundDefault, borderColor: theme.error },
+          ]}
+          onPress={handleDeleteAccount}
+          disabled={deleteMutation.isPending}
+        >
+          <View style={styles.menuItemLeft}>
+            <Feather name="trash-2" size={20} color={theme.error} />
+            <ThemedText
+              type="body"
+              style={[styles.menuItemText, { color: theme.error }]}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Account"}
+            </ThemedText>
+          </View>
+        </Pressable>
       </View>
     </KeyboardAwareScrollViewCompat>
   );
@@ -399,5 +448,8 @@ const styles = StyleSheet.create({
   },
   logoutItem: {
     marginTop: Spacing.md,
+  },
+  deleteItem: {
+    marginTop: Spacing.sm,
   },
 });
