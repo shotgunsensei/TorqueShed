@@ -280,6 +280,152 @@ function configureExpoAndLanding(app: express.Application) {
   // Serve web app static assets
   app.use("/app", express.static(path.resolve(process.cwd(), "static-build", "web")));
 
+  // Delete account page for Google Play compliance
+  app.get("/delete-account", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <title>Delete Account - TorqueShed</title>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+              background: #0D0F12;
+              color: #E5E7EB;
+              line-height: 1.6;
+              min-height: 100vh;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .container {
+              max-width: 500px;
+              padding: 48px 24px;
+              text-align: center;
+            }
+            .brand {
+              display: inline-flex;
+              align-items: center;
+              gap: 10px;
+              margin-bottom: 32px;
+            }
+            .brand-icon {
+              width: 40px;
+              height: 40px;
+              background: #FF6B35;
+              border-radius: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .brand-icon svg {
+              width: 24px;
+              height: 24px;
+              color: #fff;
+            }
+            .brand-name {
+              font-family: 'Montserrat', sans-serif;
+              font-weight: 800;
+              font-size: 24px;
+              color: #fff;
+              letter-spacing: -0.5px;
+            }
+            h1 {
+              font-family: 'Montserrat', sans-serif;
+              font-weight: 800;
+              font-size: 28px;
+              color: #fff;
+              margin-bottom: 16px;
+            }
+            p {
+              color: #9CA3AF;
+              margin-bottom: 24px;
+              font-size: 16px;
+            }
+            .steps {
+              text-align: left;
+              background: #1A1D23;
+              border-radius: 12px;
+              padding: 24px;
+              margin-bottom: 24px;
+            }
+            .steps h2 {
+              font-family: 'Montserrat', sans-serif;
+              font-size: 18px;
+              color: #FF6B35;
+              margin-bottom: 16px;
+            }
+            .steps ol {
+              padding-left: 20px;
+              color: #E5E7EB;
+            }
+            .steps li {
+              margin-bottom: 12px;
+            }
+            .contact {
+              background: #1A1D23;
+              border-radius: 12px;
+              padding: 24px;
+            }
+            .contact h2 {
+              font-family: 'Montserrat', sans-serif;
+              font-size: 18px;
+              color: #FF6B35;
+              margin-bottom: 12px;
+            }
+            .contact a {
+              color: #FF6B35;
+              text-decoration: none;
+            }
+            .contact a:hover {
+              text-decoration: underline;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="brand">
+              <div class="brand-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                </svg>
+              </div>
+              <span class="brand-name">TorqueShed</span>
+            </div>
+            
+            <h1>Delete Your Account</h1>
+            <p>We're sorry to see you go. Deleting your account will permanently remove all your data including your profile, vehicles, notes, and messages.</p>
+            
+            <div class="steps">
+              <h2>How to Delete Your Account</h2>
+              <ol>
+                <li>Open the TorqueShed app on your device</li>
+                <li>Log in to your account</li>
+                <li>Tap on the Profile tab</li>
+                <li>Scroll to the bottom of the page</li>
+                <li>Tap "Delete Account"</li>
+                <li>Confirm your choice in the dialog</li>
+              </ol>
+            </div>
+            
+            <div class="contact">
+              <h2>Need Help?</h2>
+              <p>If you're having trouble deleting your account or have questions, please contact us at <a href="mailto:support@torqueshed.app">support@torqueshed.app</a></p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+  });
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) {
       return next();
