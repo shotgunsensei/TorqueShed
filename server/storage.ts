@@ -1,7 +1,10 @@
 import { 
   users, 
   garages, 
+  garageMembers,
   chatMessages, 
+  vehicles,
+  vehicleNotes,
   reports,
   products,
   type User, 
@@ -45,6 +48,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   getPublicProfile(id: string): Promise<PublicProfile | undefined>;
   updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined>;
   
@@ -84,6 +88,18 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    const userVehicles = await db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, id));
+    for (const vehicle of userVehicles) {
+      await db.delete(vehicleNotes).where(eq(vehicleNotes.vehicleId, vehicle.id));
+    }
+    await db.delete(vehicles).where(eq(vehicles.userId, id));
+    await db.delete(garageMembers).where(eq(garageMembers.userId, id));
+    await db.delete(chatMessages).where(eq(chatMessages.userId, id));
+    await db.delete(reports).where(eq(reports.reporterId, id));
+    await db.delete(users).where(eq(users.id, id));
   }
 
   async getPublicProfile(id: string): Promise<PublicProfile | undefined> {

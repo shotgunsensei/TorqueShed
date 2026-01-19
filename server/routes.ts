@@ -328,6 +328,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/users/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      await storage.deleteUser(req.userId!);
+      res.json({ success: true, message: "Account and all associated data deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user account:", error);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   app.get("/api/users/:id/profile", async (req: Request, res: Response) => {
     try {
       const profile = await storage.getPublicProfile(req.params.id);
