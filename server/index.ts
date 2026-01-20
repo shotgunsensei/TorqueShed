@@ -2,7 +2,9 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { v4 as uuidv4 } from "uuid";
+import bcrypt from "bcrypt";
 import { registerRoutes } from "./routes";
+import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 import { ZodError } from "zod";
@@ -575,6 +577,32 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
+// Seed Google Play reviewer test account
+async function seedReviewerAccount() {
+  const REVIEWER_USERNAME = "reviewer@torqueshed.com";
+  const REVIEWER_PASSWORD = "LetmeL00kInsid3";
+  
+  try {
+    // Check if account already exists
+    const existingUser = await storage.getUserByUsername(REVIEWER_USERNAME);
+    if (existingUser) {
+      log(`Reviewer account already exists: ${REVIEWER_USERNAME}`);
+      return;
+    }
+    
+    // Create reviewer account with hashed password
+    const hashedPassword = await bcrypt.hash(REVIEWER_PASSWORD, 10);
+    await storage.createUser({
+      username: REVIEWER_USERNAME,
+      password: hashedPassword,
+    });
+    
+    log(`Created reviewer test account: ${REVIEWER_USERNAME}`);
+  } catch (error) {
+    console.error("Failed to seed reviewer account:", error);
+  }
+}
+
 (async () => {
   // Security middleware (must be first)
   setupSecurity(app);
@@ -597,6 +625,9 @@ function setupErrorHandler(app: express.Application) {
 
   // API routes
   const server = await registerRoutes(app);
+
+  // Seed test accounts for app store review
+  await seedReviewerAccount();
 
   // Error handler (must be last)
   setupErrorHandler(app);
