@@ -1,9 +1,10 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
+import logoImage from "../../assets/logo.png";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand } from "@/constants/brand";
 
@@ -43,9 +44,7 @@ export default function DesktopSidebar({ activeTab, onTabPress }: DesktopSidebar
       ]}
     >
       <View style={styles.header}>
-        <View style={[styles.logo, { backgroundColor: theme.primary }]}>
-          <Feather name="settings" size={24} color="#FFFFFF" />
-        </View>
+        <Image source={logoImage} style={styles.logo} resizeMode="contain" />
         <Text style={[styles.appName, { color: theme.text }]}>{brand.name}</Text>
         <Text style={[styles.tagline, { color: theme.textMuted }]}>{brand.tagline}</Text>
       </View>
@@ -112,11 +111,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   logo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 64,
+    height: 64,
     marginBottom: Spacing.sm,
   },
   appName: {

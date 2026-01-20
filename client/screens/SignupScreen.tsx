@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable, ActivityIndicator, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import logoImage from "../../assets/logo.png";
 import * as Haptics from "expo-haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -76,9 +77,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       }}
     >
       <View style={styles.header}>
-        <View style={[styles.logoContainer, { backgroundColor: theme.primary }]}>
-          <Feather name="tool" size={48} color="#FFFFFF" />
-        </View>
+        <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
         <ThemedText type="h1" style={styles.title}>Join TorqueShed</ThemedText>
         <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
           Create your account and join the community
@@ -159,6 +158,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  logoImage: {
+    width: 120,
+    height: 120,
     marginBottom: Spacing.lg,
   },
   title: {
