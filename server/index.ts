@@ -315,29 +315,12 @@ function configureExpoAndLanding(app: express.Application) {
             .brand {
               display: inline-flex;
               align-items: center;
-              gap: 10px;
               margin-bottom: 32px;
             }
-            .brand-icon {
-              width: 40px;
-              height: 40px;
-              background: #FF6B35;
-              border-radius: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .brand-icon svg {
-              width: 24px;
-              height: 24px;
-              color: #fff;
-            }
-            .brand-name {
-              font-family: 'Montserrat', sans-serif;
-              font-weight: 800;
-              font-size: 24px;
-              color: #fff;
-              letter-spacing: -0.5px;
+            .brand-logo {
+              width: 120px;
+              height: 120px;
+              object-fit: contain;
             }
             h1 {
               font-family: 'Montserrat', sans-serif;
@@ -394,13 +377,7 @@ function configureExpoAndLanding(app: express.Application) {
         <body>
           <div class="container">
             <div class="brand">
-              <div class="brand-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polygon points="10 8 16 12 10 16 10 8"></polygon>
-                </svg>
-              </div>
-              <span class="brand-name">TorqueShed</span>
+              <img src="/assets/logo.png" alt="TorqueShed" class="brand-logo">
             </div>
             
             <h1>Delete Your Account</h1>
