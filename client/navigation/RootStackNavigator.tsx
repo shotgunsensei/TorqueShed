@@ -8,6 +8,7 @@ import AddVehicleScreen from "@/screens/AddVehicleScreen";
 import AddNoteScreen from "@/screens/AddNoteScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
 import AdminProductsScreen from "@/screens/AdminProductsScreen";
+import GarageDetailScreen from "@/screens/GarageDetailScreen";
 import LoginScreen from "@/screens/LoginScreen";
 import SignupScreen from "@/screens/SignupScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -24,6 +25,7 @@ export type RootStackParamList = {
   AddNote: { vehicleId: string };
   SubmitProduct: undefined;
   AdminProducts: undefined;
+  GarageDetail: { garageId: string; garageName: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -100,6 +102,13 @@ export default function RootStackNavigator() {
             options={{
               headerTitle: screenTitles.adminProducts,
             }}
+          />
+          <Stack.Screen
+            name="GarageDetail"
+            component={GarageDetailScreen}
+            options={({ route }) => ({
+              headerTitle: route.params.garageName,
+            })}
           />
         </>
       )}

@@ -5,14 +5,12 @@ import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
 import GaragesScreen from "@/screens/GaragesScreen";
-import GarageDetailScreen from "@/screens/GarageDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
 import { brand } from "@/constants/brand";
 
 export type GaragesStackParamList = {
   Garages: undefined;
-  GarageDetail: { garageId: string; garageName: string };
 };
 
 const Stack = createNativeStackNavigator<GaragesStackParamList>();
@@ -38,13 +36,6 @@ export default function GaragesStackNavigator() {
             </Pressable>
           ),
         }}
-      />
-      <Stack.Screen
-        name="GarageDetail"
-        component={GarageDetailScreen}
-        options={({ route }) => ({
-          headerTitle: route.params.garageName,
-        })}
       />
     </Stack.Navigator>
   );

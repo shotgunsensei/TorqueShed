@@ -16,9 +16,9 @@ import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand, emptyStates, microcopy } from "@/constants/brand";
-import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
-type NavigationProp = NativeStackNavigationProp<GaragesStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface GarageItem {
   id: string;

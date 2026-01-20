@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
 import { placeholders, microcopy } from "@/constants/brand";
-import type { GaragesStackParamList } from "@/navigation/GaragesStackNavigator";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 function calculateHotScore(thread: Thread): number {
   const MAX_RECENCY_SCORE = 100;
@@ -27,7 +27,7 @@ function calculateHotScore(thread: Thread): number {
   return thread.replies + recencyScore;
 }
 
-type RoutePropType = RouteProp<GaragesStackParamList, "GarageDetail">;
+type RoutePropType = RouteProp<RootStackParamList, "GarageDetail">;
 
 export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
