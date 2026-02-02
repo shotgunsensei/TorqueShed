@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -279,8 +281,11 @@ const REPORT_REASONS = [
   { id: "other", label: "Other" },
 ];
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function SwapShopScreen() {
   const { theme } = useTheme();
+  const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useSafeTabBarHeight();
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -290,6 +295,10 @@ export default function SwapShopScreen() {
   const { data: listings = [], isLoading } = useQuery<SwapListing[]>({
     queryKey: ["/api/swap-shop"],
   });
+
+  const handlePostItem = () => {
+    navigation.navigate("AddListing");
+  };
 
   const swapItems = listings.length > 0
     ? listings.map(transformToSwapItem)
@@ -342,6 +351,7 @@ export default function SwapShopScreen() {
             </View>
             <Pressable
               style={[styles.postButton, { backgroundColor: theme.primary }]}
+              onPress={handlePostItem}
               testID="button-post-item"
             >
               <Feather name="plus" size={20} color="#FFFFFF" />

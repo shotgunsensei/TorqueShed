@@ -2,7 +2,8 @@ import React, { useState, useCallback, useMemo } from "react";
 import { View, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -76,6 +77,7 @@ function calculateHotScore(thread: Thread): number {
 }
 
 type RoutePropType = RouteProp<RootStackParamList, "GarageDetail">;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -84,7 +86,12 @@ export default function GarageDetailScreen() {
   const { isDesktop } = useResponsive();
   const { currentUser } = useAuth();
   const route = useRoute<RoutePropType>();
+  const navigation = useNavigation<NavigationProp>();
   const { garageId } = route.params;
+
+  const handleNewThread = () => {
+    navigation.navigate("AddThread", { garageId });
+  };
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [messageInput, setMessageInput] = useState("");
@@ -227,7 +234,7 @@ export default function GarageDetailScreen() {
         title="No Discussions Yet"
         description="Start a new thread and get the conversation going"
         actionLabel="New Thread"
-        onAction={() => {}}
+        onAction={handleNewThread}
       />
     );
   };
@@ -368,7 +375,18 @@ export default function GarageDetailScreen() {
             ListEmptyComponent={renderEmptyThreads}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
-              hotThreads.length > 0 ? (
+              <>
+                <Pressable
+                  style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
+                  onPress={handleNewThread}
+                  testID="button-new-thread"
+                >
+                  <Feather name="plus" size={18} color="#FFFFFF" />
+                  <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    New Thread
+                  </ThemedText>
+                </Pressable>
+                {hotThreads.length > 0 ? (
                 <View style={styles.hotSection}>
                   <View style={styles.hotSectionHeader}>
                     <Feather name="zap" size={16} color={theme.primary} />
@@ -385,7 +403,8 @@ export default function GarageDetailScreen() {
                     All Threads
                   </ThemedText>
                 </View>
-              ) : null
+              ) : null}
+              </>
             }
           />
         </View>
@@ -467,6 +486,15 @@ const styles = StyleSheet.create({
   threadContent: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
+  },
+  newThreadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
   },
   threadCard: {
     padding: Spacing.lg,

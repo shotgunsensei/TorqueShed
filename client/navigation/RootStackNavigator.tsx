@@ -6,6 +6,8 @@ import ResponsiveNavigator from "@/navigation/ResponsiveNavigator";
 import ProfileScreen from "@/screens/ProfileScreen";
 import AddVehicleScreen from "@/screens/AddVehicleScreen";
 import AddNoteScreen from "@/screens/AddNoteScreen";
+import AddListingScreen from "@/screens/AddListingScreen";
+import AddThreadScreen from "@/screens/AddThreadScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
 import AdminProductsScreen from "@/screens/AdminProductsScreen";
 import GarageDetailScreen from "@/screens/GarageDetailScreen";
@@ -23,6 +25,8 @@ export type RootStackParamList = {
   Profile: undefined;
   AddVehicle: undefined;
   AddNote: { vehicleId: string };
+  AddListing: undefined;
+  AddThread: { garageId: string };
   SubmitProduct: undefined;
   AdminProducts: undefined;
   GarageDetail: { garageId: string; garageName: string };
@@ -86,6 +90,22 @@ export default function RootStackNavigator() {
             options={{
               presentation: "modal",
               headerTitle: screenTitles.addNote,
+            }}
+          />
+          <Stack.Screen
+            name="AddListing"
+            component={AddListingScreen}
+            options={{
+              presentation: "modal",
+              headerTitle: "Post Item",
+            }}
+          />
+          <Stack.Screen
+            name="AddThread"
+            component={AddThreadScreen}
+            options={{
+              presentation: "modal",
+              headerTitle: "New Thread",
             }}
           />
           <Stack.Screen
