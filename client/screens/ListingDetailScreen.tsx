@@ -158,13 +158,13 @@ export default function ListingDetailScreen() {
         <View style={styles.sellerInfo}>
           <View style={[styles.avatar, { backgroundColor: theme.primary + "20" }]}>
             <ThemedText type="h4" style={{ color: theme.primary }}>
-              {listing.userName.charAt(0).toUpperCase()}
+              {(listing.userName || "U").charAt(0).toUpperCase()}
             </ThemedText>
           </View>
           <View style={styles.sellerDetails}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>{listing.userName}</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{listing.userName || "Unknown"}</ThemedText>
             <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-              {listing.userSwapCount} successful swaps
+              {listing.userSwapCount || 0} successful swaps
             </ThemedText>
           </View>
         </View>

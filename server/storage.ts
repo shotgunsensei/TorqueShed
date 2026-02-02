@@ -504,9 +504,30 @@ export class DatabaseStorage implements IStorage {
     return listings.map(l => ({ ...l, userSwapCount: 0 })) as (SwapShopListing & { userName: string; userSwapCount: number })[];
   }
 
-  async getSwapShopListing(id: string): Promise<SwapShopListing | undefined> {
-    const [listing] = await db.select().from(swapShopListings).where(eq(swapShopListings.id, id));
-    return listing || undefined;
+  async getSwapShopListing(id: string): Promise<(SwapShopListing & { userName: string; userSwapCount: number }) | undefined> {
+    const [listing] = await db
+      .select({
+        id: swapShopListings.id,
+        userId: swapShopListings.userId,
+        title: swapShopListings.title,
+        description: swapShopListings.description,
+        price: swapShopListings.price,
+        condition: swapShopListings.condition,
+        location: swapShopListings.location,
+        localPickup: swapShopListings.localPickup,
+        willShip: swapShopListings.willShip,
+        imageUrl: swapShopListings.imageUrl,
+        isActive: swapShopListings.isActive,
+        createdAt: swapShopListings.createdAt,
+        updatedAt: swapShopListings.updatedAt,
+        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+      })
+      .from(swapShopListings)
+      .leftJoin(users, eq(swapShopListings.userId, users.id))
+      .where(eq(swapShopListings.id, id));
+    
+    if (!listing) return undefined;
+    return { ...listing, userSwapCount: 0 } as (SwapShopListing & { userName: string; userSwapCount: number });
   }
 
   async createSwapShopListing(listing: InsertSwapShopListing, userId: string): Promise<SwapShopListing> {
