@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 import logoImage from "../../assets/logo.png";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand } from "@/constants/brand";
@@ -30,6 +31,10 @@ interface DesktopSidebarProps {
 export default function DesktopSidebar({ activeTab, onTabPress }: DesktopSidebarProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { currentUser } = useAuth();
+
+  const displayName = currentUser?.username || "Guest User";
+  const userRole = currentUser?.role === "admin" ? "Admin" : "Enthusiast";
 
   return (
     <View
@@ -91,8 +96,8 @@ export default function DesktopSidebar({ activeTab, onTabPress }: DesktopSidebar
           <Feather name="user" size={20} color={theme.textSecondary} />
         </View>
         <View style={styles.userInfo}>
-          <Text style={[styles.userName, { color: theme.text }]}>Guest User</Text>
-          <Text style={[styles.userRole, { color: theme.textMuted }]}>Enthusiast</Text>
+          <Text style={[styles.userName, { color: theme.text }]}>{displayName}</Text>
+          <Text style={[styles.userRole, { color: theme.textMuted }]}>{userRole}</Text>
         </View>
       </View>
     </View>
