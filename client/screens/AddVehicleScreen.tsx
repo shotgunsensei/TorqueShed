@@ -31,15 +31,12 @@ export default function AddVehicleScreen() {
 
   const createVehicleMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/vehicles", {
-        method: "POST",
-        body: JSON.stringify({
-          vin: inputMode === 0 ? vin : null,
-          year: inputMode === 1 ? year : null,
-          make: inputMode === 1 ? make : null,
-          model: inputMode === 1 ? model : null,
-          nickname,
-        }),
+      return apiRequest("POST", "/api/vehicles", {
+        vin: inputMode === 0 ? vin : null,
+        year: inputMode === 1 ? year : null,
+        make: inputMode === 1 ? make : null,
+        model: inputMode === 1 ? model : null,
+        nickname,
       });
     },
     onSuccess: () => {

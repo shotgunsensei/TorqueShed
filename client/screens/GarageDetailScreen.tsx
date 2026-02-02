@@ -3,6 +3,7 @@ import { View, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator } f
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, RouteProp } from "@react-navigation/native";
+import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
@@ -18,6 +19,53 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
 import { placeholders, microcopy } from "@/constants/brand";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+interface ApiThread {
+  id: string;
+  garageId: string;
+  userId: string;
+  title: string;
+  content: string;
+  hasSolution: boolean;
+  isPinned: boolean;
+  replyCount: number;
+  lastActivityAt: string;
+  createdAt: string;
+  userName: string;
+}
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d ago`;
+  if (diffHours > 0) return `${diffHours}h ago`;
+  if (diffMins > 0) return `${diffMins}m ago`;
+  return "Just now";
+}
+
+function transformToThread(apiThread: ApiThread): Thread {
+  const lastActivityTime = new Date(apiThread.lastActivityAt).getTime();
+  const createdAt = new Date(apiThread.createdAt).getTime();
+  const isNew = Date.now() - lastActivityTime < 24 * 60 * 60 * 1000;
+  
+  return {
+    id: apiThread.id,
+    garageId: apiThread.garageId,
+    title: apiThread.title,
+    author: apiThread.userName,
+    replies: apiThread.replyCount,
+    lastActivity: formatTimeAgo(apiThread.lastActivityAt),
+    lastActivityTime,
+    hasSolution: apiThread.hasSolution,
+    isNew,
+    createdAt,
+  };
+}
 
 function calculateHotScore(thread: Thread): number {
   const MAX_RECENCY_SCORE = 100;
@@ -52,10 +100,16 @@ export default function GarageDetailScreen() {
     garageId,
   });
 
-  const allThreads = useMemo(
-    () => SAMPLE_THREADS.filter((t) => t.garageId === garageId),
-    [garageId]
-  );
+  const { data: apiThreads = [], isLoading: threadsLoading } = useQuery<ApiThread[]>({
+    queryKey: [`/api/garages/${garageId}/threads`],
+  });
+
+  const allThreads = useMemo(() => {
+    if (apiThreads.length > 0) {
+      return apiThreads.map(transformToThread);
+    }
+    return SAMPLE_THREADS.filter((t) => t.garageId === garageId);
+  }, [apiThreads, garageId]);
 
   const hotThreads = useMemo(() => {
     return [...allThreads]
@@ -159,15 +213,24 @@ export default function GarageDetailScreen() {
     </Pressable>
   ), [theme]);
 
-  const renderEmptyThreads = () => (
-    <EmptyState
-      image={require("../../assets/images/empty-threads.png")}
-      title="No Discussions Yet"
-      description="Start a new thread and get the conversation going"
-      actionLabel="New Thread"
-      onAction={() => {}}
-    />
-  );
+  const renderEmptyThreads = () => {
+    if (threadsLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      );
+    }
+    return (
+      <EmptyState
+        image={require("../../assets/images/empty-threads.png")}
+        title="No Discussions Yet"
+        description="Start a new thread and get the conversation going"
+        actionLabel="New Thread"
+        onAction={() => {}}
+      />
+    );
+  };
 
   const renderEmptyChat = () => (
     <View style={styles.emptyChatContainer}>
@@ -334,6 +397,11 @@ export default function GarageDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   chatWrapper: {
     flex: 1,

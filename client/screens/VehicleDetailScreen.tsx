@@ -1,9 +1,10 @@
-import React, { useState } from "react";
-import { View, StyleSheet, FlatList } from "react-native";
+import React from "react";
+import { View, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { NoteCard } from "@/components/NoteCard";
@@ -12,10 +13,31 @@ import { FAB } from "@/components/FAB";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { SAMPLE_NOTES, type VehicleNote } from "@/constants/vehicles";
-import { emptyStates, microcopy } from "@/constants/brand";
+import { type VehicleNote } from "@/constants/vehicles";
+import { emptyStates } from "@/constants/brand";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+interface ApiNote {
+  id: string;
+  vehicleId: string;
+  title: string;
+  content: string;
+  isPrivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function transformToNote(apiNote: ApiNote): VehicleNote {
+  return {
+    id: apiNote.id,
+    vehicleId: apiNote.vehicleId,
+    title: apiNote.title,
+    content: apiNote.content,
+    createdAt: new Date(apiNote.createdAt),
+    isPrivate: apiNote.isPrivate,
+  };
+}
 
 type RoutePropType = RouteProp<NotesStackParamList, "VehicleDetail">;
 type NavigationProp = NativeStackNavigationProp<NotesStackParamList & RootStackParamList>;
@@ -28,9 +50,11 @@ export default function VehicleDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { vehicleId, vehicleName } = route.params;
 
-  const [notes] = useState<VehicleNote[]>(
-    SAMPLE_NOTES.filter((n) => n.vehicleId === vehicleId)
-  );
+  const { data: apiNotes = [], isLoading } = useQuery<ApiNote[]>({
+    queryKey: [`/api/vehicles/${vehicleId}/notes`],
+  });
+
+  const notes = apiNotes.map(transformToNote);
 
   const handleAddNote = () => {
     navigation.navigate("AddNote", { vehicleId });
@@ -72,15 +96,24 @@ export default function VehicleDetailScreen() {
     <NoteCard note={item} onPress={() => {}} />
   );
 
-  const renderEmpty = () => (
-    <EmptyState
-      image={require("../../assets/images/empty-threads.png")}
-      title={emptyStates.notes.title}
-      description={emptyStates.notes.message}
-      actionLabel={emptyStates.notes.action}
-      onAction={handleAddNote}
-    />
-  );
+  const renderEmpty = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      );
+    }
+    return (
+      <EmptyState
+        image={require("../../assets/images/empty-threads.png")}
+        title={emptyStates.notes.title}
+        description={emptyStates.notes.message}
+        actionLabel={emptyStates.notes.action}
+        onAction={handleAddNote}
+      />
+    );
+  };
 
   return (
     <>
@@ -117,6 +150,11 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     marginBottom: Spacing.lg,

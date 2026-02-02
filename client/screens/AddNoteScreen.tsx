@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Switch } from "react-native";
+import { View, StyleSheet, Switch, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -11,6 +12,7 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
+import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type RoutePropType = RouteProp<RootStackParamList, "AddNote">;
@@ -21,14 +23,33 @@ export default function AddNoteScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
   const route = useRoute<RoutePropType>();
+  const queryClient = useQueryClient();
+  const { vehicleId } = route.params;
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
 
+  const createNoteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/vehicles/${vehicleId}/notes`, {
+        title: title.trim(),
+        content: content.trim(),
+        isPrivate,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${vehicleId}/notes`] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Failed to save note");
+    },
+  });
+
   const handleSave = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.goBack();
+    createNoteMutation.mutate();
   };
 
   const isValid = title.trim() && content.trim();
@@ -85,8 +106,8 @@ export default function AddNoteScreen() {
         </View>
       </View>
 
-      <Button onPress={handleSave} disabled={!isValid}>
-        Save Note
+      <Button onPress={handleSave} disabled={!isValid || createNoteMutation.isPending}>
+        {createNoteMutation.isPending ? "Saving..." : "Save Note"}
       </Button>
     </KeyboardAwareScrollViewCompat>
   );
