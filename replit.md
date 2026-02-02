@@ -37,6 +37,13 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - **Monetization Ethics**: TorqueAssist features ethical monetization with transparent disclosure of affiliate links, offering multiple vendors (mixing affiliate and non-affiliate), prioritizing relevance over commission, and requiring explicit user action for external links.
 - **Tool & Gear Monetization**: Curated product discovery with `whyItMatters` context boxes, sponsored product badges (yellow "Sponsored" in top-left), "View Deal" CTAs, admin-only CRUD via x-admin-user-id header authentication. Products table includes: title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved.
 
+### Recent API Integration (Feb 2026)
+All major features now use real database storage instead of stub data:
+- **Vehicles API** (`/api/vehicles`): Full CRUD for user vehicles with VIN/YMM tracking. Requires authentication.
+- **Vehicle Notes API** (`/api/vehicles/:vehicleId/notes`, `/api/notes/:id`): Maintenance and modification notes per vehicle.
+- **Threads API** (`/api/garages/:garageId/threads`, `/api/threads/:id`): Bay discussion threads with replies and solution marking.
+- **Swap Shop API** (`/api/swap-shop`): Peer-to-peer parts marketplace with condition ratings and shipping options.
+
 ## Project Structure
 
 ### Folder Layout

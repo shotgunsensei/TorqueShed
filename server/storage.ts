@@ -7,6 +7,9 @@ import {
   vehicleNotes,
   reports,
   products,
+  threads,
+  threadReplies,
+  swapShopListings,
   type User, 
   type InsertUser,
   type Garage,
@@ -17,6 +20,16 @@ import {
   type Product,
   type InsertProduct,
   type FocusArea,
+  type Vehicle,
+  type InsertVehicle,
+  type VehicleNote,
+  type InsertVehicleNote,
+  type Thread,
+  type InsertThread,
+  type ThreadReply,
+  type InsertThreadReply,
+  type SwapShopListing,
+  type InsertSwapShopListing,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, sql, or, isNull, gt } from "drizzle-orm";
@@ -273,6 +286,256 @@ export class DatabaseStorage implements IStorage {
       .update(products)
       .set({ clicks: sql`${products.clicks} + 1` })
       .where(eq(products.id, id));
+  }
+
+  async getVehiclesByUser(userId: string): Promise<(Vehicle & { notesCount: number })[]> {
+    const userVehicles = await db
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId))
+      .orderBy(desc(vehicles.createdAt));
+    
+    const result = await Promise.all(userVehicles.map(async (vehicle) => {
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(vehicleNotes)
+        .where(eq(vehicleNotes.vehicleId, vehicle.id));
+      return { ...vehicle, notesCount: Number(countResult?.count || 0) };
+    }));
+    
+    return result;
+  }
+
+  async getVehicle(id: string): Promise<Vehicle | undefined> {
+    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id));
+    return vehicle || undefined;
+  }
+
+  async createVehicle(vehicle: InsertVehicle, userId: string): Promise<Vehicle> {
+    const [newVehicle] = await db
+      .insert(vehicles)
+      .values({ ...vehicle, userId })
+      .returning();
+    return newVehicle;
+  }
+
+  async updateVehicle(id: string, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined> {
+    const [updated] = await db
+      .update(vehicles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vehicles.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteVehicle(id: string): Promise<void> {
+    await db.delete(vehicleNotes).where(eq(vehicleNotes.vehicleId, id));
+    await db.delete(vehicles).where(eq(vehicles.id, id));
+  }
+
+  async getNotesByVehicle(vehicleId: string): Promise<VehicleNote[]> {
+    return db
+      .select()
+      .from(vehicleNotes)
+      .where(eq(vehicleNotes.vehicleId, vehicleId))
+      .orderBy(desc(vehicleNotes.createdAt));
+  }
+
+  async getNote(id: string): Promise<VehicleNote | undefined> {
+    const [note] = await db.select().from(vehicleNotes).where(eq(vehicleNotes.id, id));
+    return note || undefined;
+  }
+
+  async createNote(note: InsertVehicleNote, userId: string): Promise<VehicleNote> {
+    const [newNote] = await db
+      .insert(vehicleNotes)
+      .values({ ...note, userId })
+      .returning();
+    return newNote;
+  }
+
+  async updateNote(id: string, updates: Partial<InsertVehicleNote>): Promise<VehicleNote | undefined> {
+    const [updated] = await db
+      .update(vehicleNotes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vehicleNotes.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteNote(id: string): Promise<void> {
+    await db.delete(vehicleNotes).where(eq(vehicleNotes.id, id));
+  }
+
+  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string })[]> {
+    const garageThreads = await db
+      .select({
+        id: threads.id,
+        garageId: threads.garageId,
+        userId: threads.userId,
+        title: threads.title,
+        content: threads.content,
+        hasSolution: threads.hasSolution,
+        isPinned: threads.isPinned,
+        replyCount: threads.replyCount,
+        lastActivityAt: threads.lastActivityAt,
+        createdAt: threads.createdAt,
+        updatedAt: threads.updatedAt,
+        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+      })
+      .from(threads)
+      .leftJoin(users, eq(threads.userId, users.id))
+      .where(eq(threads.garageId, garageId))
+      .orderBy(desc(threads.isPinned), desc(threads.lastActivityAt));
+    
+    return garageThreads as (Thread & { userName: string })[];
+  }
+
+  async getThread(id: string): Promise<(Thread & { userName: string }) | undefined> {
+    const [thread] = await db
+      .select({
+        id: threads.id,
+        garageId: threads.garageId,
+        userId: threads.userId,
+        title: threads.title,
+        content: threads.content,
+        hasSolution: threads.hasSolution,
+        isPinned: threads.isPinned,
+        replyCount: threads.replyCount,
+        lastActivityAt: threads.lastActivityAt,
+        createdAt: threads.createdAt,
+        updatedAt: threads.updatedAt,
+        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+      })
+      .from(threads)
+      .leftJoin(users, eq(threads.userId, users.id))
+      .where(eq(threads.id, id));
+    return thread ? (thread as Thread & { userName: string }) : undefined;
+  }
+
+  async createThread(thread: InsertThread, userId: string): Promise<Thread> {
+    const [newThread] = await db
+      .insert(threads)
+      .values({ ...thread, userId })
+      .returning();
+    return newThread;
+  }
+
+  async updateThread(id: string, updates: Partial<{ title: string; content: string; hasSolution: boolean; isPinned: boolean }>): Promise<Thread | undefined> {
+    const [updated] = await db
+      .update(threads)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(threads.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteThread(id: string): Promise<void> {
+    await db.delete(threadReplies).where(eq(threadReplies.threadId, id));
+    await db.delete(threads).where(eq(threads.id, id));
+  }
+
+  async getRepliesByThread(threadId: string): Promise<(ThreadReply & { userName: string })[]> {
+    const replies = await db
+      .select({
+        id: threadReplies.id,
+        threadId: threadReplies.threadId,
+        userId: threadReplies.userId,
+        content: threadReplies.content,
+        isSolution: threadReplies.isSolution,
+        createdAt: threadReplies.createdAt,
+        updatedAt: threadReplies.updatedAt,
+        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+      })
+      .from(threadReplies)
+      .leftJoin(users, eq(threadReplies.userId, users.id))
+      .where(eq(threadReplies.threadId, threadId))
+      .orderBy(threadReplies.createdAt);
+    
+    return replies as (ThreadReply & { userName: string })[];
+  }
+
+  async createThreadReply(reply: InsertThreadReply, userId: string): Promise<ThreadReply> {
+    const [newReply] = await db
+      .insert(threadReplies)
+      .values({ ...reply, userId })
+      .returning();
+    
+    await db
+      .update(threads)
+      .set({ 
+        replyCount: sql`${threads.replyCount} + 1`,
+        lastActivityAt: new Date(),
+      })
+      .where(eq(threads.id, reply.threadId));
+    
+    return newReply;
+  }
+
+  async markReplyAsSolution(replyId: string, threadId: string): Promise<void> {
+    await db.update(threadReplies).set({ isSolution: false }).where(eq(threadReplies.threadId, threadId));
+    await db.update(threadReplies).set({ isSolution: true }).where(eq(threadReplies.id, replyId));
+    await db.update(threads).set({ hasSolution: true }).where(eq(threads.id, threadId));
+  }
+
+  async getSwapShopListings(): Promise<(SwapShopListing & { userName: string; userSwapCount: number })[]> {
+    const listings = await db
+      .select({
+        id: swapShopListings.id,
+        userId: swapShopListings.userId,
+        title: swapShopListings.title,
+        description: swapShopListings.description,
+        price: swapShopListings.price,
+        condition: swapShopListings.condition,
+        location: swapShopListings.location,
+        localPickup: swapShopListings.localPickup,
+        willShip: swapShopListings.willShip,
+        imageUrl: swapShopListings.imageUrl,
+        isActive: swapShopListings.isActive,
+        createdAt: swapShopListings.createdAt,
+        updatedAt: swapShopListings.updatedAt,
+        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+      })
+      .from(swapShopListings)
+      .leftJoin(users, eq(swapShopListings.userId, users.id))
+      .where(eq(swapShopListings.isActive, true))
+      .orderBy(desc(swapShopListings.createdAt));
+    
+    return listings.map(l => ({ ...l, userSwapCount: 0 })) as (SwapShopListing & { userName: string; userSwapCount: number })[];
+  }
+
+  async getSwapShopListing(id: string): Promise<SwapShopListing | undefined> {
+    const [listing] = await db.select().from(swapShopListings).where(eq(swapShopListings.id, id));
+    return listing || undefined;
+  }
+
+  async createSwapShopListing(listing: InsertSwapShopListing, userId: string): Promise<SwapShopListing> {
+    const [newListing] = await db
+      .insert(swapShopListings)
+      .values({ ...listing, userId })
+      .returning();
+    return newListing;
+  }
+
+  async updateSwapShopListing(id: string, updates: Partial<InsertSwapShopListing>): Promise<SwapShopListing | undefined> {
+    const [updated] = await db
+      .update(swapShopListings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(swapShopListings.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSwapShopListing(id: string): Promise<void> {
+    await db.delete(swapShopListings).where(eq(swapShopListings.id, id));
+  }
+
+  async getUserSwapShopListings(userId: string): Promise<SwapShopListing[]> {
+    return db
+      .select()
+      .from(swapShopListings)
+      .where(eq(swapShopListings.userId, userId))
+      .orderBy(desc(swapShopListings.createdAt));
   }
 }
 

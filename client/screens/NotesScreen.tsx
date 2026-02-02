@@ -5,10 +5,12 @@ import {
   FlatList,
   StyleSheet,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
@@ -23,22 +25,18 @@ type NavigationProp = NativeStackNavigationProp<NotesStackParamList & RootStackP
 
 interface VehicleItem {
   id: string;
-  nickname: string;
-  year: number;
-  make: string;
-  model: string;
-  vin?: string;
+  nickname: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  vin?: string | null;
   notesCount: number;
-  lastNote?: string;
 }
-
-const STUB_VEHICLES: VehicleItem[] = [
-  { id: "1", nickname: "Big Red", year: 2019, make: "Ford", model: "F-150 Lariat", vin: "1FTEW1EP7KFC12345", notesCount: 12, lastNote: "Oil change - 5W-30 Motorcraft" },
-  { id: "2", nickname: "Project Car", year: 1993, make: "Ford", model: "Mustang GT", notesCount: 28, lastNote: "Installed Coyote swap harness" },
-];
 
 function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void }) {
   const { theme } = useTheme();
+
+  const vehicleInfo = [item.year, item.make, item.model].filter(Boolean).join(" ");
 
   return (
     <Pressable
@@ -59,11 +57,13 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
         </View>
         <View style={styles.cardTitleRow}>
           <Text style={[styles.nickname, { color: theme.text }]}>
-            {item.nickname}
+            {item.nickname || "Unnamed Vehicle"}
           </Text>
-          <Text style={[styles.vehicleInfo, { color: theme.textSecondary }]}>
-            {item.year} {item.make} {item.model}
-          </Text>
+          {vehicleInfo ? (
+            <Text style={[styles.vehicleInfo, { color: theme.textSecondary }]}>
+              {vehicleInfo}
+            </Text>
+          ) : null}
         </View>
         <Feather name="chevron-right" size={20} color={theme.textMuted} />
       </View>
@@ -84,11 +84,6 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
             {item.notesCount} notes
           </Text>
         </View>
-        {item.lastNote ? (
-          <Text style={[styles.lastNote, { color: theme.textSecondary }]} numberOfLines={1}>
-            {item.lastNote}
-          </Text>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -124,10 +119,15 @@ export default function NotesScreen() {
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
 
+  const { data: vehicles = [], isLoading } = useQuery<VehicleItem[]>({
+    queryKey: ["/api/vehicles"],
+  });
+
   const handleVehiclePress = (vehicle: VehicleItem) => {
+    const vehicleName = vehicle.nickname || [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle";
     navigation.navigate("VehicleDetail", {
       vehicleId: vehicle.id,
-      vehicleName: vehicle.nickname || `${vehicle.make} ${vehicle.model}`,
+      vehicleName,
     });
   };
 
@@ -135,11 +135,19 @@ export default function NotesScreen() {
     navigation.navigate("AddVehicle");
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      {STUB_VEHICLES.length > 0 ? (
+      {vehicles.length > 0 ? (
         <FlatList
-          data={STUB_VEHICLES}
+          data={vehicles}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <VehicleCard item={item} onPress={() => handleVehiclePress(item)} />
@@ -170,6 +178,10 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContent: {
     padding: Spacing.lg,

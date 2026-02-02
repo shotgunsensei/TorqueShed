@@ -9,9 +9,11 @@ import {
   ScrollView,
   Switch,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
@@ -22,6 +24,20 @@ import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates, microcopy } from "@/constants/brand";
 
 export type ItemCondition = "New" | "Like New" | "Good" | "Fair" | "For Parts";
+
+export interface SwapListing {
+  id: string;
+  title: string;
+  price: string;
+  location: string | null;
+  condition: string;
+  userName: string;
+  userSwapCount: number;
+  localPickup: boolean;
+  willShip: boolean;
+  createdAt: string;
+  imageUrl: string | null;
+}
 
 export interface SwapItem {
   id: string;
@@ -39,6 +55,40 @@ export interface SwapItem {
   postedTime: string;
   hasImage: boolean;
   contactMethod: "in-app";
+}
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d ago`;
+  if (diffHours > 0) return `${diffHours}h ago`;
+  if (diffMins > 0) return `${diffMins}m ago`;
+  return "Just now";
+}
+
+function transformToSwapItem(listing: SwapListing): SwapItem {
+  return {
+    id: listing.id,
+    title: listing.title,
+    price: listing.price.startsWith("$") ? listing.price : `$${listing.price}`,
+    location: listing.location,
+    condition: listing.condition as ItemCondition,
+    seller: {
+      name: listing.userName,
+      successfulSwaps: listing.userSwapCount || 0,
+      memberSince: new Date(listing.createdAt).getFullYear().toString(),
+    },
+    localPickup: listing.localPickup,
+    willShip: listing.willShip,
+    postedTime: formatTimeAgo(listing.createdAt),
+    hasImage: Boolean(listing.imageUrl),
+    contactMethod: "in-app",
+  };
 }
 
 const STUB_SWAP_ITEMS: SwapItem[] = [
@@ -237,6 +287,14 @@ export default function SwapShopScreen() {
   const [selectedItem, setSelectedItem] = useState<SwapItem | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
 
+  const { data: listings = [], isLoading } = useQuery<SwapListing[]>({
+    queryKey: ["/api/swap-shop"],
+  });
+
+  const swapItems = listings.length > 0
+    ? listings.map(transformToSwapItem)
+    : STUB_SWAP_ITEMS;
+
   const handleReport = (item: SwapItem) => {
     setSelectedItem(item);
     setSelectedReason(null);
@@ -254,10 +312,18 @@ export default function SwapShopScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
-        data={STUB_SWAP_ITEMS}
+        data={swapItems}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <SwapItemCard item={item} onReport={handleReport} />}
         contentContainerStyle={[
@@ -372,6 +438,10 @@ export default function SwapShopScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContent: {
     padding: Spacing.lg,

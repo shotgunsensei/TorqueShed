@@ -620,6 +620,466 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== Vehicle Routes ==========
+  app.get("/api/vehicles", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehiclesList = await storage.getVehiclesByUser(req.userId!);
+      res.json(vehiclesList);
+    } catch (error) {
+      console.error("Error fetching vehicles:", error);
+      res.status(500).json({ error: "Failed to fetch vehicles" });
+    }
+  });
+
+  app.get("/api/vehicles/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.id);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      if (vehicle.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Error fetching vehicle:", error);
+      res.status(500).json({ error: "Failed to fetch vehicle" });
+    }
+  });
+
+  app.post("/api/vehicles", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { vin, year, make, model, nickname, imageUrl } = req.body;
+      
+      if (!nickname || typeof nickname !== "string" || nickname.trim().length === 0) {
+        return res.status(400).json({ error: "Nickname is required" });
+      }
+
+      const vehicle = await storage.createVehicle({
+        vin: vin || null,
+        year: year ? parseInt(year) : null,
+        make: make || null,
+        model: model || null,
+        nickname: nickname.trim(),
+        imageUrl: imageUrl || null,
+      }, req.userId!);
+
+      res.status(201).json(vehicle);
+    } catch (error) {
+      console.error("Error creating vehicle:", error);
+      res.status(500).json({ error: "Failed to create vehicle" });
+    }
+  });
+
+  app.patch("/api/vehicles/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.id);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      if (vehicle.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const updates: Record<string, unknown> = {};
+      const { vin, year, make, model, nickname, imageUrl } = req.body;
+      if (vin !== undefined) updates.vin = vin;
+      if (year !== undefined) updates.year = year ? parseInt(year) : null;
+      if (make !== undefined) updates.make = make;
+      if (model !== undefined) updates.model = model;
+      if (nickname !== undefined) updates.nickname = nickname;
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+
+      const updated = await storage.updateVehicle(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating vehicle:", error);
+      res.status(500).json({ error: "Failed to update vehicle" });
+    }
+  });
+
+  app.delete("/api/vehicles/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.id);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      if (vehicle.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await storage.deleteVehicle(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      res.status(500).json({ error: "Failed to delete vehicle" });
+    }
+  });
+
+  // ========== Vehicle Notes Routes ==========
+  app.get("/api/vehicles/:vehicleId/notes", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.vehicleId);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      if (vehicle.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const notes = await storage.getNotesByVehicle(req.params.vehicleId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
+  app.get("/api/notes/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const note = await storage.getNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      if (note.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error fetching note:", error);
+      res.status(500).json({ error: "Failed to fetch note" });
+    }
+  });
+
+  app.post("/api/vehicles/:vehicleId/notes", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.vehicleId);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      if (vehicle.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { title, content, isPrivate } = req.body;
+      
+      if (!title || typeof title !== "string" || title.trim().length === 0) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const note = await storage.createNote({
+        vehicleId: req.params.vehicleId,
+        title: title.trim(),
+        content: content.trim(),
+        isPrivate: isPrivate !== false,
+      }, req.userId!);
+
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  app.patch("/api/notes/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const note = await storage.getNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      if (note.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const updates: Record<string, unknown> = {};
+      const { title, content, isPrivate } = req.body;
+      if (title !== undefined) updates.title = title;
+      if (content !== undefined) updates.content = content;
+      if (isPrivate !== undefined) updates.isPrivate = isPrivate;
+
+      const updated = await storage.updateNote(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating note:", error);
+      res.status(500).json({ error: "Failed to update note" });
+    }
+  });
+
+  app.delete("/api/notes/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const note = await storage.getNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      if (note.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await storage.deleteNote(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      res.status(500).json({ error: "Failed to delete note" });
+    }
+  });
+
+  // ========== Thread Routes ==========
+  app.get("/api/garages/:garageId/threads", async (req: Request, res: Response) => {
+    try {
+      const threadsList = await storage.getThreadsByGarage(req.params.garageId);
+      res.json(threadsList);
+    } catch (error) {
+      console.error("Error fetching threads:", error);
+      res.status(500).json({ error: "Failed to fetch threads" });
+    }
+  });
+
+  app.get("/api/threads/:id", async (req: Request, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.id);
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+      res.json(thread);
+    } catch (error) {
+      console.error("Error fetching thread:", error);
+      res.status(500).json({ error: "Failed to fetch thread" });
+    }
+  });
+
+  app.post("/api/garages/:garageId/threads", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { title, content } = req.body;
+      
+      if (!title || typeof title !== "string" || title.trim().length === 0) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const thread = await storage.createThread({
+        garageId: req.params.garageId,
+        title: title.trim(),
+        content: content.trim(),
+      }, req.userId!);
+
+      res.status(201).json(thread);
+    } catch (error) {
+      console.error("Error creating thread:", error);
+      res.status(500).json({ error: "Failed to create thread" });
+    }
+  });
+
+  app.patch("/api/threads/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.id);
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+      if (thread.userId !== req.userId && req.userRole !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const updates: Record<string, unknown> = {};
+      const { title, content, hasSolution, isPinned } = req.body;
+      if (title !== undefined) updates.title = title;
+      if (content !== undefined) updates.content = content;
+      if (hasSolution !== undefined) updates.hasSolution = hasSolution;
+      if (isPinned !== undefined && req.userRole === "admin") updates.isPinned = isPinned;
+
+      const updated = await storage.updateThread(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating thread:", error);
+      res.status(500).json({ error: "Failed to update thread" });
+    }
+  });
+
+  app.delete("/api/threads/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.id);
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+      if (thread.userId !== req.userId && req.userRole !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await storage.deleteThread(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting thread:", error);
+      res.status(500).json({ error: "Failed to delete thread" });
+    }
+  });
+
+  // ========== Thread Reply Routes ==========
+  app.get("/api/threads/:threadId/replies", async (req: Request, res: Response) => {
+    try {
+      const replies = await storage.getRepliesByThread(req.params.threadId);
+      res.json(replies);
+    } catch (error) {
+      console.error("Error fetching replies:", error);
+      res.status(500).json({ error: "Failed to fetch replies" });
+    }
+  });
+
+  app.post("/api/threads/:threadId/replies", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { content } = req.body;
+      
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const reply = await storage.createThreadReply({
+        threadId: req.params.threadId,
+        content: content.trim(),
+      }, req.userId!);
+
+      res.status(201).json(reply);
+    } catch (error) {
+      console.error("Error creating reply:", error);
+      res.status(500).json({ error: "Failed to create reply" });
+    }
+  });
+
+  app.post("/api/threads/:threadId/replies/:replyId/solution", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.threadId);
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+      if (thread.userId !== req.userId && req.userRole !== "admin") {
+        return res.status(403).json({ error: "Only thread owner can mark solutions" });
+      }
+
+      await storage.markReplyAsSolution(req.params.replyId, req.params.threadId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking solution:", error);
+      res.status(500).json({ error: "Failed to mark solution" });
+    }
+  });
+
+  // ========== Swap Shop Routes ==========
+  app.get("/api/swap-shop", async (_req: Request, res: Response) => {
+    try {
+      const listings = await storage.getSwapShopListings();
+      res.json(listings);
+    } catch (error) {
+      console.error("Error fetching swap shop listings:", error);
+      res.status(500).json({ error: "Failed to fetch listings" });
+    }
+  });
+
+  app.get("/api/swap-shop/my-listings", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const listings = await storage.getUserSwapShopListings(req.userId!);
+      res.json(listings);
+    } catch (error) {
+      console.error("Error fetching user listings:", error);
+      res.status(500).json({ error: "Failed to fetch listings" });
+    }
+  });
+
+  app.get("/api/swap-shop/:id", async (req: Request, res: Response) => {
+    try {
+      const listing = await storage.getSwapShopListing(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      res.json(listing);
+    } catch (error) {
+      console.error("Error fetching listing:", error);
+      res.status(500).json({ error: "Failed to fetch listing" });
+    }
+  });
+
+  app.post("/api/swap-shop", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { title, description, price, condition, location, localPickup, willShip, imageUrl } = req.body;
+      
+      if (!title || typeof title !== "string" || title.trim().length === 0) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      if (!price || typeof price !== "string" || price.trim().length === 0) {
+        return res.status(400).json({ error: "Price is required" });
+      }
+      if (!condition) {
+        return res.status(400).json({ error: "Condition is required" });
+      }
+
+      const listing = await storage.createSwapShopListing({
+        title: title.trim(),
+        description: description || null,
+        price: price.trim(),
+        condition,
+        location: location || null,
+        localPickup: localPickup !== false,
+        willShip: willShip === true,
+        imageUrl: imageUrl || null,
+      }, req.userId!);
+
+      res.status(201).json(listing);
+    } catch (error) {
+      console.error("Error creating listing:", error);
+      res.status(500).json({ error: "Failed to create listing" });
+    }
+  });
+
+  app.patch("/api/swap-shop/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const listing = await storage.getSwapShopListing(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      if (listing.userId !== req.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const updates: Record<string, unknown> = {};
+      const { title, description, price, condition, location, localPickup, willShip, imageUrl, isActive } = req.body;
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (price !== undefined) updates.price = price;
+      if (condition !== undefined) updates.condition = condition;
+      if (location !== undefined) updates.location = location;
+      if (localPickup !== undefined) updates.localPickup = localPickup;
+      if (willShip !== undefined) updates.willShip = willShip;
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const updated = await storage.updateSwapShopListing(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating listing:", error);
+      res.status(500).json({ error: "Failed to update listing" });
+    }
+  });
+
+  app.delete("/api/swap-shop/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const listing = await storage.getSwapShopListing(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      if (listing.userId !== req.userId && req.userRole !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await storage.deleteSwapShopListing(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting listing:", error);
+      res.status(500).json({ error: "Failed to delete listing" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupWebSocket(httpServer);

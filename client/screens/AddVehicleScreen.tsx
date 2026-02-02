@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -12,12 +13,14 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
+import { apiRequest } from "@/lib/query-client";
 
 export default function AddVehicleScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const navigation = useNavigation();
+  const queryClient = useQueryClient();
 
   const [inputMode, setInputMode] = useState(0);
   const [vin, setVin] = useState("");
@@ -26,9 +29,31 @@ export default function AddVehicleScreen() {
   const [model, setModel] = useState("");
   const [nickname, setNickname] = useState("");
 
+  const createVehicleMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/vehicles", {
+        method: "POST",
+        body: JSON.stringify({
+          vin: inputMode === 0 ? vin : null,
+          year: inputMode === 1 ? year : null,
+          make: inputMode === 1 ? make : null,
+          model: inputMode === 1 ? model : null,
+          nickname,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Failed to add vehicle");
+    },
+  });
+
   const handleSave = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.goBack();
+    createVehicleMutation.mutate();
   };
 
   const isValid =
@@ -109,8 +134,8 @@ export default function AddVehicleScreen() {
         />
       </View>
 
-      <Button onPress={handleSave} disabled={!isValid}>
-        Add Vehicle
+      <Button onPress={handleSave} disabled={!isValid || createVehicleMutation.isPending}>
+        {createVehicleMutation.isPending ? "Adding..." : "Add Vehicle"}
       </Button>
     </KeyboardAwareScrollViewCompat>
   );

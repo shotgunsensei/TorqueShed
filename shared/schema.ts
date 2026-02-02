@@ -188,6 +188,8 @@ export const productsRelations = relations(products, ({ one }) => ({
   creator: one(users, { fields: [products.createdBy], references: [users.id] }),
 }));
 
+export const productsInsertSchema = createInsertSchema(products);
+
 export const insertProductSchema = createInsertSchema(products).pick({
   title: true,
   description: true,
@@ -199,6 +201,108 @@ export const insertProductSchema = createInsertSchema(products).pick({
   vendor: true,
   imageUrl: true,
   isSponsored: true,
+});
+
+export const threads = pgTable("threads", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  garageId: varchar("garage_id", { length: 50 }).notNull().references(() => garages.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  hasSolution: boolean("has_solution").default(false),
+  isPinned: boolean("is_pinned").default(false),
+  replyCount: integer("reply_count").default(0),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const threadsRelations = relations(threads, ({ one, many }) => ({
+  user: one(users, { fields: [threads.userId], references: [users.id] }),
+  garage: one(garages, { fields: [threads.garageId], references: [garages.id] }),
+  replies: many(threadReplies),
+}));
+
+export const threadReplies = pgTable("thread_replies", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  isSolution: boolean("is_solution").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const threadRepliesRelations = relations(threadReplies, ({ one }) => ({
+  thread: one(threads, { fields: [threadReplies.threadId], references: [threads.id] }),
+  user: one(users, { fields: [threadReplies.userId], references: [users.id] }),
+}));
+
+export const ITEM_CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"] as const;
+export type ItemCondition = typeof ITEM_CONDITIONS[number];
+
+export const swapShopListings = pgTable("swap_shop_listings", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  price: varchar("price", { length: 50 }).notNull(),
+  condition: varchar("condition", { length: 20 }).notNull(),
+  location: varchar("location", { length: 100 }),
+  localPickup: boolean("local_pickup").default(true),
+  willShip: boolean("will_ship").default(false),
+  imageUrl: text("image_url"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const swapShopListingsRelations = relations(swapShopListings, ({ one }) => ({
+  user: one(users, { fields: [swapShopListings.userId], references: [users.id] }),
+}));
+
+export const insertThreadSchema = createInsertSchema(threads).pick({
+  garageId: true,
+  title: true,
+  content: true,
+});
+
+export const insertThreadReplySchema = createInsertSchema(threadReplies).pick({
+  threadId: true,
+  content: true,
+});
+
+export const insertSwapShopListingSchema = createInsertSchema(swapShopListings).pick({
+  title: true,
+  description: true,
+  price: true,
+  condition: true,
+  location: true,
+  localPickup: true,
+  willShip: true,
+  imageUrl: true,
+});
+
+export const insertVehicleSchema = createInsertSchema(vehicles).pick({
+  vin: true,
+  year: true,
+  make: true,
+  model: true,
+  nickname: true,
+  imageUrl: true,
+});
+
+export const insertVehicleNoteSchema = createInsertSchema(vehicleNotes).pick({
+  vehicleId: true,
+  title: true,
+  content: true,
+  isPrivate: true,
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -232,3 +336,11 @@ export type Report = typeof reports.$inferSelect;
 export type InsertReport = z.infer<typeof insertReportSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Thread = typeof threads.$inferSelect;
+export type InsertThread = z.infer<typeof insertThreadSchema>;
+export type ThreadReply = typeof threadReplies.$inferSelect;
+export type InsertThreadReply = z.infer<typeof insertThreadReplySchema>;
+export type SwapShopListing = typeof swapShopListings.$inferSelect;
+export type InsertSwapShopListing = z.infer<typeof insertSwapShopListingSchema>;
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type InsertVehicleNote = z.infer<typeof insertVehicleNoteSchema>;
