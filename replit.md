@@ -41,8 +41,8 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 All major features now use real database storage instead of stub data:
 - **Vehicles API** (`/api/vehicles`): Full CRUD for user vehicles with VIN/YMM tracking. Requires authentication. Frontend screens: NotesScreen, AddVehicleScreen.
 - **Vehicle Notes API** (`/api/vehicles/:vehicleId/notes`, `/api/notes/:id`): Maintenance and modification notes per vehicle. Frontend screens: VehicleDetailScreen, AddNoteScreen.
-- **Threads API** (`/api/garages/:garageId/threads`, `/api/threads/:id`): Bay discussion threads with replies and solution marking. Frontend: GarageDetailScreen (Threads tab), AddThreadScreen.
-- **Swap Shop API** (`/api/swap-shop`): Peer-to-peer parts marketplace with condition ratings and shipping options. Frontend: SwapShopScreen, AddListingScreen.
+- **Threads API** (`/api/garages/:garageId/threads`, `/api/threads/:id`, `/api/threads/:threadId/replies`): Bay discussion threads with replies and solution marking. Frontend: GarageDetailScreen (Threads tab), AddThreadScreen, ThreadDetailScreen with reply functionality.
+- **Swap Shop API** (`/api/swap-shop`, `/api/swap-shop/:id`): Peer-to-peer parts marketplace with condition ratings and shipping options. Frontend: SwapShopScreen, AddListingScreen, ListingDetailScreen.
 
 ## Project Structure
 
