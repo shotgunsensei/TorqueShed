@@ -163,7 +163,7 @@ const STUB_SWAP_ITEMS: SwapItem[] = [
 
 const CONDITION_OPTIONS: ItemCondition[] = ["New", "Like New", "Good", "Fair", "For Parts"];
 
-function SwapItemCard({ item, onReport }: { item: SwapItem; onReport: (item: SwapItem) => void }) {
+function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (item: SwapItem) => void; onPress: (item: SwapItem) => void }) {
   const { theme } = useTheme();
 
   const getConditionColor = () => {
@@ -191,6 +191,7 @@ function SwapItemCard({ item, onReport }: { item: SwapItem; onReport: (item: Swa
           opacity: pressed ? 0.9 : 1,
         },
       ]}
+      onPress={() => onPress(item)}
       testID={`swap-item-${item.id}`}
     >
       <View style={styles.cardContent}>
@@ -310,6 +311,10 @@ export default function SwapShopScreen() {
     setReportModalVisible(true);
   };
 
+  const handleListingPress = (item: SwapItem) => {
+    navigation.navigate("ListingDetail", { listingId: item.id });
+  };
+
   const handleSubmitReport = () => {
     if (!selectedReason) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -334,7 +339,7 @@ export default function SwapShopScreen() {
       <FlatList
         data={swapItems}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <SwapItemCard item={item} onReport={handleReport} />}
+        renderItem={({ item }) => <SwapItemCard item={item} onReport={handleReport} onPress={handleListingPress} />}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: tabBarHeight + Spacing.lg },

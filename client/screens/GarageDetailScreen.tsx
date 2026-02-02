@@ -175,7 +175,7 @@ export default function GarageDetailScreen() {
           opacity: pressed ? 0.9 : 1,
         },
       ]}
-      onPress={() => {}}
+      onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
       testID={`thread-card-${item.id}`}
     >
       <View style={styles.threadHeader}>
