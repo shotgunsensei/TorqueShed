@@ -556,8 +556,13 @@ function setupErrorHandler(app: express.Application) {
 
 // Seed Google Play reviewer test account
 async function seedReviewerAccount() {
-  const REVIEWER_USERNAME = "reviewer@torqueshed.com";
-  const REVIEWER_PASSWORD = "LetmeL00kInsid3";
+  const REVIEWER_USERNAME = process.env.REVIEWER_USERNAME;
+  const REVIEWER_PASSWORD = process.env.REVIEWER_PASSWORD;
+  
+  if (!REVIEWER_USERNAME || !REVIEWER_PASSWORD) {
+    log("Reviewer account credentials not configured - skipping seed");
+    return;
+  }
   
   try {
     // Check if account already exists
