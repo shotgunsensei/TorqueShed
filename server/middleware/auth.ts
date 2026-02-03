@@ -19,11 +19,6 @@ const JWT_SECRET_KEY = "APP_JWT_SECRET";
 function getJwtSecret(): string | null {
   const secret = process.env[JWT_SECRET_KEY];
   if (!secret) {
-    console.error(JSON.stringify({
-      type: "auth_error",
-      message: `${JWT_SECRET_KEY} not configured`,
-      timestamp: new Date().toISOString(),
-    }));
     return null;
   }
   return secret;
