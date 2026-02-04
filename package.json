@@ -35,7 +35,6 @@
     "bcrypt": "^6.0.0",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.0",
-    "eas-cli": "^16.32.0",
     "expo": "~54.0.31",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.13",
