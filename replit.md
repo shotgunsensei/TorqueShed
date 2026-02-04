@@ -38,12 +38,19 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - **Monetization Ethics**: TorqueAssist features ethical monetization with transparent disclosure of affiliate links, offering multiple vendors (mixing affiliate and non-affiliate), prioritizing relevance over commission, and requiring explicit user action for external links.
 - **Tool & Gear Monetization**: Curated product discovery with `whyItMatters` context boxes, sponsored product badges (yellow "Sponsored" in top-left), "View Deal" CTAs, admin-only CRUD via x-admin-user-id header authentication. Products table includes: title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved.
 
-### Recent API Integration (Feb 2026)
+### Recent Updates (Feb 2026)
+- **UserAvatar Component**: Reusable avatar component showing user initials, avatar image, or fallback icon. Used across DesktopSidebar and profiles.
+- **Role Display**: Only Admin/Moderator roles are shown - regular users ("enthusiast") don't display a role label.
+- **ErrorBoundary for TorqueAssist**: TorqueAssist screen wrapped in ErrorBoundary with user-friendly fallback and "Try Again" button.
+- **EditListingScreen**: Full listing editing capability for Swap Shop with PATCH endpoint integration.
+- **Improved Validation**: AddThreadScreen and EditListingScreen show explicit validation error messages.
+
+### API Integration (Feb 2026)
 All major features now use real database storage instead of stub data:
 - **Vehicles API** (`/api/vehicles`): Full CRUD for user vehicles with VIN/YMM tracking. Requires authentication. Frontend screens: NotesScreen, AddVehicleScreen.
 - **Vehicle Notes API** (`/api/vehicles/:vehicleId/notes`, `/api/notes/:id`): Maintenance and modification notes per vehicle. Frontend screens: VehicleDetailScreen, AddNoteScreen.
 - **Threads API** (`/api/garages/:garageId/threads`, `/api/threads/:id`, `/api/threads/:threadId/replies`): Bay discussion threads with replies and solution marking. Frontend: GarageDetailScreen (Threads tab), AddThreadScreen, ThreadDetailScreen with reply functionality.
-- **Swap Shop API** (`/api/swap-shop`, `/api/swap-shop/:id`): Peer-to-peer parts marketplace with condition ratings and shipping options. Frontend: SwapShopScreen, AddListingScreen, ListingDetailScreen.
+- **Swap Shop API** (`/api/swap-shop`, `/api/swap-shop/:id`): Peer-to-peer parts marketplace with condition ratings and shipping options. Supports PATCH for editing listings. Frontend: SwapShopScreen, AddListingScreen, ListingDetailScreen, EditListingScreen.
 
 ## Project Structure
 

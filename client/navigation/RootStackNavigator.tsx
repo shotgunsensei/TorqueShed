@@ -8,6 +8,7 @@ import AddVehicleScreen from "@/screens/AddVehicleScreen";
 import AddNoteScreen from "@/screens/AddNoteScreen";
 import AddListingScreen from "@/screens/AddListingScreen";
 import ListingDetailScreen from "@/screens/ListingDetailScreen";
+import EditListingScreen from "@/screens/EditListingScreen";
 import AddThreadScreen from "@/screens/AddThreadScreen";
 import ThreadDetailScreen from "@/screens/ThreadDetailScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   AddNote: { vehicleId: string };
   AddListing: undefined;
   ListingDetail: { listingId: string };
+  EditListing: { listingId: string };
   AddThread: { garageId: string };
   ThreadDetail: { threadId: string };
   SubmitProduct: undefined;
@@ -109,6 +111,14 @@ export default function RootStackNavigator() {
             component={ListingDetailScreen}
             options={{
               headerTitle: "Listing",
+            }}
+          />
+          <Stack.Screen
+            name="EditListing"
+            component={EditListingScreen}
+            options={{
+              presentation: "modal",
+              headerTitle: "Edit Listing",
             }}
           />
           <Stack.Screen

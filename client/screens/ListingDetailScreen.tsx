@@ -2,7 +2,8 @@ import React from "react";
 import { View, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -13,6 +14,9 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type ListingDetailParams = {
   listingId: string;
@@ -41,6 +45,7 @@ export default function ListingDetailScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RoutePropType>();
+  const navigation = useNavigation<NavigationProp>();
   const { currentUser } = useAuth();
   const { listingId } = route.params;
 
@@ -178,11 +183,19 @@ export default function ListingDetailScreen() {
           Contact Seller
         </Button>
       ) : (
-        <View style={[styles.ownerNote, { backgroundColor: theme.backgroundSecondary }]}>
-          <Feather name="info" size={16} color={theme.textSecondary} />
-          <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
-            This is your listing
-          </ThemedText>
+        <View style={styles.ownerActions}>
+          <Button
+            onPress={() => navigation.navigate("EditListing", { listingId })}
+            style={styles.editButton}
+          >
+            Edit Listing
+          </Button>
+          <View style={[styles.ownerNote, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="info" size={16} color={theme.textSecondary} />
+            <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+              This is your listing
+            </ThemedText>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -249,11 +262,16 @@ const styles = StyleSheet.create({
   contactButton: {
     marginTop: Spacing.lg,
   },
+  ownerActions: {
+    marginTop: Spacing.lg,
+  },
+  editButton: {
+    marginBottom: Spacing.md,
+  },
   ownerNote: {
     flexDirection: "row",
     alignItems: "center",
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
-    marginTop: Spacing.lg,
   },
 });

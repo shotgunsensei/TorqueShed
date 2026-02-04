@@ -47,6 +47,14 @@ export default function AddThreadScreen() {
   });
 
   const handleSubmit = () => {
+    if (!title.trim()) {
+      Alert.alert("Validation Error", "Please enter a thread title");
+      return;
+    }
+    if (!content.trim()) {
+      Alert.alert("Validation Error", "Please enter thread content");
+      return;
+    }
     createThreadMutation.mutate();
   };
 

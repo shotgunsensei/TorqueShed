@@ -1,0 +1,65 @@
+You are working in the TorqueShed repo (Expo React Native Web + Express). Implement fixes for the following observed issues:
+
+1) In message board garage/bay screens, the sidebar navigation is missing.
+- Ensure garage/board routes render inside the same AppShell/layout that includes the sidebar.
+- Do NOT create a second sidebar; fix navigation/layout composition so it appears consistently.
+
+2) New Thread screens: input boxes visually misaligned.
+- Standardize all text inputs for thread creation and replies with shared components (FormInput/FormTextArea).
+- Remove absolute positioning, ensure parent uses alignItems: 'stretch', inputs use width:'100%', consistent padding/margins.
+
+3) Clicking "Post Thread" appears to do nothing.
+- Add robust submit handling:
+  - validate title/body
+  - show visible error messages (toast/banner) for network errors, auth errors, server validation
+  - ensure the mutation is awaited and failures are not swallowed
+- After successful post, navigate back to thread list and refetch threads.
+
+4) Clicking an existing thread opens in chat-style UI.
+- Replace thread detail with a proper forum thread view:
+  - original post at top (title, author, createdAt, body)
+  - replies list below
+  - reply composer at bottom
+- Remove/refrain from any chat bubble / room semantics.
+
+5) Add rich formatting for posts/replies, but do it safely.
+- Implement Markdown-first editor: simple toolbar (bold/italic/headers/code), emoji picker, and preview.
+- Store markdown; render with markdown renderer for both web and mobile.
+- Avoid WYSIWYG libraries that break Expo web.
+
+6) Swap Shop list disappears after creating a listing.
+- Fix state management: do not replace the entire list with only the created item.
+- Use query invalidation/refetch after create, preserving full list.
+
+7) Swap listing cannot be edited.
+- Add "Edit Listing" screen and backend route:
+  - PATCH /api/swap-shop/:id
+  - UI: edit title/price/description/photos/condition/location
+  - After save, return to listing detail and refetch.
+
+8) Notes page: no way to add another vehicle.
+- Implement vehicles list + selector:
+  - UI: dropdown/select current vehicle, add vehicle button
+  - support multiple vehicles
+  - notes scoped to selected vehicle
+
+9) Profile icon mismatch and meaningless "Enthusiast" label.
+- Create shared <UserAvatar user={user}/> component used in nav and profile.
+- Remove hardcoded "Enthusiast". Replace with `user.role ?? 'Member'` (or hide if missing).
+
+10) TorqueAssist crashes and forces restart.
+- Identify the exception and fix it (null access, unsupported module, route mismatch, etc).
+- Add an ErrorBoundary around TorqueAssist screen to prevent app-wide crash.
+- TorqueAssist should open reliably and follow a mechanical wizard UX (non-chat).
+
+Deliverables:
+- Provide a clear change summary + files modified.
+- Ensure no chat UI remains.
+- Ensure all actions display meaningful errors instead of failing silently.
+- Confirm with manual test steps and/or minimal automated tests for:
+  - create thread
+  - reply
+  - create listing
+  - edit listing
+  - add second vehicle
+  - open TorqueAssist without crash

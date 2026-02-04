@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { UserAvatar, getUserRoleDisplay } from "@/components/UserAvatar";
 import logoImage from "../../assets/logo.png";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand } from "@/constants/brand";
@@ -34,7 +35,7 @@ export default function DesktopSidebar({ activeTab, onTabPress }: DesktopSidebar
   const { currentUser } = useAuth();
 
   const displayName = currentUser?.username || "Guest User";
-  const userRole = currentUser?.role === "admin" ? "Admin" : "Enthusiast";
+  const userRole = getUserRoleDisplay(currentUser?.role);
 
   return (
     <View
@@ -92,12 +93,12 @@ export default function DesktopSidebar({ activeTab, onTabPress }: DesktopSidebar
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: theme.border }]}>
-        <View style={[styles.userAvatar, { backgroundColor: theme.backgroundTertiary }]}>
-          <Feather name="user" size={20} color={theme.textSecondary} />
-        </View>
+        <UserAvatar user={currentUser} size="md" />
         <View style={styles.userInfo}>
           <Text style={[styles.userName, { color: theme.text }]}>{displayName}</Text>
-          <Text style={[styles.userRole, { color: theme.textMuted }]}>{userRole}</Text>
+          {userRole ? (
+            <Text style={[styles.userRole, { color: theme.textMuted }]}>{userRole}</Text>
+          ) : null}
         </View>
       </View>
     </View>

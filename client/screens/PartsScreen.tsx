@@ -379,7 +379,10 @@ export default function PartsScreen() {
     </View>
   );
 
-  const renderSymptomStep = () => (
+  const renderSymptomStep = () => {
+    if (!selectedCategory) return null;
+    
+    return (
     <View>
       <Pressable
         style={styles.backButton}
@@ -392,10 +395,10 @@ export default function PartsScreen() {
 
       <View style={styles.stepHeader}>
         <View style={[styles.categoryIconBg, { backgroundColor: theme.primary + "15" }]}>
-          <Feather name={selectedCategory!.icon} size={24} color={theme.primary} />
+          <Feather name={selectedCategory.icon} size={24} color={theme.primary} />
         </View>
         <Text style={[styles.stepTitle, { color: theme.text }]}>
-          {selectedCategory!.name} Issues
+          {selectedCategory.name} Issues
         </Text>
         <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
           What symptom are you experiencing?
@@ -403,7 +406,7 @@ export default function PartsScreen() {
       </View>
 
       <View style={styles.symptomList}>
-        {selectedCategory!.symptoms.map(symptom => (
+        {selectedCategory.symptoms.map(symptom => (
           <Pressable
             key={symptom.id}
             style={({ pressed }) => [
@@ -430,9 +433,13 @@ export default function PartsScreen() {
         ))}
       </View>
     </View>
-  );
+    );
+  };
 
-  const renderChecklistStep = () => (
+  const renderChecklistStep = () => {
+    if (!selectedSymptom) return null;
+    
+    return (
     <View>
       <Pressable
         style={styles.backButton}
@@ -445,7 +452,7 @@ export default function PartsScreen() {
 
       <View style={styles.stepHeader}>
         <Text style={[styles.stepTitle, { color: theme.text }]}>
-          {selectedSymptom!.name}
+          {selectedSymptom.name}
         </Text>
         <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
           Work through each step to diagnose the issue
@@ -571,9 +578,13 @@ export default function PartsScreen() {
         <Text style={styles.resultsButtonText}>View Parts & Specs</Text>
       </Pressable>
     </View>
-  );
+    );
+  };
 
-  const renderResultsStep = () => (
+  const renderResultsStep = () => {
+    if (!selectedCategory || !selectedSymptom) return null;
+    
+    return (
     <View>
       <Pressable
         style={styles.backButton}
@@ -589,7 +600,7 @@ export default function PartsScreen() {
           Diagnostic Summary
         </Text>
         <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-          {selectedCategory!.name} - {selectedSymptom!.name}
+          {selectedCategory.name} - {selectedSymptom.name}
         </Text>
       </View>
 
@@ -615,7 +626,7 @@ export default function PartsScreen() {
       <Text style={[styles.sectionTitle, { color: theme.text }]}>
         Suggested Parts
       </Text>
-      {selectedSymptom!.parts.map((part, index) => (
+      {selectedSymptom.parts.map((part, index) => (
         <View
           key={index}
           style={[
@@ -640,7 +651,7 @@ export default function PartsScreen() {
         </View>
       ))}
 
-      {selectedSymptom!.torqueSpecs.length > 0 ? (
+      {selectedSymptom.torqueSpecs.length > 0 ? (
         <>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
             Torque Specifications
@@ -651,12 +662,12 @@ export default function PartsScreen() {
               { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder },
             ]}
           >
-            {selectedSymptom!.torqueSpecs.map((spec, index) => (
+            {selectedSymptom.torqueSpecs.map((spec, index) => (
               <View
                 key={index}
                 style={[
                   styles.specRow,
-                  index < selectedSymptom!.torqueSpecs.length - 1 && {
+                  index < selectedSymptom.torqueSpecs.length - 1 && {
                     borderBottomWidth: 1,
                     borderBottomColor: theme.cardBorder,
                   },
@@ -705,7 +716,8 @@ export default function PartsScreen() {
         </Text>
       </Pressable>
     </View>
-  );
+    );
+  };
 
   return (
     <ScrollView
