@@ -5,18 +5,30 @@ import * as SecureStore from "expo-secure-store";
 const TOKEN_KEY = "torqueshed_auth_token";
 
 /**
- * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
+ * Gets the base URL for the Express API server (e.g., "https://torqueshed.pro")
  * @returns {string} The API base URL
  */
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
-  if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+  // Fallback to window.location.host on web if EXPO_PUBLIC_DOMAIN is not set
+  if (!host && typeof window !== "undefined" && window.location?.host) {
+    host = window.location.host;
+    if (__DEV__) {
+      console.log("[API] Using window.location.host as fallback:", host);
+    }
   }
 
-  let url = new URL(`https://${host}`);
+  if (!host) {
+    throw new Error("EXPO_PUBLIC_DOMAIN is not set and no fallback available");
+  }
 
+  // Ensure no port suffix for production domain
+  if (host.includes("torqueshed.pro") && host.includes(":")) {
+    host = host.split(":")[0];
+  }
+
+  const url = new URL(`https://${host}`);
   return url.href;
 }
 

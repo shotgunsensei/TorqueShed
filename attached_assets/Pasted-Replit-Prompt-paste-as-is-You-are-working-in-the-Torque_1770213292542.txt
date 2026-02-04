@@ -1,0 +1,268 @@
+Replit Prompt (paste as-is)
+
+You are working in the TorqueShed repo (Expo/React Native Web frontend in client/, Express backend in server/, shared types/schema in shared/). The deployed site is torqueshed.pro. Current problems:
+
+Layout / sizing is broken across most screens
+
+Content is partially off-screen (above/below) and cannot be scrolled to.
+
+This happens on many pages, so fix must be systemic, not one-off.
+
+Posting/replying/creating is failing in all “message board” areas
+
+User cannot create threads, reply to threads, or post in swap-related boards.
+
+Message boards must remain and work.
+
+Remove all chat features
+
+The real-time “chatrooms” are not needed.
+
+Delete/strip all chat UI and chat backend (WebSocket chat) without breaking the app.
+
+Garages can remain as categories, but only forums/message boards, not live chat.
+
+Swap Shop / swap meet boards still not fully working
+
+Listings, viewing, creating, and navigation must work reliably.
+
+TorqueAssist redesign: mechanical/non-AI approach
+
+Keep TorqueAssist but ensure it is clearly rule-based, deterministic, and does not present itself as “AI chat”.
+
+In the backend, TorqueAssist is already rule-based in server/torque-assist.ts (pattern matching + canned structured response). Redesign the UI/UX to match that (wizard/checklist style), and remove any “chat assistant” framing.
+
+Hard requirements / acceptance criteria
+
+✅ Every screen must scroll correctly on mobile web and desktop web when content exceeds viewport.
+
+✅ No content should be trapped off-screen with no scroll path.
+
+✅ Posting works for:
+
+creating a thread (POST /api/garages/:garageId/threads)
+
+replying (POST /api/threads/:id/replies)
+
+creating swap listing (POST /api/swap-shop)
+
+✅ Remove chat end-to-end:
+
+Frontend: remove chat tabs/segments/components/hooks
+
+Backend: remove /ws/chat WebSocket chat and any endpoints only used for chat
+
+✅ Keep the message boards and swap shop functional
+
+✅ Do not “paper over” errors—add useful error handling/UI messages
+
+TASK A — Fix global scrolling/sizing (systemic)
+
+Implement a single reusable screen wrapper and refactor screens to use it.
+
+Create client/components/Screen.tsx (or similar) that:
+
+Uses SafeAreaView with flex: 1
+
+Provides either:
+
+a ScrollView mode with contentContainerStyle={{ flexGrow: 1 }} and safe padding, OR
+
+a FlatList mode that sets style={{ flex: 1 }} and contentContainerStyle with bottom padding
+
+Handles keyboard overlap properly (web + mobile): use existing KeyboardAwareScrollViewCompat where appropriate, but ensure scroll still works on web.
+
+Never uses fixed heights like height: '100%' for content containers that need to scroll.
+
+Refactor screens that currently trap content:
+
+Focus on: client/screens/* especially:
+
+GarageDetailScreen.tsx
+
+ThreadDetailScreen.tsx
+
+SwapShopScreen.tsx
+
+ListingDetailScreen.tsx
+
+ProfileScreen.tsx
+
+NotesScreen.tsx
+
+PartsScreen.tsx
+
+TrendingScreen.tsx
+
+Replace root View wrappers with the new Screen wrapper.
+
+Ensure consistent bottom padding so content is not hidden behind headers/tab bars.
+
+You already have hooks like useSafeTabBarHeight and useHeaderHeight. Use them.
+
+Web-specific scroll sanity:
+
+Ensure Expo web root allows scroll. If needed, add a tiny web-only CSS injection (or app.json web config) so the root container doesn’t force overflow: hidden.
+
+Verify with browser devtools: the root container should not block vertical scrolling.
+
+Deliverable: scrolling works on every main screen with long content.
+
+TASK B — Fix “can’t post/reply/create” in boards + swap shop
+
+This is likely backend CORS/origin or auth-token related when deployed on torqueshed.pro.
+
+Audit backend CORS in server/index.ts:
+
+setupCors() currently only whitelists Replit domains and localhost.
+
+Add support for production custom domains via env var, e.g. ALLOWED_ORIGINS.
+
+Include https://torqueshed.pro and https://www.torqueshed.pro.
+
+If no env var is present, allow the request origin if it ends with .torqueshed.pro (safe scoped rule).
+
+Confirm client/lib/query-client.ts:getApiUrl() works in production:
+
+It uses EXPO_PUBLIC_DOMAIN and always builds https://{host}.
+
+Ensure prod env sets EXPO_PUBLIC_DOMAIN=torqueshed.pro (no port).
+
+Add a fallback: if EXPO_PUBLIC_DOMAIN is missing on web, use window.location.host as host.
+
+Add logging only in development.
+
+Add visible error reporting:
+
+When apiRequest() throws, the UI should show:
+
+“Not authenticated” if 401/403
+
+“Network/CORS” hint if fetch fails before reaching server
+
+On create thread/reply/listing actions, show the server error body in a safe condensed format.
+
+Verify routes exist and work:
+
+Threads:
+
+GET /api/garages/:garageId/threads
+
+POST /api/garages/:garageId/threads (auth required)
+
+GET /api/threads/:id/replies
+
+POST /api/threads/:id/replies (auth required)
+
+Swap shop:
+
+GET /api/swap-shop
+
+POST /api/swap-shop (auth required)
+
+Deliverable: user can create threads, reply, and create listings in production.
+
+TASK C — Remove chat feature entirely (frontend + backend)
+
+Frontend removal:
+
+Remove chat UI/logic from GarageDetailScreen.tsx (it currently uses segmented Chat/Threads).
+
+Garages should show ONLY the thread/forum portion.
+
+Remove:
+
+client/hooks/useWebSocket.ts
+
+any useChat hook usage (find and delete/strip)
+
+MessageBubble and any chat-specific components if unused after refactor
+
+Update navigators (client/navigation/*) to remove chat entry points and any “Bays” chat references.
+
+Backend removal:
+
+Remove WebSocket chat server:
+
+server/websocket.ts
+
+setupWebSocket() usage in server/routes.ts
+
+any chat-specific storage calls/routes
+
+Keep DB schema intact if it’s too risky to migrate now, but ensure unused chat endpoints are gone.
+
+Deliverable: no chat routes, no chat UI, no WebSocket /ws/chat, no chat tabs.
+
+TASK D — Swap Shop cleanup + reliability
+
+Ensure SwapShopScreen.tsx scrolls properly and lists are not clipped.
+
+Ensure navigation to:
+
+Add listing
+
+Listing detail
+works consistently.
+
+Verify empty states and loading states don’t block scrolling.
+
+TASK E — TorqueAssist redesign (non-AI, mechanical)
+
+Backend already uses deterministic generation in server/torque-assist.ts via generateTorqueAssistResponse().
+
+Redesign the frontend TorqueAssist flow to be:
+
+Step-based form:
+
+Vehicle (VIN or Y/M/M)
+
+Issue selection (structured prompts + freeform)
+
+Results page:
+
+Likely causes with probabilities
+
+Ordered recommended checks (checklist)
+
+Torque specs section
+
+Suggested parts with purchase options
+
+Remove any “chat assistant” UI metaphor.
+
+Make it feel like a diagnostic worksheet, not a chatbot.
+
+Deliverable: TorqueAssist works, looks mechanical, and never implies AI chat.
+
+Output expected
+
+Implement changes directly in the repo.
+
+Provide a short change summary and list of files modified/removed.
+
+Include notes on required environment variables for production:
+
+EXPO_PUBLIC_DOMAIN
+
+ALLOWED_ORIGINS (or equivalent)
+
+DATABASE_URL
+
+Do not leave broken imports or dead routes.
+
+Extra context (from repo)
+
+API base URL logic: client/lib/query-client.ts
+
+CORS logic: server/index.ts setupCors()
+
+Threads UI: client/screens/AddThreadScreen.tsx, ThreadDetailScreen.tsx
+
+Swap listings UI: client/screens/SwapShopScreen.tsx, AddListingScreen.tsx
+
+TorqueAssist engine: server/torque-assist.ts
+
+Chat/websocket: server/websocket.ts, client/hooks/useWebSocket.ts, GarageDetailScreen.tsx
+
+Begin by fixing CORS + API URL fallback, then global scrolling wrapper, then remove chat, then verify boards + swap shop, then TorqueAssist redesign.

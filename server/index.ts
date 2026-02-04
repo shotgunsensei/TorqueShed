@@ -98,6 +98,18 @@ function setupCors(app: express.Application) {
       });
     }
 
+    // Add production custom domains from ALLOWED_ORIGINS env var
+    if (process.env.ALLOWED_ORIGINS) {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((d: string) => {
+        const trimmed = d.trim();
+        if (trimmed) origins.add(trimmed);
+      });
+    }
+
+    // Always allow torqueshed.pro in production
+    origins.add("https://torqueshed.pro");
+    origins.add("https://www.torqueshed.pro");
+
     const origin = req.header("origin");
 
     // Allow localhost origins for Expo web development (any port)
@@ -105,7 +117,12 @@ function setupCors(app: express.Application) {
       origin?.startsWith("http://localhost:") ||
       origin?.startsWith("http://127.0.0.1:");
 
-    if (origin && (origins.has(origin) || isLocalhost)) {
+    // Allow any subdomain of torqueshed.pro
+    const isTorqueShedDomain = origin?.endsWith(".torqueshed.pro") || 
+      origin === "https://torqueshed.pro" || 
+      origin === "https://www.torqueshed.pro";
+
+    if (origin && (origins.has(origin) || isLocalhost || isTorqueShedDomain)) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header(
         "Access-Control-Allow-Methods",
