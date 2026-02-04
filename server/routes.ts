@@ -2,7 +2,6 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import bcrypt from "bcrypt";
 import { storage, type ProfileUpdate } from "./storage";
-import { setupWebSocket, getGarageUserCount } from "./websocket";
 import { 
   validateRequest, 
   checkRateLimitAsync, 
@@ -125,11 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/garages", async (_req: Request, res: Response) => {
     try {
       const garages = await storage.getGarages();
-      const garagesWithActiveCount = garages.map(garage => ({
-        ...garage,
-        activeNow: getGarageUserCount(garage.id),
-      }));
-      res.json(garagesWithActiveCount);
+      res.json(garages);
     } catch (error) {
       console.error("Error fetching garages:", error);
       res.status(500).json({ error: "Failed to fetch garages" });
@@ -142,47 +137,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!garage) {
         return res.status(404).json({ error: "Garage not found" });
       }
-      res.json({
-        ...garage,
-        activeNow: getGarageUserCount(garage.id),
-      });
+      res.json(garage);
     } catch (error) {
       console.error("Error fetching garage:", error);
       res.status(500).json({ error: "Failed to fetch garage" });
-    }
-  });
-
-  app.get("/api/garages/:id/messages", async (req: Request, res: Response) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const before = req.query.before as string | undefined;
-      
-      const messages = await storage.getChatMessages(req.params.id, limit, before);
-      res.json(messages);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-      res.status(500).json({ error: "Failed to fetch messages" });
-    }
-  });
-
-  app.post("/api/garages/:id/messages", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { content } = req.body;
-      
-      if (!content || typeof content !== "string" || !content.trim()) {
-        return res.status(400).json({ error: "Message content is required" });
-      }
-
-      const message = await storage.createChatMessage({
-        garageId: req.params.id,
-        userId: req.userId!,
-        content: content.trim(),
-      });
-      
-      res.status(201).json(message);
-    } catch (error) {
-      console.error("Error creating message:", error);
-      res.status(500).json({ error: "Failed to create message" });
     }
   });
 
@@ -1081,8 +1039,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
-  
-  setupWebSocket(httpServer);
 
   return httpServer;
 }

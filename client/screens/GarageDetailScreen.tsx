@@ -1,24 +1,20 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
-import { SegmentedControl } from "@/components/SegmentedControl";
-import { MessageBubble } from "@/components/MessageBubble";
 import { EmptyState } from "@/components/EmptyState";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { useChat } from "@/hooks/useChat";
 import { useResponsive } from "@/hooks/useResponsive";
-import { useAuth } from "@/contexts/AuthContext";
+import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
-import { placeholders, microcopy } from "@/constants/brand";
+import { microcopy } from "@/constants/brand";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 interface ApiThread {
@@ -82,9 +78,9 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export default function GarageDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const tabBarHeight = useSafeTabBarHeight();
   const { theme } = useTheme();
   const { isDesktop } = useResponsive();
-  const { currentUser } = useAuth();
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
   const { garageId } = route.params;
@@ -92,20 +88,6 @@ export default function GarageDetailScreen() {
   const handleNewThread = () => {
     navigation.navigate("AddThread", { garageId });
   };
-
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [messageInput, setMessageInput] = useState("");
-
-  const {
-    messages,
-    isLoading,
-    connectionStatus,
-    typingUsers,
-    sendMessage,
-    sendTyping,
-  } = useChat({
-    garageId,
-  });
 
   const { data: apiThreads = [], isLoading: threadsLoading } = useQuery<ApiThread[]>({
     queryKey: [`/api/garages/${garageId}/threads`],
@@ -128,42 +110,7 @@ export default function GarageDetailScreen() {
     return [...allThreads].sort((a, b) => b.lastActivityTime - a.lastActivityTime);
   }, [allThreads]);
 
-  const handleSend = useCallback(() => {
-    if (!messageInput.trim()) return;
-    sendMessage(messageInput.trim());
-    setMessageInput("");
-  }, [messageInput, sendMessage]);
-
-  const handleInputChange = useCallback((text: string) => {
-    setMessageInput(text);
-    sendTyping();
-  }, [sendTyping]);
-
-  const displayMessages = useMemo(() => {
-    return messages.map((msg) => ({
-      id: msg.id,
-      userId: msg.userId,
-      userName: msg.userName || "Unknown",
-      message: msg.content,
-      timestamp: new Date(msg.createdAt),
-      isOwn: currentUser ? msg.userId === currentUser.id : false,
-      focusAreas: (msg as any).userFocusAreas || [],
-      yearsWrenching: (msg as any).userYearsWrenching || null,
-    }));
-  }, [messages, currentUser]);
-
-  const renderMessage = useCallback(({ item }: { item: typeof displayMessages[0] }) => (
-    <MessageBubble
-      message={item.message}
-      userName={item.userName}
-      timestamp={item.timestamp}
-      isOwn={item.isOwn}
-      focusAreas={item.focusAreas}
-      yearsWrenching={item.yearsWrenching}
-    />
-  ), []);
-
-  const renderThread = useCallback(({ item, isHot = false }: { item: Thread; isHot?: boolean }) => (
+  const renderThread = useCallback(({ item }: { item: Thread }) => (
     <Pressable
       style={({ pressed }) => [
         styles.threadCard,
@@ -218,7 +165,7 @@ export default function GarageDetailScreen() {
         </View>
       </View>
     </Pressable>
-  ), [theme]);
+  ), [theme, navigation]);
 
   const renderEmptyThreads = () => {
     if (threadsLoading) {
@@ -239,31 +186,6 @@ export default function GarageDetailScreen() {
     );
   };
 
-  const renderEmptyChat = () => (
-    <View style={styles.emptyChatContainer}>
-      {isLoading ? (
-        <ActivityIndicator size="large" color={theme.primary} />
-      ) : (
-        <ThemedText type="body" style={{ color: theme.textSecondary }}>
-          Be the first to say something!
-        </ThemedText>
-      )}
-    </View>
-  );
-
-  const renderTypingIndicator = () => {
-    if (typingUsers.length === 0) return null;
-    const names = typingUsers.slice(0, 2).join(", ");
-    const suffix = typingUsers.length > 2 ? ` and ${typingUsers.length - 2} others` : "";
-    return (
-      <View style={styles.typingIndicator}>
-        <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-          {names}{suffix} typing...
-        </ThemedText>
-      </View>
-    );
-  };
-
   const desktopContentStyle = isDesktop ? {
     maxWidth: 800,
     alignSelf: "center" as const,
@@ -271,145 +193,56 @@ export default function GarageDetailScreen() {
   } : {};
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      behavior="padding"
-      keyboardVerticalOffset={0}
-    >
-      <View
-        style={[
-          styles.segmentContainer,
-          { paddingTop: isDesktop ? Spacing.xl : headerHeight + Spacing.md },
-          desktopContentStyle,
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <FlatList
+        style={[styles.threadList, desktopContentStyle]}
+        contentContainerStyle={[
+          styles.threadContent,
+          { 
+            paddingTop: headerHeight + Spacing.md,
+            paddingBottom: tabBarHeight + Spacing.xl,
+          },
+          threads.length === 0 ? styles.emptyContent : null,
         ]}
-      >
-        <SegmentedControl
-          segments={["Chat", "Threads"]}
-          selectedIndex={selectedIndex}
-          onIndexChange={setSelectedIndex}
-        />
-        {connectionStatus !== "connected" && selectedIndex === 0 ? (
-          <View style={styles.connectionStatus}>
-            <View style={[styles.statusDot, { backgroundColor: connectionStatus === "connecting" ? theme.accent : theme.error }]} />
-            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-              {connectionStatus === "connecting" ? "Connecting..." : "Reconnecting..."}
-            </ThemedText>
-          </View>
-        ) : null}
-      </View>
-
-      {selectedIndex === 0 ? (
-        <View style={[styles.chatWrapper, desktopContentStyle]}>
-          <FlatList
-            style={styles.chatList}
-            contentContainerStyle={[
-              styles.chatContent,
-              displayMessages.length === 0 ? styles.emptyContent : null,
-            ]}
-            data={displayMessages.toReversed()}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            inverted={displayMessages.length > 0}
-            ListEmptyComponent={renderEmptyChat}
-            ListHeaderComponent={renderTypingIndicator}
-            showsVerticalScrollIndicator={false}
-          />
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                backgroundColor: theme.backgroundDefault,
-                paddingBottom: insets.bottom + Spacing.sm,
-                borderTopColor: theme.border,
-              },
-            ]}
-          >
-            <TextInput
-              style={[
-                styles.messageInput,
-                {
-                  backgroundColor: theme.backgroundSecondary,
-                  color: theme.text,
-                },
-              ]}
-              placeholder={placeholders.message}
-              placeholderTextColor={theme.textMuted}
-              value={messageInput}
-              onChangeText={handleInputChange}
-              multiline
-              maxLength={2000}
-              testID="input-message"
-            />
+        data={threads}
+        renderItem={renderThread}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={renderEmptyThreads}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
             <Pressable
-              onPress={handleSend}
-              disabled={!messageInput.trim()}
-              style={({ pressed }) => [
-                styles.sendButton,
-                {
-                  backgroundColor: messageInput.trim() ? theme.primary : theme.backgroundTertiary,
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-              testID="button-send"
+              style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
+              onPress={handleNewThread}
+              testID="button-new-thread"
             >
-              <Feather
-                name="send"
-                size={20}
-                color={messageInput.trim() ? "#FFFFFF" : theme.textMuted}
-              />
+              <Feather name="plus" size={18} color="#FFFFFF" />
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                New Thread
+              </ThemedText>
             </Pressable>
-          </View>
-        </View>
-      ) : (
-        <View style={[styles.chatWrapper, desktopContentStyle]}>
-          <FlatList
-            style={styles.threadList}
-            contentContainerStyle={[
-              styles.threadContent,
-              { paddingBottom: insets.bottom + Spacing.xl },
-              threads.length === 0 ? styles.emptyContent : null,
-            ]}
-            data={threads}
-            renderItem={renderThread}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={renderEmptyThreads}
-            showsVerticalScrollIndicator={false}
-            ListHeaderComponent={
-              <>
-                <Pressable
-                  style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
-                  onPress={handleNewThread}
-                  testID="button-new-thread"
-                >
-                  <Feather name="plus" size={18} color="#FFFFFF" />
-                  <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                    New Thread
-                  </ThemedText>
-                </Pressable>
-                {hotThreads.length > 0 ? (
-                <View style={styles.hotSection}>
-                  <View style={styles.hotSectionHeader}>
-                    <Feather name="zap" size={16} color={theme.primary} />
-                    <ThemedText type="h4" style={{ color: theme.primary }}>
-                      {microcopy.hotThreads}
-                    </ThemedText>
-                  </View>
-                  {hotThreads.map((thread) => (
-                    <View key={`hot-${thread.id}`}>
-                      {renderThread({ item: thread, isHot: true })}
-                    </View>
-                  ))}
-                  <ThemedText type="h4" style={styles.allThreadsHeader}>
-                    All Threads
-                  </ThemedText>
+            {hotThreads.length > 0 ? (
+            <View style={styles.hotSection}>
+              <View style={styles.hotSectionHeader}>
+                <Feather name="zap" size={16} color={theme.primary} />
+                <ThemedText type="h4" style={{ color: theme.primary }}>
+                  {microcopy.hotThreads}
+                </ThemedText>
+              </View>
+              {hotThreads.map((thread) => (
+                <View key={`hot-${thread.id}`}>
+                  {renderThread({ item: thread })}
                 </View>
-              ) : null}
-              </>
-            }
-          />
-        </View>
-      )}
-    </KeyboardAvoidingView>
+              ))}
+              <ThemedText type="h4" style={styles.allThreadsHeader}>
+                All Threads
+              </ThemedText>
+            </View>
+          ) : null}
+          </>
+        }
+      />
+    </View>
   );
 }
 
@@ -421,71 +254,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  chatWrapper: {
-    flex: 1,
-  },
-  segmentContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  connectionStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: Spacing.xs,
-    gap: Spacing.xs,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  chatList: {
-    flex: 1,
-  },
-  chatContent: {
-    paddingVertical: Spacing.md,
-  },
-  emptyContent: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  typingIndicator: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xs,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    gap: Spacing.sm,
-  },
-  messageInput: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: 16,
-    fontFamily: "Inter_400Regular",
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 200,
   },
   threadList: {
     flex: 1,
   },
   threadContent: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+  },
+  emptyContent: {
+    flex: 1,
+    justifyContent: "center",
   },
   newThreadButton: {
     flexDirection: "row",
@@ -547,10 +326,5 @@ const styles = StyleSheet.create({
   },
   allThreadsHeader: {
     marginBottom: Spacing.md,
-  },
-  emptyChatContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
