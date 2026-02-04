@@ -3,45 +3,47 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   Pressable,
   ScrollView,
-  ActivityIndicator,
-  Linking,
+  TextInput,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
-
-import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 
+import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
-import { SegmentedControl } from "@/components/SegmentedControl";
-import { emptyStates, microcopy, placeholders, garageBrandColors } from "@/constants/brand";
-import { getApiUrl } from "@/lib/query-client";
+import { emptyStates } from "@/constants/brand";
 
-interface DecodedVehicle {
-  year: number;
-  make: string;
-  model: string;
-  trim: string | null;
-  engine: string | null;
-  transmission: string | null;
-  drivetrain: string | null;
+interface DiagnosticCategory {
+  id: string;
+  name: string;
+  icon: keyof typeof Feather.glyphMap;
+  description: string;
+  symptoms: Symptom[];
 }
 
-interface LikelyCause {
-  cause: string;
-  probability: "high" | "medium" | "low";
-  explanation: string;
+interface Symptom {
+  id: string;
+  name: string;
+  checks: Check[];
+  parts: Part[];
+  torqueSpecs: TorqueSpec[];
 }
 
-interface RecommendedCheck {
+interface Check {
+  id: string;
   step: number;
   action: string;
   tools: string[];
   difficulty: "beginner" | "intermediate" | "advanced";
+  completed: boolean;
+}
+
+interface Part {
+  name: string;
+  priority: "high" | "medium" | "low";
+  estimatedCost: string;
 }
 
 interface TorqueSpec {
@@ -50,47 +52,231 @@ interface TorqueSpec {
   notes: string | null;
 }
 
-interface SuggestedPart {
-  name: string;
-  category: string;
-  priority: "high" | "medium" | "low";
-  estimatedCost: string | null;
-}
+const DIAGNOSTIC_CATEGORIES: DiagnosticCategory[] = [
+  {
+    id: "brakes",
+    name: "Brakes",
+    icon: "disc",
+    description: "Squeaking, grinding, soft pedal",
+    symptoms: [
+      {
+        id: "squeaking",
+        name: "Squeaking or squealing",
+        checks: [
+          { id: "1", step: 1, action: "Visually inspect brake pad thickness through wheel spokes", tools: ["Flashlight"], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Check rotor surface for scoring or grooves", tools: ["Flashlight", "Inspection mirror"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Check brake fluid level and color", tools: [], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Measure rotor thickness with micrometer", tools: ["Micrometer", "Jack", "Jack stands"], difficulty: "intermediate", completed: false },
+        ],
+        parts: [
+          { name: "Brake pad set (front)", priority: "high", estimatedCost: "$30-80" },
+          { name: "Brake rotor (each)", priority: "medium", estimatedCost: "$40-100" },
+        ],
+        torqueSpecs: [
+          { component: "Caliper bracket bolts", spec: "85-95 ft-lbs", notes: "Use thread locker" },
+          { component: "Caliper slide pins", spec: "25-35 ft-lbs", notes: "Apply brake grease" },
+          { component: "Wheel lug nuts", spec: "100-110 ft-lbs", notes: "Torque in star pattern" },
+        ],
+      },
+      {
+        id: "grinding",
+        name: "Grinding noise",
+        checks: [
+          { id: "1", step: 1, action: "STOP DRIVING - Grinding indicates metal-on-metal contact", tools: [], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Remove wheel and inspect pads - should be >2mm thick", tools: ["Jack", "Jack stands", "Lug wrench"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Check rotors for deep grooves or blue discoloration", tools: ["Flashlight"], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Inspect caliper for damage or seized pistons", tools: ["Caliper piston tool"], difficulty: "intermediate", completed: false },
+        ],
+        parts: [
+          { name: "Brake pad set (front)", priority: "high", estimatedCost: "$30-80" },
+          { name: "Brake rotor (each)", priority: "high", estimatedCost: "$40-100" },
+          { name: "Brake caliper", priority: "medium", estimatedCost: "$60-150" },
+        ],
+        torqueSpecs: [
+          { component: "Caliper bracket bolts", spec: "85-95 ft-lbs", notes: "Use thread locker" },
+          { component: "Wheel lug nuts", spec: "100-110 ft-lbs", notes: "Torque in star pattern" },
+        ],
+      },
+      {
+        id: "soft-pedal",
+        name: "Soft or spongy pedal",
+        checks: [
+          { id: "1", step: 1, action: "Check brake fluid reservoir level", tools: [], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Inspect brake lines for leaks or wet spots", tools: ["Flashlight"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Bleed brakes starting from furthest wheel", tools: ["Brake bleeder kit", "Fresh DOT 4 fluid"], difficulty: "intermediate", completed: false },
+          { id: "4", step: 4, action: "Check master cylinder for internal leaks", tools: [], difficulty: "advanced", completed: false },
+        ],
+        parts: [
+          { name: "Brake fluid (DOT 4)", priority: "high", estimatedCost: "$10-20" },
+          { name: "Brake bleeder kit", priority: "medium", estimatedCost: "$20-40" },
+          { name: "Master cylinder", priority: "low", estimatedCost: "$100-200" },
+        ],
+        torqueSpecs: [
+          { component: "Brake line fittings", spec: "10-15 ft-lbs", notes: "Use flare nut wrench" },
+          { component: "Master cylinder nuts", spec: "15-20 ft-lbs", notes: null },
+        ],
+      },
+    ],
+  },
+  {
+    id: "engine",
+    name: "Engine",
+    icon: "settings",
+    description: "Leaks, noises, performance",
+    symptoms: [
+      {
+        id: "oil-leak",
+        name: "Oil leak",
+        checks: [
+          { id: "1", step: 1, action: "Check oil level on dipstick", tools: [], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Clean engine and look for fresh oil after running", tools: ["Degreaser", "Paper towels"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Check valve cover gasket area for wetness", tools: ["Flashlight"], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Inspect oil pan gasket and drain plug", tools: ["Flashlight", "Jack", "Jack stands"], difficulty: "intermediate", completed: false },
+        ],
+        parts: [
+          { name: "Valve cover gasket set", priority: "high", estimatedCost: "$15-50" },
+          { name: "Oil pan gasket", priority: "medium", estimatedCost: "$20-60" },
+          { name: "Oil drain plug with washer", priority: "low", estimatedCost: "$5-15" },
+        ],
+        torqueSpecs: [
+          { component: "Valve cover bolts", spec: "7-10 ft-lbs", notes: "Tighten from center out" },
+          { component: "Oil pan bolts", spec: "15-22 ft-lbs", notes: "Use new gasket" },
+          { component: "Oil drain plug", spec: "20-25 ft-lbs", notes: "Use new crush washer" },
+        ],
+      },
+      {
+        id: "rough-idle",
+        name: "Rough idle or misfire",
+        checks: [
+          { id: "1", step: 1, action: "Scan for trouble codes with OBD2 scanner", tools: ["OBD2 scanner"], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Inspect spark plugs for wear or fouling", tools: ["Spark plug socket", "Ratchet"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Check ignition coils for cracks or damage", tools: [], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Inspect vacuum hoses for cracks or disconnections", tools: [], difficulty: "beginner", completed: false },
+        ],
+        parts: [
+          { name: "Spark plug set", priority: "high", estimatedCost: "$20-60" },
+          { name: "Ignition coil", priority: "medium", estimatedCost: "$30-80" },
+          { name: "Spark plug wires", priority: "medium", estimatedCost: "$30-60" },
+        ],
+        torqueSpecs: [
+          { component: "Spark plugs", spec: "12-18 ft-lbs", notes: "Do not overtighten" },
+          { component: "Ignition coil bolts", spec: "7-10 ft-lbs", notes: null },
+        ],
+      },
+      {
+        id: "overheating",
+        name: "Overheating",
+        checks: [
+          { id: "1", step: 1, action: "Let engine cool completely before opening hood", tools: [], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Check coolant level in overflow tank and radiator", tools: [], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Inspect radiator hoses for cracks or soft spots", tools: [], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Check radiator cap seal and pressure rating", tools: ["Cooling system pressure tester"], difficulty: "intermediate", completed: false },
+          { id: "5", step: 5, action: "Test thermostat operation in boiling water", tools: ["Thermometer", "Pot"], difficulty: "intermediate", completed: false },
+        ],
+        parts: [
+          { name: "Coolant (50/50 mix)", priority: "high", estimatedCost: "$15-25" },
+          { name: "Thermostat", priority: "medium", estimatedCost: "$15-40" },
+          { name: "Radiator cap", priority: "low", estimatedCost: "$10-20" },
+          { name: "Water pump", priority: "low", estimatedCost: "$50-150" },
+        ],
+        torqueSpecs: [
+          { component: "Thermostat housing bolts", spec: "15-20 ft-lbs", notes: null },
+          { component: "Water pump bolts", spec: "15-22 ft-lbs", notes: "Use new gasket" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "electrical",
+    name: "Electrical",
+    icon: "zap",
+    description: "Battery, starting, lights",
+    symptoms: [
+      {
+        id: "no-start",
+        name: "Won't start / no crank",
+        checks: [
+          { id: "1", step: 1, action: "Check if dashboard lights come on with key", tools: [], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Test battery voltage with multimeter (12.4-12.7V)", tools: ["Multimeter"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Inspect battery terminals for corrosion", tools: ["Terminal cleaner brush"], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Check starter connections and ground straps", tools: ["Flashlight"], difficulty: "intermediate", completed: false },
+        ],
+        parts: [
+          { name: "Automotive battery", priority: "high", estimatedCost: "$100-200" },
+          { name: "Battery terminal cleaner", priority: "medium", estimatedCost: "$5-10" },
+          { name: "Starter motor", priority: "low", estimatedCost: "$100-300" },
+        ],
+        torqueSpecs: [
+          { component: "Battery terminal bolts", spec: "5-7 ft-lbs", notes: "Do not overtighten" },
+          { component: "Starter mounting bolts", spec: "30-40 ft-lbs", notes: "Varies by vehicle" },
+        ],
+      },
+      {
+        id: "check-engine",
+        name: "Check engine light",
+        checks: [
+          { id: "1", step: 1, action: "Scan for diagnostic trouble codes (DTCs)", tools: ["OBD2 scanner"], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Check gas cap seal and ensure tight fit", tools: [], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Record code numbers and research specific causes", tools: [], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Clear codes and monitor if they return", tools: ["OBD2 scanner"], difficulty: "beginner", completed: false },
+        ],
+        parts: [
+          { name: "Gas cap with seal", priority: "high", estimatedCost: "$10-25" },
+          { name: "Oxygen sensor", priority: "medium", estimatedCost: "$30-100" },
+          { name: "Mass airflow sensor", priority: "medium", estimatedCost: "$40-150" },
+        ],
+        torqueSpecs: [],
+      },
+    ],
+  },
+  {
+    id: "suspension",
+    name: "Suspension",
+    icon: "truck",
+    description: "Ride quality, noises, handling",
+    symptoms: [
+      {
+        id: "clunking",
+        name: "Clunking over bumps",
+        checks: [
+          { id: "1", step: 1, action: "Bounce each corner of vehicle and listen for noise", tools: [], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Inspect sway bar end links for play or worn bushings", tools: ["Flashlight"], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Check ball joints by rocking wheel at 12 and 6 o'clock", tools: ["Jack", "Jack stands"], difficulty: "intermediate", completed: false },
+          { id: "4", step: 4, action: "Inspect strut mounts for cracks or separation", tools: ["Flashlight"], difficulty: "intermediate", completed: false },
+        ],
+        parts: [
+          { name: "Sway bar end links (pair)", priority: "high", estimatedCost: "$30-60" },
+          { name: "Ball joint", priority: "medium", estimatedCost: "$40-100" },
+          { name: "Strut mount", priority: "medium", estimatedCost: "$30-80" },
+        ],
+        torqueSpecs: [
+          { component: "Sway bar end link nuts", spec: "35-45 ft-lbs", notes: null },
+          { component: "Ball joint nuts", spec: "60-80 ft-lbs", notes: "Use cotter pin" },
+          { component: "Strut mount nuts", spec: "30-40 ft-lbs", notes: null },
+        ],
+      },
+      {
+        id: "pulling",
+        name: "Pulling to one side",
+        checks: [
+          { id: "1", step: 1, action: "Check tire pressures on all four tires", tools: ["Tire pressure gauge"], difficulty: "beginner", completed: false },
+          { id: "2", step: 2, action: "Inspect tires for uneven wear patterns", tools: [], difficulty: "beginner", completed: false },
+          { id: "3", step: 3, action: "Check for brake dragging (wheel hot after driving)", tools: [], difficulty: "beginner", completed: false },
+          { id: "4", step: 4, action: "Schedule wheel alignment check", tools: ["Alignment machine"], difficulty: "advanced", completed: false },
+        ],
+        parts: [
+          { name: "Tie rod end", priority: "medium", estimatedCost: "$25-60" },
+          { name: "Control arm bushing", priority: "low", estimatedCost: "$30-80" },
+        ],
+        torqueSpecs: [
+          { component: "Tie rod end nut", spec: "35-45 ft-lbs", notes: "Use cotter pin" },
+        ],
+      },
+    ],
+  },
+];
 
-interface PurchaseLink {
-  provider: string;
-  url: string;
-  type: "oem" | "aftermarket" | "used";
-}
-
-interface PurchaseOption {
-  vendorName: string;
-  priceRange: string | null;
-  affiliateUrl: string | null;
-  disclosureFlag: boolean;
-  partName: string;
-  type: "oem" | "aftermarket" | "used";
-}
-
-interface TorqueAssistResponse {
-  vehicle: DecodedVehicle;
-  normalizedIssue: string;
-  likelyCauses: LikelyCause[];
-  recommendedChecks: RecommendedCheck[];
-  torqueSpecs: TorqueSpec[] | null;
-  suggestedParts: SuggestedPart[];
-  purchaseLinks: PurchaseLink[];
-  purchaseOptions: PurchaseOption[];
-  confidenceNote: "common_issue" | "vehicle_specific" | "general_guidance" | "requires_diagnosis";
-  disclaimer: string;
-}
-
-const confidenceLabels: Record<string, string> = {
-  common_issue: "Common Issue",
-  vehicle_specific: "Vehicle-Specific",
-  general_guidance: "General Guidance",
-  requires_diagnosis: "Requires Diagnosis",
-};
+type WizardStep = "category" | "symptom" | "checklist" | "results";
 
 const difficultyColors: Record<string, string> = {
   beginner: Colors.dark.success,
@@ -106,488 +292,438 @@ const priorityColors: Record<string, string> = {
 
 export default function PartsScreen() {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const tabBarHeight = useSafeTabBarHeight();
-  const navigation = useNavigation<any>();
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [vin, setVin] = useState("");
-  const [year, setYear] = useState("");
-  const [make, setMake] = useState("");
-  const [model, setModel] = useState("");
-  const [issue, setIssue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [response, setResponse] = useState<TorqueAssistResponse | null>(null);
+  const [step, setStep] = useState<WizardStep>("category");
+  const [selectedCategory, setSelectedCategory] = useState<DiagnosticCategory | null>(null);
+  const [selectedSymptom, setSelectedSymptom] = useState<Symptom | null>(null);
+  const [checks, setChecks] = useState<Check[]>([]);
+  const [notes, setNotes] = useState("");
 
-  const handleAssist = async () => {
-    setIsLoading(true);
-    setError(null);
-    setResponse(null);
-
-    try {
-      const vehicleData = selectedIndex === 0
-        ? { type: "vin" as const, vin }
-        : { type: "ymm" as const, year: parseInt(year), make, model };
-
-      const res = await fetch(new URL("/api/torque-assist", getApiUrl()).toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicle: vehicleData, issue }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error?.message || "Failed to get assistance");
-      }
-
-      setResponse(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSelectCategory = (category: DiagnosticCategory) => {
+    setSelectedCategory(category);
+    setStep("symptom");
   };
 
-  const handleAskTheBay = () => {
-    if (!response) return;
-
-    const bayId = getBayForMake(response.vehicle.make);
-    const vehicleSummary = `${response.vehicle.year} ${response.vehicle.make} ${response.vehicle.model}`;
-    
-    const topCauses = response.likelyCauses
-      .slice(0, 2)
-      .map(c => `- ${c.cause} (${c.probability} probability)`)
-      .join("\n");
-    
-    const prefilledContent = `Vehicle: ${vehicleSummary}
-Issue: ${response.normalizedIssue}
-
-TorqueAssist identified these likely causes:
-${topCauses}
-
-Has anyone dealt with this before? Looking for advice.`;
-
-    navigation.navigate("GarageDetail", {
-      garageId: bayId,
-      prefillThread: {
-        title: `${response.normalizedIssue} - ${vehicleSummary}`,
-        content: prefilledContent,
-      },
-    });
+  const handleSelectSymptom = (symptom: Symptom) => {
+    setSelectedSymptom(symptom);
+    setChecks(symptom.checks.map(c => ({ ...c, completed: false })));
+    setStep("checklist");
   };
 
-  const getBayForMake = (vehicleMake: string): string => {
-    const makeLower = vehicleMake.toLowerCase();
-    if (makeLower.includes("ford")) return "ford";
-    if (makeLower.includes("dodge") || makeLower.includes("ram") || makeLower.includes("chrysler")) return "dodge";
-    if (makeLower.includes("chevy") || makeLower.includes("chevrolet") || makeLower.includes("gmc")) return "chevy";
-    if (makeLower.includes("jeep")) return "jeep";
-    return "general";
+  const handleToggleCheck = (checkId: string) => {
+    setChecks(prev =>
+      prev.map(c =>
+        c.id === checkId ? { ...c, completed: !c.completed } : c
+      )
+    );
   };
 
-  const canSearch = selectedIndex === 0 
-    ? vin.length === 17 && issue.trim().length >= 3
-    : year && make && model && issue.trim().length >= 3;
-
-  const resetForm = () => {
-    setResponse(null);
-    setError(null);
-    setVin("");
-    setYear("");
-    setMake("");
-    setModel("");
-    setIssue("");
+  const handleViewResults = () => {
+    setStep("results");
   };
 
-  const openLink = (url: string) => {
-    Linking.openURL(url).catch(() => {});
+  const handleReset = () => {
+    setStep("category");
+    setSelectedCategory(null);
+    setSelectedSymptom(null);
+    setChecks([]);
+    setNotes("");
   };
+
+  const completedCount = checks.filter(c => c.completed).length;
+  const progress = checks.length > 0 ? completedCount / checks.length : 0;
+
+  const renderCategoryStep = () => (
+    <View>
+      <View style={styles.header}>
+        <View style={[styles.iconContainer, { backgroundColor: theme.primary + "15" }]}>
+          <Feather name="tool" size={32} color={theme.primary} />
+        </View>
+        <Text style={[styles.title, { color: theme.text }]}>
+          {emptyStates.parts.title}
+        </Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+          Select a system to diagnose
+        </Text>
+      </View>
+
+      <View style={styles.categoryGrid}>
+        {DIAGNOSTIC_CATEGORIES.map(category => (
+          <Pressable
+            key={category.id}
+            style={({ pressed }) => [
+              styles.categoryCard,
+              {
+                backgroundColor: theme.backgroundSecondary,
+                borderColor: theme.cardBorder,
+                opacity: pressed ? 0.9 : 1,
+              },
+            ]}
+            onPress={() => handleSelectCategory(category)}
+            testID={`category-${category.id}`}
+          >
+            <View style={[styles.categoryIconBg, { backgroundColor: theme.primary + "15" }]}>
+              <Feather name={category.icon} size={24} color={theme.primary} />
+            </View>
+            <Text style={[styles.categoryName, { color: theme.text }]}>
+              {category.name}
+            </Text>
+            <Text style={[styles.categoryDesc, { color: theme.textSecondary }]}>
+              {category.description}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderSymptomStep = () => (
+    <View>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => setStep("category")}
+        hitSlop={8}
+      >
+        <Feather name="arrow-left" size={20} color={theme.textSecondary} />
+        <Text style={[styles.backText, { color: theme.textSecondary }]}>Back</Text>
+      </Pressable>
+
+      <View style={styles.stepHeader}>
+        <View style={[styles.categoryIconBg, { backgroundColor: theme.primary + "15" }]}>
+          <Feather name={selectedCategory!.icon} size={24} color={theme.primary} />
+        </View>
+        <Text style={[styles.stepTitle, { color: theme.text }]}>
+          {selectedCategory!.name} Issues
+        </Text>
+        <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+          What symptom are you experiencing?
+        </Text>
+      </View>
+
+      <View style={styles.symptomList}>
+        {selectedCategory!.symptoms.map(symptom => (
+          <Pressable
+            key={symptom.id}
+            style={({ pressed }) => [
+              styles.symptomCard,
+              {
+                backgroundColor: theme.backgroundSecondary,
+                borderColor: theme.cardBorder,
+                opacity: pressed ? 0.9 : 1,
+              },
+            ]}
+            onPress={() => handleSelectSymptom(symptom)}
+            testID={`symptom-${symptom.id}`}
+          >
+            <Text style={[styles.symptomName, { color: theme.text }]}>
+              {symptom.name}
+            </Text>
+            <View style={styles.symptomMeta}>
+              <Text style={[styles.symptomSteps, { color: theme.textMuted }]}>
+                {symptom.checks.length} diagnostic steps
+              </Text>
+              <Feather name="chevron-right" size={18} color={theme.textMuted} />
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderChecklistStep = () => (
+    <View>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => setStep("symptom")}
+        hitSlop={8}
+      >
+        <Feather name="arrow-left" size={20} color={theme.textSecondary} />
+        <Text style={[styles.backText, { color: theme.textSecondary }]}>Back</Text>
+      </Pressable>
+
+      <View style={styles.stepHeader}>
+        <Text style={[styles.stepTitle, { color: theme.text }]}>
+          {selectedSymptom!.name}
+        </Text>
+        <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+          Work through each step to diagnose the issue
+        </Text>
+      </View>
+
+      <View style={[styles.progressBar, { backgroundColor: theme.backgroundTertiary }]}>
+        <View
+          style={[
+            styles.progressFill,
+            { backgroundColor: theme.primary, width: `${progress * 100}%` },
+          ]}
+        />
+      </View>
+      <Text style={[styles.progressText, { color: theme.textSecondary }]}>
+        {completedCount} of {checks.length} steps completed
+      </Text>
+
+      <View style={styles.checkList}>
+        {checks.map(check => (
+          <Pressable
+            key={check.id}
+            style={[
+              styles.checkItem,
+              {
+                backgroundColor: check.completed
+                  ? theme.success + "10"
+                  : theme.backgroundSecondary,
+                borderColor: check.completed ? theme.success + "40" : theme.cardBorder,
+              },
+            ]}
+            onPress={() => handleToggleCheck(check.id)}
+            testID={`check-${check.id}`}
+          >
+            <View style={styles.checkHeader}>
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    backgroundColor: check.completed ? theme.success : "transparent",
+                    borderColor: check.completed ? theme.success : theme.textMuted,
+                  },
+                ]}
+              >
+                {check.completed ? (
+                  <Feather name="check" size={14} color="#FFFFFF" />
+                ) : null}
+              </View>
+              <View style={[styles.stepBadge, { backgroundColor: theme.primary }]}>
+                <Text style={styles.stepNum}>{check.step}</Text>
+              </View>
+              <View
+                style={[
+                  styles.difficultyBadge,
+                  { backgroundColor: difficultyColors[check.difficulty] + "20" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.difficultyText,
+                    { color: difficultyColors[check.difficulty] },
+                  ]}
+                >
+                  {check.difficulty}
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.checkAction,
+                {
+                  color: check.completed ? theme.textSecondary : theme.text,
+                  textDecorationLine: check.completed ? "line-through" : "none",
+                },
+              ]}
+            >
+              {check.action}
+            </Text>
+            {check.tools.length > 0 ? (
+              <View style={styles.toolsRow}>
+                <Feather name="tool" size={12} color={theme.textMuted} />
+                <Text style={[styles.toolsText, { color: theme.textMuted }]}>
+                  {check.tools.join(", ")}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.notesSection}>
+        <Text style={[styles.notesLabel, { color: theme.text }]}>Notes</Text>
+        <TextInput
+          style={[
+            styles.notesInput,
+            {
+              backgroundColor: theme.backgroundSecondary,
+              borderColor: theme.cardBorder,
+              color: theme.text,
+            },
+          ]}
+          placeholder="Record your observations..."
+          placeholderTextColor={theme.textMuted}
+          value={notes}
+          onChangeText={setNotes}
+          multiline
+          testID="input-notes"
+        />
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.resultsButton,
+          {
+            backgroundColor: theme.primary,
+            opacity: pressed ? 0.9 : 1,
+          },
+        ]}
+        onPress={handleViewResults}
+        testID="button-view-results"
+      >
+        <Feather name="list" size={18} color="#FFFFFF" />
+        <Text style={styles.resultsButtonText}>View Parts & Specs</Text>
+      </Pressable>
+    </View>
+  );
+
+  const renderResultsStep = () => (
+    <View>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => setStep("checklist")}
+        hitSlop={8}
+      >
+        <Feather name="arrow-left" size={20} color={theme.textSecondary} />
+        <Text style={[styles.backText, { color: theme.textSecondary }]}>Back to Checklist</Text>
+      </Pressable>
+
+      <View style={styles.stepHeader}>
+        <Text style={[styles.stepTitle, { color: theme.text }]}>
+          Diagnostic Summary
+        </Text>
+        <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+          {selectedCategory!.name} - {selectedSymptom!.name}
+        </Text>
+      </View>
+
+      <View style={[styles.summaryCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+            Steps Completed
+          </Text>
+          <Text style={[styles.summaryValue, { color: theme.text }]}>
+            {completedCount} of {checks.length}
+          </Text>
+        </View>
+        {notes ? (
+          <View style={styles.summaryNotes}>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Your Notes
+            </Text>
+            <Text style={[styles.notesText, { color: theme.text }]}>{notes}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>
+        Suggested Parts
+      </Text>
+      {selectedSymptom!.parts.map((part, index) => (
+        <View
+          key={index}
+          style={[
+            styles.partCard,
+            { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder },
+          ]}
+        >
+          <View style={styles.partHeader}>
+            <Text style={[styles.partName, { color: theme.text }]}>{part.name}</Text>
+            <View
+              style={[styles.priorityDot, { backgroundColor: priorityColors[part.priority] }]}
+            />
+          </View>
+          <View style={styles.partDetails}>
+            <Text style={[styles.partPriority, { color: theme.textSecondary }]}>
+              {part.priority} priority
+            </Text>
+            <Text style={[styles.partCost, { color: theme.primary }]}>
+              {part.estimatedCost}
+            </Text>
+          </View>
+        </View>
+      ))}
+
+      {selectedSymptom!.torqueSpecs.length > 0 ? (
+        <>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Torque Specifications
+          </Text>
+          <View
+            style={[
+              styles.specsTable,
+              { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder },
+            ]}
+          >
+            {selectedSymptom!.torqueSpecs.map((spec, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.specRow,
+                  index < selectedSymptom!.torqueSpecs.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.cardBorder,
+                  },
+                ]}
+              >
+                <Text style={[styles.specComponent, { color: theme.text }]}>
+                  {spec.component}
+                </Text>
+                <Text style={[styles.specValue, { color: theme.primary }]}>
+                  {spec.spec}
+                </Text>
+                {spec.notes ? (
+                  <Text style={[styles.specNotes, { color: theme.textMuted }]}>
+                    {spec.notes}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      <View style={[styles.disclaimer, { backgroundColor: theme.backgroundTertiary }]}>
+        <Feather name="info" size={14} color={theme.textMuted} />
+        <Text style={[styles.disclaimerText, { color: theme.textMuted }]}>
+          Torque specs are general guidelines. Always verify with your vehicle's
+          service manual.
+        </Text>
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.resetButton,
+          {
+            backgroundColor: theme.backgroundSecondary,
+            borderColor: theme.cardBorder,
+            opacity: pressed ? 0.9 : 1,
+          },
+        ]}
+        onPress={handleReset}
+        testID="button-new-diagnosis"
+      >
+        <Feather name="refresh-cw" size={18} color={theme.primary} />
+        <Text style={[styles.resetButtonText, { color: theme.primary }]}>
+          Start New Diagnosis
+        </Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: tabBarHeight + Spacing.xl },
+        {
+          paddingTop: headerHeight + Spacing.md,
+          paddingBottom: tabBarHeight + Spacing.xl,
+        },
       ]}
+      showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {response ? (
-        <View>
-          <View style={styles.resultHeader}>
-            <View style={[styles.confidenceBadge, { backgroundColor: theme.primary + "20" }]}>
-              <Text style={[styles.confidenceText, { color: theme.primary }]}>
-                {confidenceLabels[response.confidenceNote]}
-              </Text>
-            </View>
-            <Pressable onPress={resetForm} style={styles.resetButton}>
-              <Feather name="refresh-cw" size={16} color={theme.textSecondary} />
-              <Text style={[styles.resetText, { color: theme.textSecondary }]}>New Search</Text>
-            </Pressable>
-          </View>
-
-          <View style={[styles.vehicleCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-            <Text style={[styles.vehicleTitle, { color: theme.text }]}>
-              {response.vehicle.year} {response.vehicle.make} {response.vehicle.model}
-            </Text>
-            {response.vehicle.engine ? (
-              <Text style={[styles.vehicleDetail, { color: theme.textSecondary }]}>
-                {response.vehicle.engine} {response.vehicle.transmission ? `/ ${response.vehicle.transmission}` : ""}
-              </Text>
-            ) : null}
-            <View style={[styles.issueBadge, { backgroundColor: theme.primary + "15" }]}>
-              <Text style={[styles.issueText, { color: theme.primary }]}>
-                {response.normalizedIssue}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Likely Causes</Text>
-            {response.likelyCauses.map((cause, index) => (
-              <View key={index} style={[styles.causeCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <View style={styles.causeHeader}>
-                  <View style={[styles.probabilityBadge, { backgroundColor: priorityColors[cause.probability] + "20" }]}>
-                    <Text style={[styles.probabilityText, { color: priorityColors[cause.probability] }]}>
-                      {cause.probability.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={[styles.causeName, { color: theme.text }]}>{cause.cause}</Text>
-                </View>
-                <Text style={[styles.causeExplanation, { color: theme.textSecondary }]}>
-                  {cause.explanation}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended Checks</Text>
-            {response.recommendedChecks.map((check) => (
-              <View key={check.step} style={[styles.checkCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <View style={styles.checkHeader}>
-                  <View style={[styles.stepNumber, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.stepText}>{check.step}</Text>
-                  </View>
-                  <View style={[styles.difficultyBadge, { backgroundColor: difficultyColors[check.difficulty] + "20" }]}>
-                    <Text style={[styles.difficultyText, { color: difficultyColors[check.difficulty] }]}>
-                      {check.difficulty}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.checkAction, { color: theme.text }]}>{check.action}</Text>
-                {check.tools.length > 0 ? (
-                  <View style={styles.toolsRow}>
-                    <Feather name="tool" size={12} color={theme.textMuted} />
-                    <Text style={[styles.toolsText, { color: theme.textMuted }]}>
-                      {check.tools.join(", ")}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            ))}
-          </View>
-
-          {response.torqueSpecs && response.torqueSpecs.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Torque Specifications</Text>
-              <View style={[styles.specsTable, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                {response.torqueSpecs.map((spec, index) => (
-                  <View key={index} style={[styles.specRow, index < response.torqueSpecs!.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
-                    <Text style={[styles.specComponent, { color: theme.text }]}>{spec.component}</Text>
-                    <Text style={[styles.specValue, { color: theme.primary }]}>{spec.spec}</Text>
-                    {spec.notes ? (
-                      <Text style={[styles.specNotes, { color: theme.textMuted }]}>{spec.notes}</Text>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Suggested Parts</Text>
-            {response.suggestedParts.map((part, index) => (
-              <View key={index} style={[styles.partCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <View style={styles.partHeader}>
-                  <Text style={[styles.partName, { color: theme.text }]}>{part.name}</Text>
-                  <View style={[styles.priorityDot, { backgroundColor: priorityColors[part.priority] }]} />
-                </View>
-                <View style={styles.partDetails}>
-                  <Text style={[styles.partCategory, { color: theme.textSecondary }]}>{part.category}</Text>
-                  {part.estimatedCost ? (
-                    <Text style={[styles.partCost, { color: theme.primary }]}>{part.estimatedCost}</Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {response.purchaseOptions && response.purchaseOptions.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Purchase Options</Text>
-              <View style={[styles.disclosureBanner, { backgroundColor: theme.backgroundTertiary }]}>
-                <Feather name="info" size={12} color={theme.textMuted} />
-                <Text style={[styles.disclosureText, { color: theme.textMuted }]}>
-                  Links may earn TorqueShed a small commission.
-                </Text>
-              </View>
-              {Object.entries(
-                response.purchaseOptions.reduce((acc, opt) => {
-                  if (!acc[opt.partName]) acc[opt.partName] = [];
-                  acc[opt.partName].push(opt);
-                  return acc;
-                }, {} as Record<string, PurchaseOption[]>)
-              ).map(([partName, options]) => (
-                <View key={partName} style={styles.purchaseGroup}>
-                  <Text style={[styles.purchasePartName, { color: theme.text }]}>{partName}</Text>
-                  <View style={styles.vendorList}>
-                    {options.map((option, idx) => (
-                      <Pressable
-                        key={idx}
-                        onPress={() => option.affiliateUrl ? openLink(option.affiliateUrl) : null}
-                        disabled={!option.affiliateUrl}
-                        style={({ pressed }) => [
-                          styles.vendorCard,
-                          { 
-                            backgroundColor: theme.backgroundSecondary, 
-                            borderColor: theme.border,
-                            opacity: pressed && option.affiliateUrl ? 0.8 : 1,
-                          },
-                        ]}
-                        testID={`vendor-${option.vendorName.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <View style={styles.vendorHeader}>
-                          <Text style={[styles.vendorName, { color: option.affiliateUrl ? theme.primary : theme.text }]}>
-                            {option.vendorName}
-                          </Text>
-                          {option.disclosureFlag ? (
-                            <View style={[styles.affiliateBadge, { backgroundColor: theme.accent + "20" }]}>
-                              <Text style={[styles.affiliateText, { color: theme.accent }]}>Ad</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        <View style={styles.vendorMeta}>
-                          <Text style={[styles.vendorType, { color: theme.textMuted }]}>{option.type}</Text>
-                          {option.priceRange ? (
-                            <Text style={[styles.vendorPrice, { color: theme.textSecondary }]}>{option.priceRange}</Text>
-                          ) : null}
-                        </View>
-                        {option.affiliateUrl ? (
-                          <Feather name="external-link" size={14} color={theme.textMuted} style={styles.externalIcon} />
-                        ) : (
-                          <Text style={[styles.noLinkText, { color: theme.textMuted }]}>Search vendor directly</Text>
-                        )}
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          <View style={[styles.disclaimerBox, { backgroundColor: theme.backgroundTertiary }]}>
-            <Feather name="info" size={14} color={theme.textMuted} />
-            <Text style={[styles.disclaimerText, { color: theme.textMuted }]}>
-              {response.disclaimer}
-            </Text>
-          </View>
-
-          <Pressable
-            onPress={handleAskTheBay}
-            style={({ pressed }) => [
-              styles.askBayButton,
-              { backgroundColor: garageBrandColors[getBayForMake(response.vehicle.make) as keyof typeof garageBrandColors] || theme.primary, opacity: pressed ? 0.9 : 1 },
-            ]}
-          >
-            <Feather name="message-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.askBayText}>Ask the Bay</Text>
-          </Pressable>
-          <Text style={[styles.askBayHint, { color: theme.textMuted }]}>
-            Get advice from real enthusiasts in the {response.vehicle.make} Bay
-          </Text>
-        </View>
-      ) : (
-        <View>
-          <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: theme.primary + "15" }]}>
-              <Feather name="tool" size={32} color={theme.primary} />
-            </View>
-            <Text style={[styles.title, { color: theme.text }]}>
-              {emptyStates.parts.title}
-            </Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              {emptyStates.parts.message}
-            </Text>
-          </View>
-
-          <View style={styles.segmentContainer}>
-            <SegmentedControl
-              segments={["VIN Lookup", "Year/Make/Model"]}
-              selectedIndex={selectedIndex}
-              onIndexChange={setSelectedIndex}
-            />
-          </View>
-
-          {selectedIndex === 0 ? (
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Vehicle Identification Number
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.backgroundSecondary,
-                    borderColor: theme.border,
-                    color: theme.text,
-                  },
-                ]}
-                placeholder={placeholders.vin}
-                placeholderTextColor={theme.textMuted}
-                value={vin}
-                onChangeText={(text) => setVin(text.toUpperCase())}
-                autoCapitalize="characters"
-                maxLength={17}
-                testID="input-vin"
-              />
-              <Text style={[styles.hint, { color: theme.textMuted }]}>
-                17 characters, no I, O, or Q
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.ymmContainer}>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>Year</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.backgroundSecondary,
-                      borderColor: theme.border,
-                      color: theme.text,
-                    },
-                  ]}
-                  placeholder={placeholders.year}
-                  placeholderTextColor={theme.textMuted}
-                  value={year}
-                  onChangeText={setYear}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  testID="input-year"
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>Make</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.backgroundSecondary,
-                      borderColor: theme.border,
-                      color: theme.text,
-                    },
-                  ]}
-                  placeholder={placeholders.make}
-                  placeholderTextColor={theme.textMuted}
-                  value={make}
-                  onChangeText={setMake}
-                  testID="input-make"
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>Model</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.backgroundSecondary,
-                      borderColor: theme.border,
-                      color: theme.text,
-                    },
-                  ]}
-                  placeholder={placeholders.model}
-                  placeholderTextColor={theme.textMuted}
-                  value={model}
-                  onChangeText={setModel}
-                  testID="input-model"
-                />
-              </View>
-            </View>
-          )}
-
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>
-              What are you trying to fix?
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.issueInput,
-                {
-                  backgroundColor: theme.backgroundSecondary,
-                  borderColor: theme.border,
-                  color: theme.text,
-                },
-              ]}
-              placeholder="e.g., brakes squeaking, oil leak, check engine light..."
-              placeholderTextColor={theme.textMuted}
-              value={issue}
-              onChangeText={setIssue}
-              multiline
-              testID="input-issue"
-            />
-          </View>
-
-          {error ? (
-            <View style={[styles.errorBox, { backgroundColor: theme.error + "15" }]}>
-              <Feather name="alert-circle" size={16} color={theme.error} />
-              <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
-            </View>
-          ) : null}
-
-          <Pressable
-            onPress={handleAssist}
-            disabled={!canSearch || isLoading}
-            style={({ pressed }) => [
-              styles.assistButton,
-              {
-                backgroundColor: canSearch ? theme.primary : theme.backgroundTertiary,
-                opacity: pressed && canSearch ? 0.9 : 1,
-              },
-            ]}
-            testID="button-assist"
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Feather
-                  name="zap"
-                  size={20}
-                  color={canSearch ? "#FFFFFF" : theme.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.assistButtonText,
-                    { color: canSearch ? "#FFFFFF" : theme.textMuted },
-                  ]}
-                >
-                  {microcopy.assistMe}
-                </Text>
-              </>
-            )}
-          </Pressable>
-
-          <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
-            TorqueAssist provides diagnostic guidance, likely causes, and parts suggestions based on common issues.
-          </Text>
-        </View>
-      )}
+      {step === "category" ? renderCategoryStep() : null}
+      {step === "symptom" ? renderSymptomStep() : null}
+      {step === "checklist" ? renderChecklistStep() : null}
+      {step === "results" ? renderResultsStep() : null}
     </ScrollView>
   );
 }
@@ -597,178 +733,119 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   header: {
     alignItems: "center",
     marginBottom: Spacing.xl,
   },
   iconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   title: {
     ...Typography.h2,
     marginBottom: Spacing.xs,
+    textAlign: "center",
   },
   subtitle: {
     ...Typography.body,
     textAlign: "center",
   },
-  segmentContainer: {
-    marginBottom: Spacing.xl,
-  },
-  inputGroup: {
-    marginBottom: Spacing.lg,
-  },
-  label: {
-    ...Typography.small,
-    fontWeight: "500",
-    marginBottom: Spacing.xs,
-  },
-  input: {
-    height: 48,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.md,
-    ...Typography.body,
-  },
-  issueInput: {
-    height: 100,
-    paddingTop: Spacing.md,
-    textAlignVertical: "top",
-  },
-  hint: {
-    ...Typography.caption,
-    marginTop: Spacing.xs,
-  },
-  ymmContainer: {
-    gap: 0,
-  },
-  divider: {
-    height: 1,
-    marginVertical: Spacing.lg,
-  },
-  errorBox: {
+  categoryGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.lg,
+    flexWrap: "wrap",
+    gap: Spacing.md,
   },
-  errorText: {
-    ...Typography.small,
-    flex: 1,
-  },
-  assistButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 52,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  assistButtonText: {
-    ...Typography.h4,
-  },
-  disclaimer: {
-    ...Typography.caption,
-    textAlign: "center",
-  },
-  resultHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.lg,
-  },
-  confidenceBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  confidenceText: {
-    ...Typography.caption,
-    fontWeight: "600",
-  },
-  resetButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  resetText: {
-    ...Typography.small,
-  },
-  vehicleCard: {
+  categoryCard: {
+    width: "47%",
     padding: Spacing.lg,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    marginBottom: Spacing.xl,
+    alignItems: "center",
   },
-  vehicleTitle: {
-    ...Typography.h3,
-    marginBottom: Spacing.xs,
-  },
-  vehicleDetail: {
-    ...Typography.small,
-    marginBottom: Spacing.md,
-  },
-  issueBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  issueText: {
-    ...Typography.body,
-    fontWeight: "600",
-  },
-  section: {
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
-    ...Typography.h4,
-    marginBottom: Spacing.md,
-  },
-  causeCard: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
+  categoryIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: Spacing.sm,
   },
-  causeHeader: {
+  categoryName: {
+    ...Typography.h4,
+    marginBottom: Spacing.xxs,
+  },
+  categoryDesc: {
+    ...Typography.caption,
+    textAlign: "center",
+  },
+  backButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    gap: Spacing.xs,
+    marginBottom: Spacing.lg,
+  },
+  backText: {
+    ...Typography.body,
+  },
+  stepHeader: {
+    marginBottom: Spacing.lg,
+  },
+  stepTitle: {
+    ...Typography.h2,
+    marginTop: Spacing.sm,
     marginBottom: Spacing.xs,
   },
-  probabilityBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  probabilityText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  causeName: {
+  stepSubtitle: {
     ...Typography.body,
-    fontWeight: "600",
-    flex: 1,
   },
-  causeExplanation: {
-    ...Typography.small,
+  symptomList: {
+    gap: Spacing.md,
   },
-  checkCard: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+  symptomCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    marginBottom: Spacing.sm,
+  },
+  symptomName: {
+    ...Typography.h4,
+    marginBottom: Spacing.xs,
+  },
+  symptomMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  symptomSteps: {
+    ...Typography.caption,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    marginBottom: Spacing.xs,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  progressText: {
+    ...Typography.caption,
+    marginBottom: Spacing.lg,
+  },
+  checkList: {
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  checkItem: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
   },
   checkHeader: {
     flexDirection: "row",
@@ -776,63 +853,111 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
-  stepNumber: {
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBadge: {
     width: 24,
     height: 24,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  stepText: {
+  stepNum: {
     color: "#FFFFFF",
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: "700",
   },
   difficultyBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: BorderRadius.full,
+    marginLeft: "auto",
   },
   difficultyText: {
-    fontSize: 10,
+    ...Typography.caption,
     fontWeight: "600",
     textTransform: "capitalize",
   },
   checkAction: {
     ...Typography.body,
-    marginBottom: Spacing.xs,
+    marginLeft: 32,
   },
   toolsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    marginLeft: 32,
   },
   toolsText: {
     ...Typography.caption,
   },
-  specsTable: {
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    overflow: "hidden",
+  notesSection: {
+    marginBottom: Spacing.lg,
   },
-  specRow: {
-    padding: Spacing.md,
-  },
-  specComponent: {
-    ...Typography.body,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  specValue: {
+  notesLabel: {
     ...Typography.h4,
-    marginBottom: 2,
+    marginBottom: Spacing.sm,
   },
-  specNotes: {
-    ...Typography.caption,
+  notesInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    minHeight: 80,
+    ...Typography.body,
+    textAlignVertical: "top",
+  },
+  resultsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  resultsButtonText: {
+    color: "#FFFFFF",
+    ...Typography.h4,
+  },
+  summaryCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summaryLabel: {
+    ...Typography.body,
+  },
+  summaryValue: {
+    ...Typography.h4,
+  },
+  summaryNotes: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+  },
+  notesText: {
+    ...Typography.body,
+    marginTop: Spacing.xs,
+  },
+  sectionTitle: {
+    ...Typography.h3,
+    marginBottom: Spacing.md,
   },
   partCard: {
     padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
     marginBottom: Spacing.sm,
   },
@@ -843,7 +968,7 @@ const styles = StyleSheet.create({
   },
   partName: {
     ...Typography.body,
-    fontWeight: "500",
+    fontWeight: "600",
     flex: 1,
   },
   priorityDot: {
@@ -856,131 +981,58 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: Spacing.xs,
   },
-  partCategory: {
-    ...Typography.small,
-  },
-  partCost: {
-    ...Typography.small,
-    fontWeight: "600",
-  },
-  linksGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
-  },
-  linkButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    minWidth: "45%",
-    flexGrow: 1,
-  },
-  linkProvider: {
-    ...Typography.body,
-    fontWeight: "500",
-  },
-  linkType: {
+  partPriority: {
     ...Typography.caption,
     textTransform: "capitalize",
   },
-  disclaimerBox: {
+  partCost: {
+    ...Typography.body,
+    fontWeight: "600",
+  },
+  specsTable: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: Spacing.lg,
+  },
+  specRow: {
+    padding: Spacing.md,
+  },
+  specComponent: {
+    ...Typography.body,
+    fontWeight: "600",
+    marginBottom: Spacing.xxs,
+  },
+  specValue: {
+    ...Typography.h4,
+  },
+  specNotes: {
+    ...Typography.caption,
+    marginTop: Spacing.xxs,
+  },
+  disclaimer: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: Spacing.sm,
     padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
   },
   disclaimerText: {
     ...Typography.caption,
     flex: 1,
   },
-  askBayButton: {
+  resetButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 52,
-    borderRadius: BorderRadius.md,
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
   },
-  askBayText: {
-    ...Typography.h4,
-    color: "#FFFFFF",
-  },
-  askBayHint: {
-    ...Typography.caption,
-    textAlign: "center",
-  },
-  disclosureBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.md,
-  },
-  disclosureText: {
-    ...Typography.caption,
-    fontStyle: "italic",
-  },
-  purchaseGroup: {
-    marginBottom: Spacing.lg,
-  },
-  purchasePartName: {
+  resetButtonText: {
     ...Typography.body,
     fontWeight: "600",
-    marginBottom: Spacing.sm,
-  },
-  vendorList: {
-    gap: Spacing.sm,
-  },
-  vendorCard: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    position: "relative",
-  },
-  vendorHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  vendorName: {
-    ...Typography.body,
-    fontWeight: "500",
-  },
-  affiliateBadge: {
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
-  affiliateText: {
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  vendorMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  vendorType: {
-    ...Typography.caption,
-    textTransform: "capitalize",
-  },
-  vendorPrice: {
-    ...Typography.small,
-    fontWeight: "500",
-  },
-  externalIcon: {
-    position: "absolute",
-    top: Spacing.md,
-    right: Spacing.md,
-  },
-  noLinkText: {
-    ...Typography.caption,
-    marginTop: Spacing.xs,
   },
 });
