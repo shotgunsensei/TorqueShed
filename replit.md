@@ -44,6 +44,9 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - **ErrorBoundary for TorqueAssist**: TorqueAssist screen wrapped in ErrorBoundary with user-friendly fallback and "Try Again" button.
 - **EditListingScreen**: Full listing editing capability for Swap Shop with PATCH endpoint integration.
 - **Improved Validation**: AddThreadScreen and EditListingScreen show explicit validation error messages.
+- **Delete Functionality**: Both Swap Shop listings and forum threads can now be deleted by their owners with confirmation dialogs.
+- **Forum-Style Thread View**: ThreadDetailScreen shows original post, author avatar, replies, and "Replying to thread" label above the input field. Not chat-like - full message board view.
+- **Add Vehicle Button**: NotesScreen displays an "Add Vehicle" button at the top of the vehicle list, or a prominent "Add Your First Vehicle" button when empty.
 
 ### API Integration (Feb 2026)
 All major features now use real database storage instead of stub data:
