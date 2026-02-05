@@ -181,16 +181,7 @@ export default function TrendingScreen() {
             },
           ]}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={styles.header}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Tool & Gear
-              </Text>
-              <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                Curated picks for your garage. No algorithms, just good gear.
-              </Text>
-            </View>
-          }
+          ListHeaderComponent={null}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Feather name="package" size={48} color={theme.textMuted} />

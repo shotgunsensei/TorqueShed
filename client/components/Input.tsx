@@ -27,6 +27,8 @@ export function Input({
   rightIcon,
   onRightIconPress,
   style,
+  multiline,
+  numberOfLines,
   ...props
 }: InputProps) {
   const { theme } = useTheme();
@@ -37,6 +39,8 @@ export function Input({
     : isFocused
       ? theme.primary
       : theme.border;
+
+  const isMultiline = multiline === true;
 
   return (
     <View style={styles.container}>
@@ -53,9 +57,10 @@ export function Input({
             borderColor,
             backgroundColor: theme.backgroundDefault,
           },
+          isMultiline && styles.multilineContainer,
         ]}
       >
-        {leftIcon ? (
+        {leftIcon && !isMultiline ? (
           <Feather
             name={leftIcon}
             size={20}
@@ -68,12 +73,16 @@ export function Input({
           style={[
             styles.input,
             { color: theme.text },
-            leftIcon ? { paddingLeft: 0 } : null,
+            leftIcon && !isMultiline ? { paddingLeft: 0 } : null,
+            isMultiline && styles.multilineInput,
             style,
           ]}
           placeholderTextColor={theme.textSecondary}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          textAlignVertical={isMultiline ? "top" : "center"}
           {...props}
         />
 
@@ -106,8 +115,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderRadius: BorderRadius.sm,
-    height: Spacing.inputHeight,
+    minHeight: Spacing.inputHeight,
     paddingHorizontal: Spacing.md,
+  },
+  multilineContainer: {
+    alignItems: "flex-start",
+    paddingVertical: Spacing.sm,
   },
   leftIcon: {
     marginRight: Spacing.sm,
@@ -115,7 +128,12 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    height: "100%",
+    minHeight: Spacing.inputHeight - Spacing.md,
+  },
+  multilineInput: {
+    minHeight: 100,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   rightIcon: {
     padding: Spacing.xs,

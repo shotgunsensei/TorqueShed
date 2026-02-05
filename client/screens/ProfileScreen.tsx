@@ -281,7 +281,13 @@ export default function ProfileScreen() {
             styles.menuItem,
             { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
           ]}
-          onPress={() => {}}
+          onPress={() => {
+            Alert.alert(
+              "Notifications",
+              "Notification settings coming soon. You'll be able to manage push notifications for new replies, swap shop messages, and community updates.",
+              [{ text: "OK" }]
+            );
+          }}
         >
           <View style={styles.menuItemLeft}>
             <Feather name="bell" size={20} color={theme.text} />
@@ -297,7 +303,13 @@ export default function ProfileScreen() {
             styles.menuItem,
             { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
           ]}
-          onPress={() => {}}
+          onPress={() => {
+            Alert.alert(
+              "Privacy Settings",
+              "Your data is important to us.\n\n- Profile visibility: Public (other users can see your profile)\n- Activity: Only you can see your activity history\n- Messages: Direct messages are private\n\nFull privacy controls coming in a future update.",
+              [{ text: "OK" }]
+            );
+          }}
         >
           <View style={styles.menuItemLeft}>
             <Feather name="shield" size={20} color={theme.text} />
@@ -313,7 +325,13 @@ export default function ProfileScreen() {
             styles.menuItem,
             { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
           ]}
-          onPress={() => {}}
+          onPress={() => {
+            Alert.alert(
+              "Help & Support",
+              "Need help with TorqueShed?\n\nFAQ & Guides: Check our community forums for tips and tutorials.\n\nContact Us: support@torqueshed.pro\n\nReport a Bug: Use the feedback option in any thread.\n\nVersion: 1.0.0",
+              [{ text: "OK" }]
+            );
+          }}
         >
           <View style={styles.menuItemLeft}>
             <Feather name="help-circle" size={20} color={theme.text} />

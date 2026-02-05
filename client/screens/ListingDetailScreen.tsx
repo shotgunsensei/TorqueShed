@@ -226,6 +226,7 @@ export default function ListingDetailScreen() {
             onPress={handleDelete}
             disabled={deleteMutation.isPending}
             style={[styles.deleteButton, { borderColor: theme.error }]}
+            testID="delete-listing-button"
           >
             <Feather name="trash-2" size={16} color={theme.error} />
             <ThemedText type="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>

@@ -159,13 +159,19 @@ export default function NotesScreen() {
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListHeaderComponent={
-            <Pressable
-              onPress={handleAddVehicle}
-              style={[styles.addButton, { backgroundColor: theme.primary }]}
-            >
-              <Feather name="plus" size={20} color="#FFFFFF" />
-              <Text style={styles.addButtonText}>{microcopy.addVehicle}</Text>
-            </Pressable>
+            <View style={styles.headerSection}>
+              <Pressable
+                onPress={handleAddVehicle}
+                style={[styles.addButton, { backgroundColor: theme.primary }]}
+                testID="add-vehicle-button"
+              >
+                <Feather name="plus" size={20} color="#FFFFFF" />
+                <Text style={styles.addButtonText}>{microcopy.addVehicle}</Text>
+              </Pressable>
+              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                Your Vehicles ({vehicles.length})
+              </Text>
+            </View>
           }
         />
       ) : (
@@ -186,13 +192,20 @@ const styles = StyleSheet.create({
   listContent: {
     padding: Spacing.lg,
   },
+  headerSection: {
+    marginBottom: Spacing.md,
+  },
+  sectionLabel: {
+    ...Typography.caption,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
   addButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
     gap: Spacing.sm,
   },
   addButtonText: {
