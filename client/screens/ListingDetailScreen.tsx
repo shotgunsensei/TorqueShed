@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -14,6 +14,7 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -49,9 +50,40 @@ export default function ListingDetailScreen() {
   const { currentUser } = useAuth();
   const { listingId } = route.params;
 
+  const queryClient = useQueryClient();
+
   const { data: listing, isLoading } = useQuery<Listing>({
     queryKey: [`/api/swap-shop/${listingId}`],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/swap-shop/${listingId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Failed to delete listing");
+    },
+  });
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Listing",
+      "Are you sure you want to delete this listing? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteMutation.mutate(),
+        },
+      ]
+    );
+  };
 
   const getConditionColor = (condition: string) => {
     switch (condition) {
@@ -190,12 +222,16 @@ export default function ListingDetailScreen() {
           >
             Edit Listing
           </Button>
-          <View style={[styles.ownerNote, { backgroundColor: theme.backgroundSecondary }]}>
-            <Feather name="info" size={16} color={theme.textSecondary} />
-            <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
-              This is your listing
+          <Pressable
+            onPress={handleDelete}
+            disabled={deleteMutation.isPending}
+            style={[styles.deleteButton, { borderColor: theme.error }]}
+          >
+            <Feather name="trash-2" size={16} color={theme.error} />
+            <ThemedText type="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete Listing"}
             </ThemedText>
-          </View>
+          </Pressable>
         </View>
       )}
     </ScrollView>
@@ -268,10 +304,12 @@ const styles = StyleSheet.create({
   editButton: {
     marginBottom: Spacing.md,
   },
-  ownerNote: {
+  deleteButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
+    borderWidth: 1,
   },
 });

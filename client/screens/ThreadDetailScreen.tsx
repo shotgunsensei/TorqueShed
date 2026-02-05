@@ -7,10 +7,12 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Feather } from "@expo/vector-icons";
@@ -20,8 +22,11 @@ import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type ThreadDetailParams = {
   threadId: string;
@@ -57,11 +62,13 @@ export default function ThreadDetailScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RoutePropType>();
+  const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
   const { currentUser } = useAuth();
   const { threadId } = route.params;
 
   const [replyText, setReplyText] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   const { data: thread, isLoading: threadLoading } = useQuery<Thread>({
@@ -109,6 +116,20 @@ export default function ThreadDetailScreen() {
     createReplyMutation.mutate();
   };
 
+  const deleteThreadMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/threads/${threadId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Failed to delete thread");
+    },
+  });
+
   const handleMarkSolution = (replyId: string) => {
     Alert.alert(
       "Mark as Solution",
@@ -116,6 +137,21 @@ export default function ThreadDetailScreen() {
       [
         { text: "Cancel", style: "cancel" },
         { text: "Mark Solution", onPress: () => markSolutionMutation.mutate(replyId) },
+      ]
+    );
+  };
+
+  const handleDeleteThread = () => {
+    Alert.alert(
+      "Delete Thread",
+      "Are you sure you want to delete this thread and all its replies? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteThreadMutation.mutate(),
+        },
       ]
     );
   };
@@ -189,14 +225,33 @@ export default function ThreadDetailScreen() {
             ) : null}
           </View>
           <View style={styles.threadMeta}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>{thread.userName}</ThemedText>
-            <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
-              {formatDate(thread.createdAt)}
-            </ThemedText>
+            <View style={[styles.authorAvatar, { backgroundColor: theme.primary + "20" }]}>
+              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                {(thread.userName || "U").charAt(0).toUpperCase()}
+              </ThemedText>
+            </View>
+            <View>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>{thread.userName}</ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                {formatDate(thread.createdAt)}
+              </ThemedText>
+            </View>
           </View>
           <ThemedText type="body" style={styles.threadContent}>
             {thread.content}
           </ThemedText>
+          {isThreadAuthor ? (
+            <Pressable
+              onPress={handleDeleteThread}
+              disabled={deleteThreadMutation.isPending}
+              style={[styles.deleteThreadButton, { borderColor: theme.error }]}
+            >
+              <Feather name="trash-2" size={14} color={theme.error} />
+              <ThemedText type="caption" style={{ color: theme.error, marginLeft: 4 }}>
+                {deleteThreadMutation.isPending ? "Deleting..." : "Delete Thread"}
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </Card>
         <ThemedText type="h4" style={styles.repliesHeader}>
           Replies ({replies.length})
@@ -251,37 +306,47 @@ export default function ThreadDetailScreen() {
           },
         ]}
       >
-        <TextInput
-          ref={inputRef}
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.backgroundRoot,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          placeholder="Write a reply..."
-          placeholderTextColor={theme.textSecondary}
-          value={replyText}
-          onChangeText={setReplyText}
-          multiline
-          maxLength={2000}
-        />
-        <Pressable
-          style={[
-            styles.sendButton,
-            { backgroundColor: replyText.trim() ? theme.primary : theme.border },
-          ]}
-          onPress={handleSubmitReply}
-          disabled={!replyText.trim() || createReplyMutation.isPending}
-        >
-          {createReplyMutation.isPending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Feather name="send" size={20} color="#fff" />
-          )}
-        </Pressable>
+        <View style={styles.replyHeader}>
+          <Feather name="corner-down-right" size={16} color={theme.textSecondary} />
+          <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.xs }}>
+            Replying to thread
+          </ThemedText>
+        </View>
+        <View style={styles.inputRow}>
+          <TextInput
+            ref={inputRef}
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.backgroundRoot,
+                color: theme.text,
+                borderColor: replyText.trim() ? theme.primary : theme.border,
+              },
+            ]}
+            placeholder="Write your reply..."
+            placeholderTextColor={theme.textSecondary}
+            value={replyText}
+            onChangeText={setReplyText}
+            multiline
+            maxLength={2000}
+            onFocus={() => setIsComposing(true)}
+            onBlur={() => setIsComposing(false)}
+          />
+          <Pressable
+            style={[
+              styles.sendButton,
+              { backgroundColor: replyText.trim() ? theme.primary : theme.border },
+            ]}
+            onPress={handleSubmitReply}
+            disabled={!replyText.trim() || createReplyMutation.isPending}
+          >
+            {createReplyMutation.isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Feather name="send" size={20} color="#fff" />
+            )}
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -317,6 +382,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  authorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteThreadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginTop: Spacing.md,
   },
   threadContent: {
     lineHeight: 22,
@@ -368,22 +451,30 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing["2xl"],
   },
   inputContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  replyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
     gap: Spacing.sm,
   },
   input: {
     flex: 1,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: 16,
     fontFamily: "Inter_400Regular",
-    maxHeight: 100,
+    minHeight: 44,
+    maxHeight: 120,
   },
   sendButton: {
     width: 44,
