@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
 import { registerRoutes } from "./routes";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { ZodError } from "zod";
@@ -582,15 +585,14 @@ async function seedReviewerAccount() {
   }
   
   try {
-    // Check if account already exists
+    const hashedPassword = await bcrypt.hash(REVIEWER_PASSWORD, 10);
     const existingUser = await storage.getUserByUsername(REVIEWER_USERNAME);
     if (existingUser) {
-      log(`Reviewer account already exists: ${REVIEWER_USERNAME}`);
+      await db.update(users).set({ password: hashedPassword }).where(eq(users.id, existingUser.id));
+      log(`Reviewer account password synced: ${REVIEWER_USERNAME}`);
       return;
     }
     
-    // Create reviewer account with hashed password
-    const hashedPassword = await bcrypt.hash(REVIEWER_PASSWORD, 10);
     await storage.createUser({
       username: REVIEWER_USERNAME,
       password: hashedPassword,
