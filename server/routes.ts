@@ -996,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!listing) {
         return res.status(404).json({ error: "Listing not found" });
       }
-      if (listing.userId !== req.userId) {
+      if (listing.userId !== req.userId && req.userRole !== "admin") {
         return res.status(403).json({ error: "Forbidden" });
       }
 

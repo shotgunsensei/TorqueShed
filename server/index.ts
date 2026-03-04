@@ -574,33 +574,35 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
-// Seed Google Play reviewer test account
-async function seedReviewerAccount() {
-  const REVIEWER_USERNAME = process.env.REVIEWER_USERNAME;
-  const REVIEWER_PASSWORD = process.env.REVIEWER_PASSWORD;
-  
-  if (!REVIEWER_USERNAME || !REVIEWER_PASSWORD) {
-    log("Reviewer account credentials not configured - skipping seed");
+async function seedAccount(
+  username: string | undefined,
+  password: string | undefined,
+  role: string,
+  label: string
+) {
+  if (!username || !password) {
+    log(`${label} account credentials not configured - skipping seed`);
     return;
   }
-  
+
   try {
-    const hashedPassword = await bcrypt.hash(REVIEWER_PASSWORD, 10);
-    const existingUser = await storage.getUserByUsername(REVIEWER_USERNAME);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
-      await db.update(users).set({ password: hashedPassword }).where(eq(users.id, existingUser.id));
-      log(`Reviewer account password synced: ${REVIEWER_USERNAME}`);
+      await db.update(users).set({ password: hashedPassword, role }).where(eq(users.id, existingUser.id));
+      log(`${label} account synced: ${username} (role: ${role})`);
       return;
     }
-    
-    await storage.createUser({
-      username: REVIEWER_USERNAME,
+
+    const user = await storage.createUser({
+      username,
       password: hashedPassword,
     });
-    
-    log(`Created reviewer test account: ${REVIEWER_USERNAME}`);
+    await db.update(users).set({ role }).where(eq(users.id, user.id));
+
+    log(`Created ${label} account: ${username} (role: ${role})`);
   } catch (error) {
-    console.error("Failed to seed reviewer account:", error);
+    console.error(`Failed to seed ${label} account:`, error);
   }
 }
 
@@ -627,8 +629,9 @@ async function seedReviewerAccount() {
   // API routes
   const server = await registerRoutes(app);
 
-  // Seed test accounts for app store review
-  await seedReviewerAccount();
+  // Seed accounts
+  await seedAccount(process.env.REVIEWER_USERNAME, process.env.REVIEWER_PASSWORD, "user", "Reviewer");
+  await seedAccount(process.env.ADMIN_USERNAME, process.env.ADMIN_PASSWORD, "admin", "Admin");
 
   // Error handler (must be last)
   setupErrorHandler(app);
