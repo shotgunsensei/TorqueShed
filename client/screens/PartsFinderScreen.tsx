@@ -42,23 +42,42 @@ export default function PartsFinderScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSearching(true);
 
-    await new Promise((r) => setTimeout(r, 1500));
+    const fitment = inputMode === 0 && vin 
+      ? `VIN: ...${vin.slice(-6)}`
+      : `${year} ${make} ${model}`;
 
-    const mockResult: PartResult = {
+    const searchTerm = encodeURIComponent(partQuery.trim());
+    const vehicleInfo = encodeURIComponent(fitment);
+
+    const vendorLinks: PartResult = {
       id: "1",
       name: partQuery.trim(),
-      fitment: inputMode === 0 && vin 
-        ? `Fits VIN: ...${vin.slice(-6)}`
-        : `Fits ${year} ${make} ${model}`,
-      vendors: [
-        { name: "RockAuto", url: "https://rockauto.com", price: "$45.99" },
-        { name: "AutoZone", url: "https://autozone.com", price: "$52.99" },
-        { name: "O'Reilly", url: "https://oreillyauto.com", price: "$49.99" },
-        { name: "Amazon", url: "https://amazon.com", price: "$42.99" },
-      ],
+      fitment: fitment,
+      vendors: PART_VENDORS
+        .filter(v => v.id !== "ebay")
+        .map((vendor) => {
+          let url = "";
+          switch (vendor.id) {
+            case "rockauto":
+              url = `https://www.rockauto.com/en/catalog/?a=${searchTerm}`;
+              break;
+            case "autozone":
+              url = `https://www.autozone.com/searchresult?searchText=${searchTerm}`;
+              break;
+            case "oreilly":
+              url = `https://www.oreillyauto.com/shop/b?q=${searchTerm}`;
+              break;
+            case "amazon":
+              url = `https://www.amazon.com/s?k=${searchTerm}+${vehicleInfo}`;
+              break;
+            default:
+              url = `https://www.google.com/search?q=${searchTerm}+${vehicleInfo}`;
+          }
+          return { name: vendor.name, url, price: "Search" };
+        }),
     };
 
-    setResults([mockResult]);
+    setResults([vendorLinks]);
     setIsSearching(false);
   };
 

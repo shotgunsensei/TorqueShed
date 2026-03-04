@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import * as Haptics from "expo-haptics";
 
@@ -92,74 +93,6 @@ function transformToSwapItem(listing: SwapListing): SwapItem {
     contactMethod: "in-app",
   };
 }
-
-const STUB_SWAP_ITEMS: SwapItem[] = [
-  { 
-    id: "1", 
-    title: "Coyote 5.0L Engine - Complete", 
-    price: "$4,500", 
-    location: "Austin, TX", 
-    condition: "Good", 
-    seller: { name: "WrenchMonkey", successfulSwaps: 12, memberSince: "2023" }, 
-    localPickup: true,
-    willShip: false,
-    postedTime: "2h ago", 
-    hasImage: true,
-    contactMethod: "in-app",
-  },
-  { 
-    id: "2", 
-    title: "Fox Body K-Member", 
-    price: "$350", 
-    location: "Dallas, TX", 
-    condition: "Like New", 
-    seller: { name: "FoxBodyFan", successfulSwaps: 8, memberSince: "2022" }, 
-    localPickup: true,
-    willShip: true,
-    postedTime: "5h ago", 
-    hasImage: true,
-    contactMethod: "in-app",
-  },
-  { 
-    id: "3", 
-    title: "T56 Magnum 6-Speed", 
-    price: "$2,800", 
-    location: "Houston, TX", 
-    condition: "Good", 
-    seller: { name: "GearheadGary", successfulSwaps: 23, memberSince: "2021" }, 
-    localPickup: true,
-    willShip: false,
-    postedTime: "1d ago", 
-    hasImage: true,
-    contactMethod: "in-app",
-  },
-  { 
-    id: "4", 
-    title: "Ford 9\" Rear End - 3.55 Gears", 
-    price: "$1,200", 
-    location: "San Antonio, TX", 
-    condition: "Fair", 
-    seller: { name: "NineInch9", successfulSwaps: 5, memberSince: "2024" }, 
-    localPickup: true,
-    willShip: true,
-    postedTime: "2d ago", 
-    hasImage: false,
-    contactMethod: "in-app",
-  },
-  { 
-    id: "5", 
-    title: "Tremec T45 5-Speed", 
-    price: "$800", 
-    location: null, 
-    condition: "For Parts", 
-    seller: { name: "TransGuy", successfulSwaps: 0, memberSince: "2024" }, 
-    localPickup: false,
-    willShip: true,
-    postedTime: "3d ago", 
-    hasImage: true,
-    contactMethod: "in-app",
-  },
-];
 
 const CONDITION_OPTIONS: ItemCondition[] = ["New", "Like New", "Good", "Fair", "For Parts"];
 
@@ -301,9 +234,7 @@ export default function SwapShopScreen() {
     navigation.navigate("AddListing");
   };
 
-  const swapItems = listings.length > 0
-    ? listings.map(transformToSwapItem)
-    : STUB_SWAP_ITEMS;
+  const swapItems = listings.map(transformToSwapItem);
 
   const handleReport = (item: SwapItem) => {
     setSelectedItem(item);
@@ -346,6 +277,15 @@ export default function SwapShopScreen() {
         ]}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          <EmptyState
+            image={require("../../assets/images/empty-marketplace.png")}
+            title={emptyStates.swapShop.title}
+            description={emptyStates.swapShop.message}
+            actionLabel={emptyStates.swapShop.action}
+            onAction={handlePostItem}
+          />
+        }
         ListHeaderComponent={
           <View>
             <View style={[styles.trustBanner, { backgroundColor: theme.success + "15", borderColor: theme.success + "30" }]}>

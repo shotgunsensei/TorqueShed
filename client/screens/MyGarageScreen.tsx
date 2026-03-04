@@ -1,17 +1,18 @@
 import React, { useState, useCallback } from "react";
-import { StyleSheet, FlatList, RefreshControl } from "react-native";
+import { StyleSheet, FlatList, RefreshControl, ActivityIndicator, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { VehicleCard } from "@/components/VehicleCard";
 import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
-import { SAMPLE_VEHICLES, type Vehicle } from "@/constants/vehicles";
+import type { Vehicle } from "@/constants/vehicles";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -22,13 +23,19 @@ export default function MyGarageScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const [vehicles, setVehicles] = useState<Vehicle[]>(SAMPLE_VEHICLES);
+
+  const { data: vehicles = [], isLoading } = useQuery<Vehicle[]>({
+    queryKey: ["/api/vehicles"],
+  });
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] }).then(() => {
+      setRefreshing(false);
+    });
+  }, [queryClient]);
 
   const handleVehiclePress = (vehicle: Vehicle) => {
     navigation.navigate("VehicleDetail", { vehicle });
@@ -42,15 +49,24 @@ export default function MyGarageScreen() {
     <VehicleCard vehicle={item} onPress={() => handleVehiclePress(item)} />
   );
 
-  const renderEmpty = () => (
-    <EmptyState
-      image={require("../../assets/images/empty-garage.png")}
-      title="Your Garage is Empty"
-      description="Add your first vehicle to start tracking maintenance and notes"
-      actionLabel="Add Vehicle"
-      onAction={handleAddVehicle}
-    />
-  );
+  const renderEmpty = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      );
+    }
+    return (
+      <EmptyState
+        image={require("../../assets/images/empty-garage.png")}
+        title="Your Garage is Empty"
+        description="Add your first vehicle to start tracking maintenance and notes"
+        actionLabel="Add Vehicle"
+        onAction={handleAddVehicle}
+      />
+    );
+  };
 
   return (
     <>
@@ -94,5 +110,11 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 200,
   },
 });

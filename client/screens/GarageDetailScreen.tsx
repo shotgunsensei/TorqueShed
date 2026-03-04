@@ -13,7 +13,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { SAMPLE_THREADS, type Thread } from "@/constants/garages";
+import type { Thread } from "@/constants/garages";
 import { microcopy } from "@/constants/brand";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -64,14 +64,6 @@ function transformToThread(apiThread: ApiThread): Thread {
   };
 }
 
-function calculateHotScore(thread: Thread): number {
-  const MAX_RECENCY_SCORE = 100;
-  const HOUR = 3600000;
-  const hoursAgo = (Date.now() - thread.lastActivityTime) / HOUR;
-  const recencyScore = Math.max(0, MAX_RECENCY_SCORE - hoursAgo * 10);
-  return thread.replies + recencyScore;
-}
-
 type RoutePropType = RouteProp<RootStackParamList, "GarageDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -93,22 +85,11 @@ export default function GarageDetailScreen() {
     queryKey: [`/api/garages/${garageId}/threads`],
   });
 
-  const allThreads = useMemo(() => {
-    if (apiThreads.length > 0) {
-      return apiThreads.map(transformToThread);
-    }
-    return SAMPLE_THREADS.filter((t) => t.garageId === garageId);
-  }, [apiThreads, garageId]);
-
-  const hotThreads = useMemo(() => {
-    return [...allThreads]
-      .sort((a, b) => calculateHotScore(b) - calculateHotScore(a))
-      .slice(0, 3);
-  }, [allThreads]);
-
   const threads = useMemo(() => {
-    return [...allThreads].sort((a, b) => b.lastActivityTime - a.lastActivityTime);
-  }, [allThreads]);
+    return apiThreads
+      .map(transformToThread)
+      .sort((a, b) => b.lastActivityTime - a.lastActivityTime);
+  }, [apiThreads]);
 
   const renderThread = useCallback(({ item }: { item: Thread }) => (
     <Pressable
@@ -210,36 +191,16 @@ export default function GarageDetailScreen() {
         ListEmptyComponent={renderEmptyThreads}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <>
-            <Pressable
-              style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
-              onPress={handleNewThread}
-              testID="button-new-thread"
-            >
-              <Feather name="plus" size={18} color="#FFFFFF" />
-              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                New Thread
-              </ThemedText>
-            </Pressable>
-            {hotThreads.length > 0 ? (
-            <View style={styles.hotSection}>
-              <View style={styles.hotSectionHeader}>
-                <Feather name="zap" size={16} color={theme.primary} />
-                <ThemedText type="h4" style={{ color: theme.primary }}>
-                  {microcopy.hotThreads}
-                </ThemedText>
-              </View>
-              {hotThreads.map((thread) => (
-                <View key={`hot-${thread.id}`}>
-                  {renderThread({ item: thread })}
-                </View>
-              ))}
-              <ThemedText type="h4" style={styles.allThreadsHeader}>
-                All Threads
-              </ThemedText>
-            </View>
-          ) : null}
-          </>
+          <Pressable
+            style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
+            onPress={handleNewThread}
+            testID="button-new-thread"
+          >
+            <Feather name="plus" size={18} color="#FFFFFF" />
+            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              New Thread
+            </ThemedText>
+          </Pressable>
         }
       />
     </View>
@@ -314,17 +275,5 @@ const styles = StyleSheet.create({
   replyCount: {
     marginLeft: 4,
     marginRight: Spacing.sm,
-  },
-  hotSection: {
-    marginBottom: Spacing.lg,
-  },
-  hotSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-    gap: Spacing.xs,
-  },
-  allThreadsHeader: {
-    marginBottom: Spacing.md,
   },
 });

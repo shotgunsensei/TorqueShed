@@ -35,14 +35,6 @@ interface Product {
   createdAt: string;
 }
 
-const FALLBACK_PRODUCTS: Product[] = [
-  { id: "1", title: "K&N Cold Air Intake Kit", description: "High-flow performance air intake for improved horsepower and throttle response", whyItMatters: "More air = more power. Fits most trucks and SUVs.", price: "$349.99", priceRange: null, category: "Performance", vendor: "K&N Engineering", affiliateLink: "https://www.knfilters.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
-  { id: "2", title: "Bilstein 5100 Shock Kit", description: "Premium monotube shocks for lifted trucks, adjustable ride height", whyItMatters: "Smoother ride, better control on and off road.", price: "$599.99", priceRange: null, category: "Suspension", vendor: "Bilstein", affiliateLink: "https://www.bilstein.com", imageUrl: null, isSponsored: true, submissionStatus: "featured", featuredExpiration: null, createdAt: new Date().toISOString() },
-  { id: "3", title: "Flowmaster Super 44 Muffler", description: "Aggressive deep tone exhaust with improved flow", whyItMatters: "That rumble you want without droning on highways.", price: "$179.99", priceRange: null, category: "Exhaust", vendor: "Flowmaster", affiliateLink: "https://www.flowmastermufflers.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
-  { id: "4", title: "Rigid Industries LED Light Bar", description: "20-inch spot/flood combo LED bar, 20,000 lumens", whyItMatters: "See everything. Built tough for off-road abuse.", price: "$449.99", priceRange: null, category: "Lighting", vendor: "Rigid Industries", affiliateLink: "https://www.rigidindustries.com", imageUrl: null, isSponsored: true, submissionStatus: "featured", featuredExpiration: null, createdAt: new Date().toISOString() },
-  { id: "5", title: "WeatherTech Floor Liners", description: "Custom-fit floor protection for all weather conditions", whyItMatters: "Save your carpets from mud, snow, and spills.", price: "$189.99", priceRange: "$149 - $229", category: "Interior", vendor: "WeatherTech", affiliateLink: "https://www.weathertech.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
-  { id: "6", title: "Borla Cat-Back Exhaust System", description: "Stainless steel performance exhaust system with deep tone", whyItMatters: "Quality sound and added horsepower. Lifetime warranty.", price: "$899.99", priceRange: null, category: "Exhaust", vendor: "Borla", affiliateLink: "https://www.borla.com", imageUrl: null, isSponsored: false, submissionStatus: "approved", featuredExpiration: null, createdAt: new Date().toISOString() },
-];
 
 function ProductCard({ item }: { item: Product }) {
   const { theme } = useTheme();
@@ -155,7 +147,7 @@ export default function TrendingScreen() {
     queryKey: ["/api/products"],
   });
 
-  const displayProducts = products && products.length > 0 ? products : FALLBACK_PRODUCTS;
+  const displayProducts = products || [];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -170,7 +162,7 @@ export default function TrendingScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ProductCard item={item} />}
           numColumns={numColumns}
-          columnWrapperStyle={styles.row}
+          columnWrapperStyle={displayProducts.length > 0 ? styles.row : undefined}
           contentContainerStyle={[
             styles.listContent,
             {

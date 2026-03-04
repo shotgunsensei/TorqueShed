@@ -53,12 +53,6 @@ export function GarageCard({ garage, onPress }: GarageCardProps) {
     >
       <View style={styles.header}>
         <GarageBadge brandKey={garage.brandKey} size={40} />
-        <View style={styles.activeIndicator}>
-          <View style={[styles.activeDot, { backgroundColor: theme.success }]} />
-          <ThemedText style={[styles.activeText, { color: theme.textSecondary }]}>
-            {garage.activeNow} online
-          </ThemedText>
-        </View>
       </View>
 
       <ThemedText type="h3" style={styles.name} numberOfLines={1}>
@@ -72,13 +66,6 @@ export function GarageCard({ garage, onPress }: GarageCardProps) {
       >
         {garage.description}
       </ThemedText>
-
-      <View style={styles.footer}>
-        <Feather name="users" size={14} color={theme.textSecondary} />
-        <ThemedText style={[styles.memberCount, { color: theme.textSecondary }]}>
-          {garage.memberCount.toLocaleString()} members
-        </ThemedText>
-      </View>
     </AnimatedPressable>
   );
 }
@@ -97,32 +84,11 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: Spacing.md,
   },
-  activeIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: Spacing.xs,
-  },
-  activeText: {
-    fontSize: 11,
-  },
   name: {
     marginBottom: Spacing.xs,
   },
   description: {
     flex: 1,
     marginBottom: Spacing.md,
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  memberCount: {
-    fontSize: 12,
-    marginLeft: Spacing.xs,
   },
 });

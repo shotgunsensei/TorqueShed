@@ -81,7 +81,16 @@ All major features now use real database storage instead of stub data:
 - **PostgreSQL**: As the primary database.
 - **Drizzle ORM**: For interacting with the PostgreSQL database.
 
-## Recent Changes (Feb 2026)
+## Recent Changes (Mar 2026)
+- **Eliminated all hardcoded/fake data**: Removed SAMPLE_THREADS, SAMPLE_MESSAGES, SAMPLE_VEHICLES, SAMPLE_NOTES, SAMPLE_PRODUCTS, FALLBACK_PRODUCTS, STUB_GARAGES, STUB_SWAP_ITEMS from all client code. Every screen now displays only real data from the database.
+- **Real member/thread counts**: GaragesScreen fetches from `/api/garages` which computes memberCount from `garage_members` table and threadCount from `threads` table in real-time.
+- **Removed fake indicators**: No more hardcoded "online" counts, "active now" counts, or "hot threads" sections. These were artificial metrics not backed by real data.
+- **PartsFinderScreen**: Search now generates direct links to vendor search pages (RockAuto, AutoZone, O'Reilly, Amazon) instead of returning mock results with fake prices.
+- **MarketplaceScreen and TrendingScreen**: Now fetch products from `/api/products` API instead of using hardcoded sample product arrays.
+- **MyGarageScreen**: Now fetches vehicles from `/api/vehicles` instead of using hardcoded sample vehicles.
+- **SwapShopScreen**: Uses only real listings from `/api/swap-shop`, shows empty state when no listings exist.
+
+## Previous Changes (Feb 2026)
 - Removed real-time chat feature (WebSocket) in favor of forum-style threads
 - Redesigned TorqueAssist from API-based to wizard/checklist approach
 - Added CORS support for torqueshed.pro production domain

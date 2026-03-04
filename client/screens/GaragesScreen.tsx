@@ -5,41 +5,33 @@ import {
   FlatList,
   StyleSheet,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
-import { brand, emptyStates, microcopy } from "@/constants/brand";
+import { brand } from "@/constants/brand";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface GarageItem {
+interface ApiGarage {
   id: string;
   name: string;
-  brandColor: string;
+  description: string | null;
+  brandColor: string | null;
   memberCount: number;
-  onlineCount: number;
-  latestMessageTime: string;
-  hotThreads: number;
+  threadCount: number;
 }
 
-const STUB_GARAGES: GarageItem[] = [
-  { id: "ford", name: "Ford Bay", brandColor: "#003478", memberCount: 1247, onlineCount: 42, latestMessageTime: "2m ago", hotThreads: 3 },
-  { id: "dodge", name: "Dodge Bay", brandColor: "#C8102E", memberCount: 892, onlineCount: 28, latestMessageTime: "5m ago", hotThreads: 2 },
-  { id: "chevy", name: "Chevy Bay", brandColor: "#F2A900", memberCount: 1089, onlineCount: 35, latestMessageTime: "1m ago", hotThreads: 4 },
-  { id: "jeep", name: "Jeep Bay", brandColor: "#006341", memberCount: 756, onlineCount: 21, latestMessageTime: "8m ago", hotThreads: 1 },
-  { id: "general", name: "General Bay", brandColor: "#6B6B6B", memberCount: 2341, onlineCount: 67, latestMessageTime: "Just now", hotThreads: 5 },
-  { id: "swap-shop", name: "Swap Shop", brandColor: "#FF6B35", memberCount: 1532, onlineCount: 48, latestMessageTime: "3m ago", hotThreads: 2 },
-];
-
-function GarageCard({ item, onPress }: { item: GarageItem; onPress: () => void }) {
+function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void }) {
   const { theme } = useTheme();
 
   return (
@@ -54,19 +46,19 @@ function GarageCard({ item, onPress }: { item: GarageItem; onPress: () => void }
           transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}
+      testID={`garage-card-${item.id}`}
     >
       <View style={styles.cardHeader}>
-        <View style={[styles.brandBadge, { backgroundColor: item.brandColor }]}>
+        <View style={[styles.brandBadge, { backgroundColor: item.brandColor || theme.primary }]}>
           <Text style={styles.brandBadgeText}>{item.name.charAt(0)}</Text>
         </View>
         <View style={styles.cardTitleRow}>
           <Text style={[styles.cardTitle, { color: theme.text }]}>{item.name}</Text>
-          <View style={styles.onlineRow}>
-            <View style={[styles.onlineDot, { backgroundColor: theme.success }]} />
-            <Text style={[styles.onlineText, { color: theme.textSecondary }]}>
-              {item.onlineCount} {microcopy.online}
+          {item.description ? (
+            <Text style={[styles.descriptionText, { color: theme.textSecondary }]} numberOfLines={1}>
+              {item.description}
             </Text>
-          </View>
+          ) : null}
         </View>
       </View>
 
@@ -74,23 +66,15 @@ function GarageCard({ item, onPress }: { item: GarageItem; onPress: () => void }
         <View style={styles.statItem}>
           <Feather name="users" size={14} color={theme.textMuted} />
           <Text style={[styles.statText, { color: theme.textMuted }]}>
-            {item.memberCount.toLocaleString()}
+            {item.memberCount.toLocaleString()} {item.memberCount === 1 ? "member" : "members"}
           </Text>
         </View>
         <View style={styles.statItem}>
           <Feather name="message-circle" size={14} color={theme.textMuted} />
           <Text style={[styles.statText, { color: theme.textMuted }]}>
-            {item.latestMessageTime}
+            {item.threadCount} {item.threadCount === 1 ? "thread" : "threads"}
           </Text>
         </View>
-        {item.hotThreads > 0 ? (
-          <View style={[styles.hotBadge, { backgroundColor: theme.primary + "20" }]}>
-            <Feather name="zap" size={12} color={theme.primary} />
-            <Text style={[styles.hotText, { color: theme.primary }]}>
-              {item.hotThreads} {microcopy.hot}
-            </Text>
-          </View>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -105,18 +89,30 @@ export default function GaragesScreen() {
 
   const numColumns = isDesktop ? (width >= 1280 ? 3 : 2) : 1;
 
-  const handleGaragePress = (garage: GarageItem) => {
+  const { data: garages = [], isLoading } = useQuery<ApiGarage[]>({
+    queryKey: ["/api/garages"],
+  });
+
+  const handleGaragePress = (garage: ApiGarage) => {
     navigation.navigate("GarageDetail", {
       garageId: garage.id,
       garageName: garage.name,
     });
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         key={`garages-${numColumns}`}
-        data={STUB_GARAGES}
+        data={garages}
         keyExtractor={(item) => item.id}
         numColumns={numColumns}
         renderItem={({ item }) => (
@@ -150,6 +146,10 @@ export default function GaragesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContent: {
     padding: Spacing.lg,
@@ -188,17 +188,7 @@ const styles = StyleSheet.create({
     ...Typography.h4,
     marginBottom: 2,
   },
-  onlineRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  onlineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: Spacing.xs,
-  },
-  onlineText: {
+  descriptionText: {
     ...Typography.caption,
   },
   cardStats: {
@@ -213,21 +203,6 @@ const styles = StyleSheet.create({
   },
   statText: {
     ...Typography.caption,
-  },
-  hotBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xxs,
-    borderRadius: BorderRadius.full,
-    gap: 4,
-  },
-  hotText: {
-    ...Typography.caption,
-    fontWeight: "600",
-  },
-  separator: {
-    height: Spacing.md,
   },
   gridHeader: {
     width: "100%",
