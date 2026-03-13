@@ -4,6 +4,8 @@ import * as SecureStore from "expo-secure-store";
 
 const TOKEN_KEY = "torqueshed_auth_token";
 
+const PRODUCTION_API_URL = "https://torqueshed.pro";
+
 /**
  * Gets the base URL for the Express API server (e.g., "https://torqueshed.pro")
  * @returns {string} The API base URL
@@ -19,8 +21,10 @@ export function getApiUrl(): string {
     }
   }
 
+  // On native production builds (Play Store / App Store), env vars are not available.
+  // Fall back to the hardcoded production URL.
   if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set and no fallback available");
+    return PRODUCTION_API_URL;
   }
 
   // Ensure no port suffix for production domain
