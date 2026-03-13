@@ -57,6 +57,13 @@ export interface PublicProfile {
   createdAt: Date | null;
 }
 
+export interface UserStats {
+  threadCount: number;
+  replyCount: number;
+  listingCount: number;
+  vehicleCount: number;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -64,9 +71,13 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getPublicProfile(id: string): Promise<PublicProfile | undefined>;
   updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined>;
+  getUserStats(userId: string): Promise<UserStats>;
   
   getGarages(): Promise<Garage[]>;
   getGarage(id: string): Promise<Garage | undefined>;
+  joinGarage(userId: string, garageId: string): Promise<void>;
+  leaveGarage(userId: string, garageId: string): Promise<void>;
+  isGarageMember(userId: string, garageId: string): Promise<boolean>;
   
   getChatMessages(garageId: string, limit?: number, before?: string): Promise<(ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage & { userName: string }>;
@@ -147,6 +158,52 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async getUserStats(userId: string): Promise<UserStats> {
+    const [threadResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(threads)
+      .where(eq(threads.userId, userId));
+    const [replyResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(threadReplies)
+      .where(eq(threadReplies.userId, userId));
+    const [listingResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(swapShopListings)
+      .where(eq(swapShopListings.userId, userId));
+    const [vehicleResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId));
+    return {
+      threadCount: Number(threadResult?.count || 0),
+      replyCount: Number(replyResult?.count || 0),
+      listingCount: Number(listingResult?.count || 0),
+      vehicleCount: Number(vehicleResult?.count || 0),
+    };
+  }
+
+  async joinGarage(userId: string, garageId: string): Promise<void> {
+    await db
+      .insert(garageMembers)
+      .values({ userId, garageId })
+      .onConflictDoNothing();
+  }
+
+  async leaveGarage(userId: string, garageId: string): Promise<void> {
+    await db
+      .delete(garageMembers)
+      .where(and(eq(garageMembers.userId, userId), eq(garageMembers.garageId, garageId)));
+  }
+
+  async isGarageMember(userId: string, garageId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ userId: garageMembers.userId })
+      .from(garageMembers)
+      .where(and(eq(garageMembers.userId, userId), eq(garageMembers.garageId, garageId)));
+    return !!row;
   }
 
   async getGarages(): Promise<(Garage & { threadCount: number })[]> {

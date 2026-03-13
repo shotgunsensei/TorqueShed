@@ -121,10 +121,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/garages", async (_req: Request, res: Response) => {
+  app.get("/api/garages", async (req: Request, res: Response) => {
     try {
       const garages = await storage.getGarages();
-      res.json(garages);
+      const userId = (req as AuthenticatedRequest).userId;
+      if (userId) {
+        const withMembership = await Promise.all(
+          garages.map(async (g) => ({
+            ...g,
+            isJoined: await storage.isGarageMember(userId, g.id),
+          }))
+        );
+        return res.json(withMembership);
+      }
+      res.json(garages.map((g) => ({ ...g, isJoined: false })));
     } catch (error) {
       console.error("Error fetching garages:", error);
       res.status(500).json({ error: "Failed to fetch garages" });
@@ -137,10 +147,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!garage) {
         return res.status(404).json({ error: "Garage not found" });
       }
-      res.json(garage);
+      const userId = (req as AuthenticatedRequest).userId;
+      const isJoined = userId ? await storage.isGarageMember(userId, req.params.id) : false;
+      res.json({ ...garage, isJoined });
     } catch (error) {
       console.error("Error fetching garage:", error);
       res.status(500).json({ error: "Failed to fetch garage" });
+    }
+  });
+
+  app.post("/api/garages/:id/join", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const garage = await storage.getGarage(req.params.id);
+      if (!garage) return res.status(404).json({ error: "Garage not found" });
+      await storage.joinGarage(req.userId!, req.params.id);
+      res.json({ joined: true });
+    } catch (error) {
+      console.error("Error joining garage:", error);
+      res.status(500).json({ error: "Failed to join garage" });
+    }
+  });
+
+  app.delete("/api/garages/:id/join", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      await storage.leaveGarage(req.userId!, req.params.id);
+      res.json({ joined: false });
+    } catch (error) {
+      console.error("Error leaving garage:", error);
+      res.status(500).json({ error: "Failed to leave garage" });
     }
   });
 
@@ -293,6 +327,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting user account:", error);
       res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
+  app.get("/api/users/me/stats", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const stats = await storage.getUserStats(req.userId!);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
     }
   });
 

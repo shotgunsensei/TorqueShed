@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   FlatList,
   StyleSheet,
   Pressable,
@@ -225,6 +226,7 @@ export default function SwapShopScreen() {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SwapItem | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: listings = [], isLoading } = useQuery<SwapListing[]>({
     queryKey: ["/api/swap-shop"],
@@ -234,7 +236,15 @@ export default function SwapShopScreen() {
     navigation.navigate("AddListing");
   };
 
-  const swapItems = listings.map(transformToSwapItem);
+  const allSwapItems = listings.map(transformToSwapItem);
+
+  const swapItems = searchQuery.trim()
+    ? allSwapItems.filter((item) =>
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.seller.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.location || "").toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allSwapItems;
 
   const handleReport = (item: SwapItem) => {
     setSelectedItem(item);
@@ -278,13 +288,22 @@ export default function SwapShopScreen() {
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          <EmptyState
-            image={require("../../assets/images/empty-marketplace.png")}
-            title={emptyStates.swapShop.title}
-            description={emptyStates.swapShop.message}
-            actionLabel={emptyStates.swapShop.action}
-            onAction={handlePostItem}
-          />
+          searchQuery.trim() ? (
+            <View style={styles.noResultsState}>
+              <Feather name="search" size={40} color={theme.textMuted} />
+              <Text style={[styles.noResultsText, { color: theme.textMuted }]}>
+                No listings match "{searchQuery}"
+              </Text>
+            </View>
+          ) : (
+            <EmptyState
+              image={require("../../assets/images/empty-marketplace.png")}
+              title={emptyStates.swapShop.title}
+              description={emptyStates.swapShop.message}
+              actionLabel={emptyStates.swapShop.action}
+              onAction={handlePostItem}
+            />
+          )
         }
         ListHeaderComponent={
           <View>
@@ -293,6 +312,19 @@ export default function SwapShopScreen() {
               <Text style={[styles.trustBannerText, { color: theme.textSecondary }]}>
                 All contact is in-app only. No personal info shared.
               </Text>
+            </View>
+            <View style={[styles.searchRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+              <Feather name="search" size={16} color={theme.textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Search listings, sellers, location..."
+                placeholderTextColor={theme.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+                testID="input-search-listings"
+              />
             </View>
             <Pressable
               style={[styles.postButton, { backgroundColor: theme.primary }]}
@@ -413,6 +445,29 @@ const styles = StyleSheet.create({
   trustBannerText: {
     ...Typography.caption,
     flex: 1,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    fontSize: 15,
+  },
+  noResultsState: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl * 2,
+    gap: Spacing.md,
+  },
+  noResultsText: {
+    ...Typography.body,
   },
   postButton: {
     flexDirection: "row",

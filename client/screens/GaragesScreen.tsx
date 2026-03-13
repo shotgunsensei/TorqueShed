@@ -29,6 +29,7 @@ interface ApiGarage {
   brandColor: string | null;
   memberCount: number;
   threadCount: number;
+  isJoined: boolean;
 }
 
 function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void }) {
@@ -63,18 +64,26 @@ function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void })
       </View>
 
       <View style={styles.cardStats}>
-        <View style={styles.statItem}>
-          <Feather name="users" size={14} color={theme.textMuted} />
-          <Text style={[styles.statText, { color: theme.textMuted }]}>
-            {item.memberCount.toLocaleString()} {item.memberCount === 1 ? "member" : "members"}
-          </Text>
+        <View style={styles.statsLeft}>
+          <View style={styles.statItem}>
+            <Feather name="users" size={14} color={theme.textMuted} />
+            <Text style={[styles.statText, { color: theme.textMuted }]}>
+              {item.memberCount.toLocaleString()} {item.memberCount === 1 ? "member" : "members"}
+            </Text>
+          </View>
+          <View style={styles.statItem}>
+            <Feather name="message-circle" size={14} color={theme.textMuted} />
+            <Text style={[styles.statText, { color: theme.textMuted }]}>
+              {item.threadCount} {item.threadCount === 1 ? "thread" : "threads"}
+            </Text>
+          </View>
         </View>
-        <View style={styles.statItem}>
-          <Feather name="message-circle" size={14} color={theme.textMuted} />
-          <Text style={[styles.statText, { color: theme.textMuted }]}>
-            {item.threadCount} {item.threadCount === 1 ? "thread" : "threads"}
-          </Text>
-        </View>
+        {item.isJoined ? (
+          <View style={[styles.joinedBadge, { backgroundColor: theme.success + "20" }]}>
+            <Feather name="check" size={11} color={theme.success} />
+            <Text style={[styles.joinedText, { color: theme.success }]}>Joined</Text>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -194,6 +203,11 @@ const styles = StyleSheet.create({
   cardStats: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  statsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.lg,
   },
   statItem: {
@@ -203,6 +217,19 @@ const styles = StyleSheet.create({
   },
   statText: {
     ...Typography.caption,
+  },
+  joinedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  joinedText: {
+    ...Typography.caption,
+    fontWeight: "600",
+    fontSize: 11,
   },
   gridHeader: {
     width: "100%",

@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ThemedText } from "@/components/ThemedText";
@@ -16,6 +17,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import type { Thread } from "@/constants/garages";
 import { microcopy } from "@/constants/brand";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { apiRequest } from "@/lib/query-client";
 
 interface ApiThread {
   id: string;
@@ -29,6 +31,16 @@ interface ApiThread {
   lastActivityAt: string;
   createdAt: string;
   userName: string;
+}
+
+interface ApiGarageDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  brandColor: string | null;
+  memberCount: number;
+  threadCount: number;
+  isJoined: boolean;
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -75,20 +87,43 @@ export default function GarageDetailScreen() {
   const { isDesktop } = useResponsive();
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
+  const queryClient = useQueryClient();
   const { garageId } = route.params;
 
   const handleNewThread = () => {
     navigation.navigate("AddThread", { garageId });
   };
 
+  const { data: garage } = useQuery<ApiGarageDetail>({
+    queryKey: [`/api/garages/${garageId}`],
+  });
+
   const { data: apiThreads = [], isLoading: threadsLoading } = useQuery<ApiThread[]>({
     queryKey: [`/api/garages/${garageId}/threads`],
+  });
+
+  const joinMutation = useMutation({
+    mutationFn: async () => {
+      if (garage?.isJoined) {
+        return apiRequest("DELETE", `/api/garages/${garageId}/join`);
+      } else {
+        return apiRequest("POST", `/api/garages/${garageId}/join`);
+      }
+    },
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: [`/api/garages/${garageId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
+    },
   });
 
   const threads = useMemo(() => {
     return apiThreads
       .map(transformToThread)
-      .sort((a, b) => b.lastActivityTime - a.lastActivityTime);
+      .sort((a, b) => {
+        if (a.hasSolution !== b.hasSolution) return a.hasSolution ? 1 : -1;
+        return b.lastActivityTime - a.lastActivityTime;
+      });
   }, [apiThreads]);
 
   const renderThread = useCallback(({ item }: { item: Thread }) => (
@@ -173,6 +208,9 @@ export default function GarageDetailScreen() {
     width: "100%" as const,
   } : {};
 
+  const isJoined = garage?.isJoined ?? false;
+  const memberCount = garage?.memberCount ?? 0;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
@@ -191,16 +229,52 @@ export default function GarageDetailScreen() {
         ListEmptyComponent={renderEmptyThreads}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <Pressable
-            style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
-            onPress={handleNewThread}
-            testID="button-new-thread"
-          >
-            <Feather name="plus" size={18} color="#FFFFFF" />
-            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-              New Thread
-            </ThemedText>
-          </Pressable>
+          <View>
+            <View style={[styles.garageStats, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
+              <View style={styles.statItem}>
+                <Feather name="users" size={14} color={theme.textMuted} />
+                <ThemedText type="caption" style={{ color: theme.textMuted, marginLeft: 4 }}>
+                  {memberCount} {memberCount === 1 ? "member" : "members"}
+                </ThemedText>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.joinButton,
+                  {
+                    backgroundColor: isJoined ? theme.backgroundTertiary : theme.primary,
+                    borderColor: isJoined ? theme.border : theme.primary,
+                    opacity: pressed || joinMutation.isPending ? 0.8 : 1,
+                  },
+                ]}
+                onPress={() => joinMutation.mutate()}
+                disabled={joinMutation.isPending}
+                testID="button-join-garage"
+              >
+                <Feather
+                  name={isJoined ? "check" : "plus"}
+                  size={13}
+                  color={isJoined ? theme.text : "#FFFFFF"}
+                />
+                <ThemedText
+                  type="caption"
+                  style={{ color: isJoined ? theme.text : "#FFFFFF", fontWeight: "600", marginLeft: 4 }}
+                >
+                  {isJoined ? "Joined" : "Join Bay"}
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={[styles.newThreadButton, { backgroundColor: theme.primary }]}
+              onPress={handleNewThread}
+              testID="button-new-thread"
+            >
+              <Feather name="plus" size={18} color="#FFFFFF" />
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                New Thread
+              </ThemedText>
+            </Pressable>
+          </View>
         }
       />
     </View>
@@ -226,6 +300,27 @@ const styles = StyleSheet.create({
   emptyContent: {
     flex: 1,
     justifyContent: "center",
+  },
+  garageStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  joinButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
   newThreadButton: {
     flexDirection: "row",
