@@ -258,6 +258,13 @@ function configureExpoAndLanding(app: express.Application) {
 
   log("Serving static Expo files with dynamic manifest routing");
 
+  // Serve PWA web manifest (for PWABuilder and browsers)
+  const pwaManifestPath = path.resolve(process.cwd(), "server", "templates", "pwa-manifest.json");
+  app.get("/manifest.json", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "application/manifest+json");
+    res.sendFile(pwaManifestPath);
+  });
+
   // Serve web app at /app route
   const webIndexPath = path.resolve(process.cwd(), "static-build", "web", "index.html");
   const isDevelopment = process.env.NODE_ENV !== "production";
