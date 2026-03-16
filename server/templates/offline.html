@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>TorqueShed - Offline</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#FF6B35" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #0D0F12;
+        color: #E5E7EB;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        text-align: center;
+        padding: 24px;
+      }
+      .container { max-width: 400px; }
+      .icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 24px;
+        color: #FF6B35;
+      }
+      h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 12px;
+      }
+      p {
+        font-size: 16px;
+        color: #9CA3AF;
+        line-height: 1.5;
+        margin-bottom: 32px;
+      }
+      .retry-btn {
+        display: inline-block;
+        background: #FF6B35;
+        color: #fff;
+        font-weight: 600;
+        font-size: 16px;
+        padding: 14px 32px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.15s;
+      }
+      .retry-btn:hover { background: #E65A2E; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+        <path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+        <line x1="12" y1="20" x2="12.01" y2="20"></line>
+      </svg>
+      <h1>You're Offline</h1>
+      <p>TorqueShed needs an internet connection. Check your signal and try again.</p>
+      <button class="retry-btn" onclick="window.location.reload()">Try Again</button>
+    </div>
+  </body>
+</html>

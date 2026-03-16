@@ -265,6 +265,22 @@ function configureExpoAndLanding(app: express.Application) {
     res.sendFile(pwaManifestPath);
   });
 
+  // Serve PWA service worker at root scope
+  const swPath = path.resolve(process.cwd(), "server", "templates", "sw.js");
+  app.get("/sw.js", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Service-Worker-Allowed", "/");
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(swPath);
+  });
+
+  // Serve offline fallback page
+  const offlinePath = path.resolve(process.cwd(), "server", "templates", "offline.html");
+  app.get("/offline.html", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(offlinePath);
+  });
+
   // Serve web app at /app route
   const webIndexPath = path.resolve(process.cwd(), "static-build", "web", "index.html");
   const isDevelopment = process.env.NODE_ENV !== "production";
