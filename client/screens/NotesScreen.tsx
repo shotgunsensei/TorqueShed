@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
@@ -17,7 +16,7 @@ import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
-import { emptyStates, microcopy } from "@/constants/brand";
+import { emptyStates } from "@/constants/brand";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -160,14 +159,6 @@ export default function NotesScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListHeaderComponent={
             <View style={styles.headerSection}>
-              <Pressable
-                onPress={handleAddVehicle}
-                style={[styles.addButton, { backgroundColor: theme.primary }]}
-                testID="add-vehicle-button"
-              >
-                <Feather name="plus" size={20} color="#FFFFFF" />
-                <Text style={styles.addButtonText}>{microcopy.addVehicle}</Text>
-              </Pressable>
               <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
                 Your Vehicles ({vehicles.length})
               </Text>
@@ -177,6 +168,23 @@ export default function NotesScreen() {
       ) : (
         <EmptyVehicles onAdd={handleAddVehicle} />
       )}
+      {vehicles.length > 0 ? (
+        <Pressable
+          onPress={handleAddVehicle}
+          testID="add-vehicle-fab"
+          style={({ pressed }) => [
+            styles.fab,
+            {
+              backgroundColor: theme.primary,
+              bottom: tabBarHeight + Spacing.lg,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.92 : 1 }],
+            },
+          ]}
+        >
+          <Feather name="plus" size={28} color="#FFFFFF" />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -200,17 +208,19 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
   },
-  addButton: {
-    flexDirection: "row",
+  fab: {
+    position: "absolute",
+    right: Spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-  },
-  addButtonText: {
-    color: "#FFFFFF",
-    ...Typography.h4,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   card: {
     borderRadius: BorderRadius.md,
