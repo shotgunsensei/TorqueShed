@@ -153,7 +153,7 @@ export default function NotesScreen() {
           )}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: tabBarHeight + Spacing.lg },
+            { paddingBottom: tabBarHeight + Spacing.lg + 56 + Spacing.md },
           ]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
