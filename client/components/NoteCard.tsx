@@ -16,6 +16,7 @@ interface NoteCardProps {
   note: VehicleNote;
   onPress: () => void;
   onDiagnose?: () => void;
+  onAskForHelp?: () => void;
 }
 
 const TYPE_CONFIG: Record<NoteType, { icon: string; label: string; color: string }> = {
@@ -27,7 +28,7 @@ const TYPE_CONFIG: Record<NoteType, { icon: string; label: string; color: string
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function NoteCard({ note, onPress, onDiagnose }: NoteCardProps) {
+export function NoteCard({ note, onPress, onDiagnose, onAskForHelp }: NoteCardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -119,15 +120,29 @@ export function NoteCard({ note, onPress, onDiagnose }: NoteCardProps) {
         </View>
       ) : null}
 
-      {note.type === "issue" && onDiagnose ? (
-        <Pressable
-          onPress={onDiagnose}
-          style={[styles.diagnoseLink, { backgroundColor: "#FF6B3515" }]}
-          testID={`diagnose-${note.id}`}
-        >
-          <Feather name="cpu" size={14} color="#FF6B35" />
-          <Text style={styles.diagnoseLinkText}>Diagnose with TorqueAssist</Text>
-        </Pressable>
+      {note.type === "issue" ? (
+        <View style={styles.issueActions}>
+          {onDiagnose ? (
+            <Pressable
+              onPress={onDiagnose}
+              style={[styles.diagnoseLink, { backgroundColor: "#FF6B3515" }]}
+              testID={`diagnose-${note.id}`}
+            >
+              <Feather name="cpu" size={14} color="#FF6B35" />
+              <Text style={styles.diagnoseLinkText}>Diagnose</Text>
+            </Pressable>
+          ) : null}
+          {onAskForHelp ? (
+            <Pressable
+              onPress={onAskForHelp}
+              style={[styles.diagnoseLink, { backgroundColor: "#3B82F615" }]}
+              testID={`ask-help-${note.id}`}
+            >
+              <Feather name="help-circle" size={14} color="#3B82F6" />
+              <Text style={[styles.diagnoseLinkText, { color: "#3B82F6" }]}>Ask for Help</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
 
       <View style={[styles.footer, { borderTopColor: theme.border }]}>
@@ -227,13 +242,18 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     flex: 1,
   },
+  issueActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
   diagnoseLink: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
     padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.sm,
   },
   diagnoseLinkText: {
     ...Typography.caption,

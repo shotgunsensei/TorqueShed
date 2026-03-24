@@ -449,12 +449,17 @@ export default function VehicleDetailScreen() {
     (navigation as any).navigate("MoreTab", { screen: "TorqueAssist" });
   };
 
+  const handleAskForHelp = () => {
+    (navigation as any).navigate("AskForHelp");
+  };
+
   const renderNotesTab = () => {
     const renderNote = ({ item }: { item: VehicleNote }) => (
       <NoteCard
         note={item}
         onPress={() => {}}
         onDiagnose={item.type === "issue" ? handleDiagnose : undefined}
+        onAskForHelp={item.type === "issue" ? handleAskForHelp : undefined}
       />
     );
 

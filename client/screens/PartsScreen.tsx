@@ -8,7 +8,10 @@ import {
   TextInput,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { useTheme } from "@/hooks/useTheme";
@@ -294,6 +297,7 @@ export default function PartsScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useSafeTabBarHeight();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [step, setStep] = useState<WizardStep>("category");
   const [selectedCategory, setSelectedCategory] = useState<DiagnosticCategory | null>(null);
@@ -698,6 +702,25 @@ export default function PartsScreen() {
         </Text>
       </View>
 
+      <View style={[styles.askHelpCard, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "30" }]}>
+        <Feather name="users" size={20} color={theme.primary} />
+        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+          <Text style={[styles.askHelpTitle, { color: theme.text }]}>
+            Still stuck?
+          </Text>
+          <Text style={[styles.askHelpDesc, { color: theme.textSecondary }]}>
+            Post a structured help request to the community with your symptoms and diagnostics.
+          </Text>
+        </View>
+        <Pressable
+          style={[styles.askHelpButton, { backgroundColor: theme.primary }]}
+          onPress={() => navigation.navigate("AskForHelp")}
+          testID="button-ask-help-torqueassist"
+        >
+          <Text style={styles.askHelpButtonText}>Ask for Help</Text>
+        </Pressable>
+      </View>
+
       <Pressable
         style={({ pressed }) => [
           styles.resetButton,
@@ -1045,6 +1068,33 @@ const styles = StyleSheet.create({
   },
   resetButtonText: {
     ...Typography.body,
+    fontWeight: "600",
+  },
+  askHelpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  askHelpTitle: {
+    ...Typography.body,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  askHelpDesc: {
+    ...Typography.caption,
+  },
+  askHelpButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+  },
+  askHelpButtonText: {
+    ...Typography.caption,
+    color: "#FFFFFF",
     fontWeight: "600",
   },
 });

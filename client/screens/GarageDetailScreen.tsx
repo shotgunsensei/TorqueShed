@@ -468,6 +468,14 @@ export default function GarageDetailScreen() {
       />
 
       <Pressable
+        style={[styles.fabSecondary, { backgroundColor: theme.backgroundSecondary, borderColor: theme.primary, bottom: tabBarHeight + Spacing.lg + 60 }]}
+        onPress={() => navigation.navigate("AskForHelp")}
+        testID="button-ask-help-bay"
+      >
+        <Feather name="help-circle" size={22} color={theme.primary} />
+      </Pressable>
+
+      <Pressable
         style={[styles.fab, { backgroundColor: brandColor, bottom: tabBarHeight + Spacing.lg }]}
         onPress={handleNewThread}
         testID="button-new-thread"
@@ -644,5 +652,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  fabSecondary: {
+    position: "absolute",
+    right: Spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
   },
 });
