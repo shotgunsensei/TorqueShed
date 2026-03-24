@@ -11,7 +11,9 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { Skeleton } from "@/components/Skeleton";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
@@ -51,6 +53,7 @@ export default function ListingDetailScreen() {
   const { listingId } = route.params;
 
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const { data: listing, isLoading } = useQuery<Listing>({
     queryKey: [`/api/swap-shop/${listingId}`],
@@ -63,10 +66,11 @@ export default function ListingDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Listing deleted", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to delete listing");
+      toast.show(error.message || "Failed to delete listing", "error");
     },
   });
 
@@ -115,8 +119,8 @@ export default function ListingDetailScreen() {
 
   if (isLoading || !listing) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
-        <ThemedText type="body">Loading...</ThemedText>
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <Skeleton.List count={3} style={{ paddingTop: headerHeight + Spacing.lg }} />
       </View>
     );
   }
@@ -242,11 +246,6 @@ export default function ListingDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   imageContainer: {
     height: 200,

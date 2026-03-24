@@ -7,7 +7,7 @@ import {
   Pressable,
   TextInput,
   Alert,
-  ActivityIndicator,
+  RefreshControl,
   Modal,
   ScrollView,
   Platform,
@@ -20,6 +20,10 @@ import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
+import { Skeleton } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
+import { FAB } from "@/components/FAB";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -83,6 +87,7 @@ export default function AdminProductsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isModalVisible, setModalVisible] = useState(false);
@@ -105,7 +110,7 @@ export default function AdminProductsScreen() {
     getAuthToken().then(setAuthToken);
   }, []);
 
-  const { data: products, isLoading, error: productsError } = useQuery<Product[]>({
+  const { data: products, isLoading, refetch, isRefetching } = useQuery<Product[]>({
     queryKey: ["/api/admin/products", authToken],
     queryFn: async () => {
       const url = new URL("/api/admin/products", getApiUrl());
@@ -146,11 +151,12 @@ export default function AdminProductsScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Product created", "success");
       setModalVisible(false);
       resetForm();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message);
+      toast.show(error.message || "Failed to create product", "error");
     },
   });
 
@@ -177,12 +183,13 @@ export default function AdminProductsScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Product updated", "success");
       setModalVisible(false);
       setEditingProduct(null);
       resetForm();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message);
+      toast.show(error.message || "Failed to update product", "error");
     },
   });
 
@@ -201,9 +208,10 @@ export default function AdminProductsScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Product deleted", "success");
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message);
+      toast.show(error.message || "Failed to delete product", "error");
     },
   });
 
@@ -452,9 +460,7 @@ export default function AdminProductsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       {isLoading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
+        <Skeleton.List count={4} style={{ paddingTop: headerHeight + Spacing.lg }} />
       ) : (
         <FlatList
           data={products}
@@ -464,23 +470,27 @@ export default function AdminProductsScreen() {
             styles.list,
             { paddingTop: headerHeight + Spacing.lg, paddingBottom: insets.bottom + 80 },
           ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Feather name="package" size={48} color={theme.textMuted} />
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No products yet. Add your first product.
-              </Text>
-            </View>
+            <EmptyState
+              icon="package"
+              title="No Products Yet"
+              description="Add your first product to the Tool and Gear section."
+              actionLabel="Add Product"
+              onAction={openCreateModal}
+            />
           }
         />
       )}
 
-      <Pressable
-        onPress={openCreateModal}
-        style={[styles.fab, { backgroundColor: theme.primary, bottom: insets.bottom + 16 }]}
-      >
-        <Feather name="plus" size={24} color="#FFFFFF" />
-      </Pressable>
+      <FAB icon="plus" onPress={openCreateModal} bottom={insets.bottom + 16} />
 
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
@@ -665,11 +675,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   list: {
     padding: Spacing.lg,
   },
@@ -762,30 +767,6 @@ const styles = StyleSheet.create({
   },
   vendor: {
     ...Typography.small,
-  },
-  empty: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.xl * 2,
-    gap: Spacing.md,
-  },
-  emptyText: {
-    ...Typography.body,
-    textAlign: "center",
-  },
-  fab: {
-    position: "absolute",
-    right: Spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   modalContainer: {
     flex: 1,

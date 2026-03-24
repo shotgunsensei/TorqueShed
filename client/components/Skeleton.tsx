@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, StyleSheet, ViewStyle } from "react-native";
+import { View, StyleSheet, ViewStyle, DimensionValue } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,7 +13,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
 interface SkeletonProps {
-  width?: number | string;
+  width?: DimensionValue;
   height?: number;
   borderRadius?: number;
   style?: ViewStyle;
@@ -39,7 +39,7 @@ function SkeletonBox({ width = "100%", height = 16, borderRadius = BorderRadius.
     <Animated.View
       style={[
         {
-          width: width as any,
+          width,
           height,
           borderRadius,
           backgroundColor: theme.backgroundTertiary,
@@ -91,7 +91,7 @@ function SkeletonGrid({ count = 4, columns = 2, style }: { count?: number; colum
   return (
     <View style={[skeletonStyles.grid, style]}>
       {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={[skeletonStyles.gridItem, { width: `${100 / columns - 2}%` as any }]}>
+        <View key={i} style={[skeletonStyles.gridItem, { width: `${100 / columns - 2}%` as DimensionValue }]}>
           <View
             style={[
               skeletonStyles.gridCard,
