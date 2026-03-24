@@ -29,7 +29,7 @@ import {
   type InsertSwapShopListing,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, or, isNull, gt } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull, gt, inArray } from "drizzle-orm";
 
 export interface ProfileUpdate {
   bio?: string;
@@ -75,6 +75,7 @@ export interface IStorage {
   joinGarage(userId: string, garageId: string): Promise<void>;
   leaveGarage(userId: string, garageId: string): Promise<void>;
   isGarageMember(userId: string, garageId: string): Promise<boolean>;
+  getTopContributors(garageId: string, limit?: number): Promise<{ id: string; username: string; replyCount: number; yearsWrenching: number | null; focusAreas: string[] }[]>;
   
   createReport(report: InsertReport): Promise<Report>;
   
@@ -198,7 +199,31 @@ export class DatabaseStorage implements IStorage {
     return !!row;
   }
 
-  async getGarages(): Promise<(Garage & { threadCount: number })[]> {
+  async getTopContributors(garageId: string, limit = 5): Promise<{ id: string; username: string; replyCount: number; yearsWrenching: number | null; focusAreas: string[] }[]> {
+    const garageThreadIds = db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(eq(threads.garageId, garageId));
+
+    const results = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        replyCount: sql<number>`count(${threadReplies.id})::int`,
+        yearsWrenching: users.yearsWrenching,
+        focusAreas: sql<string[]>`${users.focusAreas}::jsonb`,
+      })
+      .from(threadReplies)
+      .innerJoin(users, eq(threadReplies.userId, users.id))
+      .where(inArray(threadReplies.threadId, garageThreadIds))
+      .groupBy(users.id, users.username, users.yearsWrenching, sql`${users.focusAreas}::jsonb`)
+      .orderBy(sql`count(${threadReplies.id}) DESC`)
+      .limit(limit);
+
+    return results as { id: string; username: string; replyCount: number; yearsWrenching: number | null; focusAreas: string[] }[];
+  }
+
+  async getGarages(): Promise<(Garage & { threadCount: number; latestActivityAt: string | null })[]> {
     const allGarages = await db.select().from(garages).orderBy(garages.name);
     const result = await Promise.all(allGarages.map(async (garage) => {
       const [memberResult] = await db
@@ -209,10 +234,15 @@ export class DatabaseStorage implements IStorage {
         .select({ count: sql<number>`count(*)` })
         .from(threads)
         .where(eq(threads.garageId, garage.id));
+      const [latestResult] = await db
+        .select({ latest: sql<string>`MAX(${threads.lastActivityAt})` })
+        .from(threads)
+        .where(eq(threads.garageId, garage.id));
       return {
         ...garage,
         memberCount: Number(memberResult?.count || 0),
         threadCount: Number(threadResult?.count || 0),
+        latestActivityAt: latestResult?.latest || null,
       };
     }));
     return result;
@@ -392,7 +422,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(vehicleNotes).where(eq(vehicleNotes.id, id));
   }
 
-  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string })[]> {
+  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] })[]> {
     const garageThreads = await db
       .select({
         id: threads.id,
@@ -407,16 +437,18 @@ export class DatabaseStorage implements IStorage {
         createdAt: threads.createdAt,
         updatedAt: threads.updatedAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+        yearsWrenching: users.yearsWrenching,
+        focusAreas: users.focusAreas,
       })
       .from(threads)
       .leftJoin(users, eq(threads.userId, users.id))
       .where(eq(threads.garageId, garageId))
       .orderBy(desc(threads.isPinned), desc(threads.lastActivityAt));
     
-    return garageThreads as (Thread & { userName: string })[];
+    return garageThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] })[];
   }
 
-  async getThread(id: string): Promise<(Thread & { userName: string }) | undefined> {
+  async getThread(id: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] }) | undefined> {
     const [thread] = await db
       .select({
         id: threads.id,
@@ -431,11 +463,13 @@ export class DatabaseStorage implements IStorage {
         createdAt: threads.createdAt,
         updatedAt: threads.updatedAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+        yearsWrenching: users.yearsWrenching,
+        focusAreas: users.focusAreas,
       })
       .from(threads)
       .leftJoin(users, eq(threads.userId, users.id))
       .where(eq(threads.id, id));
-    return thread ? (thread as Thread & { userName: string }) : undefined;
+    return thread ? (thread as Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] }) : undefined;
   }
 
   async createThread(thread: InsertThread, userId: string): Promise<Thread> {

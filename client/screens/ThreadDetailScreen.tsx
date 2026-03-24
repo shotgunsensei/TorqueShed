@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -47,6 +47,8 @@ interface Thread {
   replyCount: number;
   createdAt: string;
   userName: string;
+  yearsWrenching: number | null;
+  focusAreas: string[];
 }
 
 interface ThreadReply {
@@ -81,6 +83,15 @@ export default function ThreadDetailScreen() {
   const { data: replies = [], isLoading: repliesLoading } = useQuery<ThreadReply[]>({
     queryKey: [`/api/threads/${threadId}/replies`],
   });
+
+  const sortedReplies = useMemo(() => {
+    const solutionReply = replies.find((r) => r.isSolution);
+    const otherReplies = replies.filter((r) => !r.isSolution);
+    if (solutionReply) {
+      return [solutionReply, ...otherReplies];
+    }
+    return replies;
+  }, [replies]);
 
   const createReplyMutation = useMutation({
     mutationFn: async () => {
@@ -179,38 +190,77 @@ export default function ThreadDetailScreen() {
 
   const isThreadAuthor = currentUser?.id === thread?.userId;
 
-  const renderReply = ({ item }: { item: ThreadReply }) => (
-    <Card style={item.isSolution ? { ...styles.replyCard, borderColor: theme.success, borderWidth: 2 } : styles.replyCard}>
-      {item.isSolution ? (
-        <View style={[styles.solutionBadge, { backgroundColor: theme.success }]}>
-          <Feather name="check-circle" size={12} color="#fff" />
-          <ThemedText type="caption" style={{ color: "#fff", marginLeft: 4 }}>
-            Solution
+  const renderReply = ({ item }: { item: ThreadReply }) => {
+    if (item.isSolution) {
+      return (
+        <View style={[styles.solutionCard, { backgroundColor: theme.success + "10", borderColor: theme.success }]}>
+          <View style={[styles.solutionBanner, { backgroundColor: theme.success }]}>
+            <Feather name="check-circle" size={14} color="#fff" />
+            <ThemedText type="caption" style={{ color: "#fff", fontWeight: "700", marginLeft: 6 }}>
+              Accepted Solution
+            </ThemedText>
+          </View>
+          <View style={styles.replyBody}>
+            <View style={styles.replyHeaderRow}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>{item.userName}</ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                {formatDate(item.createdAt)}
+              </ThemedText>
+            </View>
+            <ThemedText type="body" style={styles.replyContent}>
+              {item.content}
+            </ThemedText>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <Card style={styles.replyCard}>
+        <View style={styles.replyHeaderRow}>
+          <ThemedText type="body" style={{ fontWeight: "600" }}>{item.userName}</ThemedText>
+          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+            {formatDate(item.createdAt)}
           </ThemedText>
         </View>
-      ) : null}
-      <View style={styles.replyHeader}>
-        <ThemedText type="body" style={{ fontWeight: "600" }}>{item.userName}</ThemedText>
-        <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-          {formatDate(item.createdAt)}
+        <ThemedText type="body" style={styles.replyContent}>
+          {item.content}
+        </ThemedText>
+        {isThreadAuthor && !thread?.hasSolution ? (
+          <Pressable
+            style={[styles.solutionButton, { borderColor: theme.success }]}
+            onPress={() => handleMarkSolution(item.id)}
+          >
+            <Feather name="check" size={14} color={theme.success} />
+            <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4 }}>
+              Mark as Solution
+            </ThemedText>
+          </Pressable>
+        ) : null}
+      </Card>
+    );
+  };
+
+  const renderCredibility = () => {
+    if (!thread) return null;
+    const signals: string[] = [];
+    if (thread.yearsWrenching) {
+      signals.push(`${thread.yearsWrenching} ${thread.yearsWrenching === 1 ? "year" : "years"} wrenching`);
+    }
+    if (thread.focusAreas && thread.focusAreas.length > 0) {
+      signals.push(thread.focusAreas.join(", "));
+    }
+    if (signals.length === 0) return null;
+
+    return (
+      <View style={[styles.credRow, { backgroundColor: theme.backgroundTertiary }]}>
+        <Feather name="tool" size={11} color={theme.textMuted} />
+        <ThemedText type="caption" style={{ color: theme.textMuted, marginLeft: 4 }}>
+          {signals.join(" / ")}
         </ThemedText>
       </View>
-      <ThemedText type="body" style={styles.replyContent}>
-        {item.content}
-      </ThemedText>
-      {isThreadAuthor && !item.isSolution && !thread?.hasSolution ? (
-        <Pressable
-          style={[styles.solutionButton, { borderColor: theme.success }]}
-          onPress={() => handleMarkSolution(item.id)}
-        >
-          <Feather name="check" size={14} color={theme.success} />
-          <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4 }}>
-            Mark as Solution
-          </ThemedText>
-        </Pressable>
-      ) : null}
-    </Card>
-  );
+    );
+  };
 
   const renderHeader = () => {
     if (!thread) return null;
@@ -224,7 +274,7 @@ export default function ThreadDetailScreen() {
             {thread.hasSolution ? (
               <View style={[styles.solvedBadge, { backgroundColor: theme.success }]}>
                 <Feather name="check-circle" size={12} color="#fff" />
-                <ThemedText type="caption" style={{ color: "#fff", marginLeft: 4 }}>
+                <ThemedText type="caption" style={{ color: "#fff", marginLeft: 4, fontWeight: "600" }}>
                   Solved
                 </ThemedText>
               </View>
@@ -236,13 +286,14 @@ export default function ThreadDetailScreen() {
                 {(thread.userName || "U").charAt(0).toUpperCase()}
               </ThemedText>
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <ThemedText type="body" style={{ fontWeight: "600" }}>{thread.userName}</ThemedText>
               <ThemedText type="caption" style={{ color: theme.textSecondary }}>
                 {formatDate(thread.createdAt)}
               </ThemedText>
             </View>
           </View>
+          {renderCredibility()}
           <ThemedText type="body" style={styles.threadContent}>
             {thread.content}
           </ThemedText>
@@ -281,7 +332,7 @@ export default function ThreadDetailScreen() {
       keyboardVerticalOffset={0}
     >
       <FlatList
-        data={replies}
+        data={sortedReplies}
         keyExtractor={(item) => item.id}
         renderItem={renderReply}
         ListHeaderComponent={renderHeader}
@@ -311,7 +362,7 @@ export default function ThreadDetailScreen() {
           },
         ]}
       >
-        <View style={styles.replyHeader}>
+        <View style={styles.replyLabel}>
           <Feather name="corner-down-right" size={16} color={theme.textSecondary} />
           <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.xs }}>
             Replying to thread
@@ -391,6 +442,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  credRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    alignSelf: "flex-start",
+    marginBottom: Spacing.md,
+  },
   deleteThreadButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -414,11 +474,26 @@ const styles = StyleSheet.create({
   repliesHeader: {
     marginBottom: Spacing.md,
   },
+  solutionCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    overflow: "hidden",
+    marginBottom: Spacing.md,
+  },
+  solutionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  replyBody: {
+    padding: Spacing.md,
+  },
   replyCard: {
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
-  replyHeader: {
+  replyHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -426,15 +501,6 @@ const styles = StyleSheet.create({
   },
   replyContent: {
     lineHeight: 20,
-  },
-  solutionBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    marginBottom: Spacing.sm,
   },
   solutionButton: {
     flexDirection: "row",
@@ -451,7 +517,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
   },
-  replyHeader: {
+  replyLabel: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: Spacing.xs,

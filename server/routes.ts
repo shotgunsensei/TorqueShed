@@ -846,6 +846,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/garages/:garageId/top-contributors", async (req: Request, res: Response) => {
+    try {
+      const contributors = await storage.getTopContributors(req.params.garageId);
+      res.json(contributors);
+    } catch (error) {
+      console.error("Error fetching top contributors:", error);
+      res.status(500).json({ error: "Failed to fetch top contributors" });
+    }
+  });
+
   // ========== Thread Routes ==========
   app.get("/api/garages/:garageId/threads", async (req: Request, res: Response) => {
     try {

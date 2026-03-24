@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -31,10 +32,28 @@ interface ApiGarage {
   memberCount: number;
   threadCount: number;
   isJoined: boolean;
+  latestActivityAt: string | null;
+}
+
+function formatTimeAgo(dateString: string | null): string | null {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d ago`;
+  if (diffHours > 0) return `${diffHours}h ago`;
+  if (diffMins > 0) return `${diffMins}m ago`;
+  return "Just now";
 }
 
 function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void }) {
   const { theme } = useTheme();
+  const brandColor = item.brandColor || theme.primary;
+  const latestActivity = formatTimeAgo(item.latestActivityAt);
 
   return (
     <Pressable
@@ -50,41 +69,56 @@ function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void })
       ]}
       testID={`garage-card-${item.id}`}
     >
-      <View style={styles.cardHeader}>
-        <View style={[styles.brandBadge, { backgroundColor: item.brandColor || theme.primary }]}>
-          <Text style={styles.brandBadgeText}>{item.name.charAt(0)}</Text>
+      <LinearGradient
+        colors={[brandColor, brandColor + "00"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[styles.heroAccent, { borderTopLeftRadius: BorderRadius.md, borderTopRightRadius: BorderRadius.md }]}
+      />
+
+      <View style={styles.cardBody}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.brandBadge, { backgroundColor: brandColor }]}>
+            <Text style={styles.brandBadgeText}>{item.name.charAt(0)}</Text>
+          </View>
+          <View style={styles.cardTitleRow}>
+            <View style={styles.titleWithBadge}>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>{item.name}</Text>
+              {item.isJoined ? (
+                <View style={[styles.joinedBadge, { backgroundColor: theme.success + "20" }]}>
+                  <Feather name="check" size={10} color={theme.success} />
+                </View>
+              ) : null}
+            </View>
+            {item.description ? (
+              <Text style={[styles.descriptionText, { color: theme.textSecondary }]} numberOfLines={1}>
+                {item.description}
+              </Text>
+            ) : null}
+          </View>
         </View>
-        <View style={styles.cardTitleRow}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>{item.name}</Text>
-          {item.description ? (
-            <Text style={[styles.descriptionText, { color: theme.textSecondary }]} numberOfLines={1}>
-              {item.description}
+
+        <View style={styles.cardStats}>
+          <View style={styles.statsLeft}>
+            <View style={styles.statItem}>
+              <Feather name="users" size={13} color={theme.textMuted} />
+              <Text style={[styles.statText, { color: theme.textMuted }]}>
+                {item.memberCount.toLocaleString()}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Feather name="message-circle" size={13} color={theme.textMuted} />
+              <Text style={[styles.statText, { color: theme.textMuted }]}>
+                {item.threadCount}
+              </Text>
+            </View>
+          </View>
+          {latestActivity ? (
+            <Text style={[styles.activityText, { color: theme.textMuted }]}>
+              Active {latestActivity}
             </Text>
           ) : null}
         </View>
-      </View>
-
-      <View style={styles.cardStats}>
-        <View style={styles.statsLeft}>
-          <View style={styles.statItem}>
-            <Feather name="users" size={14} color={theme.textMuted} />
-            <Text style={[styles.statText, { color: theme.textMuted }]}>
-              {item.memberCount.toLocaleString()} {item.memberCount === 1 ? "member" : "members"}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Feather name="message-circle" size={14} color={theme.textMuted} />
-            <Text style={[styles.statText, { color: theme.textMuted }]}>
-              {item.threadCount} {item.threadCount === 1 ? "thread" : "threads"}
-            </Text>
-          </View>
-        </View>
-        {item.isJoined ? (
-          <View style={[styles.joinedBadge, { backgroundColor: theme.success + "20" }]}>
-            <Feather name="check" size={11} color={theme.success} />
-            <Text style={[styles.joinedText, { color: theme.success }]}>Joined</Text>
-          </View>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -176,6 +210,13 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: BorderRadius.md,
     borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: Spacing.md,
+  },
+  heroAccent: {
+    height: 4,
+  },
+  cardBody: {
     padding: Spacing.lg,
   },
   cardHeader: {
@@ -198,12 +239,17 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.md,
   },
+  titleWithBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
   cardTitle: {
     ...Typography.h4,
-    marginBottom: 2,
   },
   descriptionText: {
     ...Typography.caption,
+    marginTop: 2,
   },
   cardStats: {
     flexDirection: "row",
@@ -218,23 +264,21 @@ const styles = StyleSheet.create({
   statItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
+    gap: 4,
   },
   statText: {
     ...Typography.caption,
   },
-  joinedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.full,
-  },
-  joinedText: {
+  activityText: {
     ...Typography.caption,
-    fontWeight: "600",
     fontSize: 11,
+  },
+  joinedBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   gridHeader: {
     width: "100%",
