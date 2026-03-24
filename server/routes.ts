@@ -11,7 +11,6 @@ import {
   generateTorqueAssistResponse 
 } from "./torque-assist";
 import { 
-  PRODUCT_CATEGORIES,
   signupSchema,
   loginSchema,
   createReportSchema,
@@ -22,6 +21,11 @@ import {
   insertVehicleNoteSchema,
   insertVehicleSchema,
   insertProductSchema,
+  updateVehicleSchema,
+  updateVehicleNoteSchema,
+  updateThreadSchema,
+  updateSwapShopListingSchema,
+  updateProductSchema,
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 
@@ -463,38 +467,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
+      const parsed = updateProductSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
-      const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, submissionStatus, featuredExpiration } = req.body;
-
-      if (title !== undefined) updates.title = title;
-      if (description !== undefined) updates.description = description;
-      if (whyItMatters !== undefined) updates.whyItMatters = whyItMatters;
-      if (price !== undefined) updates.price = price;
-      if (priceRange !== undefined) updates.priceRange = priceRange;
-      if (category !== undefined) {
-        if (!PRODUCT_CATEGORIES.includes(category)) {
-          return res.status(400).json({ error: "Invalid category" });
-        }
-        updates.category = category;
-      }
-      if (affiliateLink !== undefined) updates.affiliateLink = affiliateLink;
-      if (vendor !== undefined) updates.vendor = vendor;
-      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
-      if (isSponsored !== undefined) updates.isSponsored = isSponsored;
-      if (submissionStatus !== undefined) {
-        const validStatuses = ["pending", "approved", "featured"];
-        if (!validStatuses.includes(submissionStatus)) {
-          return res.status(400).json({ error: "Invalid submission status" });
-        }
-        updates.submissionStatus = submissionStatus;
-      }
-      if (featuredExpiration !== undefined) {
-        updates.featuredExpiration = featuredExpiration ? new Date(featuredExpiration) : null;
+      if (parsed.title !== undefined) updates.title = parsed.title;
+      if (parsed.description !== undefined) updates.description = parsed.description;
+      if (parsed.whyItMatters !== undefined) updates.whyItMatters = parsed.whyItMatters;
+      if (parsed.price !== undefined) updates.price = parsed.price;
+      if (parsed.priceRange !== undefined) updates.priceRange = parsed.priceRange;
+      if (parsed.category !== undefined) updates.category = parsed.category;
+      if (parsed.affiliateLink !== undefined) updates.affiliateLink = parsed.affiliateLink;
+      if (parsed.vendor !== undefined) updates.vendor = parsed.vendor;
+      if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
+      if (parsed.isSponsored !== undefined) updates.isSponsored = parsed.isSponsored;
+      if (parsed.submissionStatus !== undefined) updates.submissionStatus = parsed.submissionStatus;
+      if (parsed.featuredExpiration !== undefined) {
+        updates.featuredExpiration = parsed.featuredExpiration ? new Date(parsed.featuredExpiration) : null;
       }
 
       const updated = await storage.updateProduct(req.params.id, updates);
       res.json(updated);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating product:", error);
       res.status(500).json({ error: "Failed to update product" });
     }
@@ -575,18 +570,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      const parsed = updateVehicleSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
-      const { vin, year, make, model, nickname, imageUrl } = req.body;
-      if (vin !== undefined) updates.vin = vin;
-      if (year !== undefined) updates.year = year ? parseInt(year) : null;
-      if (make !== undefined) updates.make = make;
-      if (model !== undefined) updates.model = model;
-      if (nickname !== undefined) updates.nickname = nickname;
-      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+      if (parsed.vin !== undefined) updates.vin = parsed.vin;
+      if (parsed.year !== undefined) updates.year = parsed.year;
+      if (parsed.make !== undefined) updates.make = parsed.make;
+      if (parsed.model !== undefined) updates.model = parsed.model;
+      if (parsed.nickname !== undefined) updates.nickname = parsed.nickname;
+      if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
 
       const updated = await storage.updateVehicle(req.params.id, updates);
       res.json(updated);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating vehicle:", error);
       res.status(500).json({ error: "Failed to update vehicle" });
     }
@@ -684,15 +682,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      const parsed = updateVehicleNoteSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
-      const { title, content, isPrivate } = req.body;
-      if (title !== undefined) updates.title = title;
-      if (content !== undefined) updates.content = content;
-      if (isPrivate !== undefined) updates.isPrivate = isPrivate;
+      if (parsed.title !== undefined) updates.title = parsed.title;
+      if (parsed.content !== undefined) updates.content = parsed.content;
+      if (parsed.isPrivate !== undefined) updates.isPrivate = parsed.isPrivate;
 
       const updated = await storage.updateNote(req.params.id, updates);
       res.json(updated);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating note:", error);
       res.status(500).json({ error: "Failed to update note" });
     }
@@ -770,16 +771,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      const parsed = updateThreadSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
-      const { title, content, hasSolution, isPinned } = req.body;
-      if (title !== undefined) updates.title = title;
-      if (content !== undefined) updates.content = content;
-      if (hasSolution !== undefined) updates.hasSolution = hasSolution;
-      if (isPinned !== undefined && req.userRole === "admin") updates.isPinned = isPinned;
+      if (parsed.title !== undefined) updates.title = parsed.title;
+      if (parsed.content !== undefined) updates.content = parsed.content;
+      if (parsed.hasSolution !== undefined) updates.hasSolution = parsed.hasSolution;
+      if (parsed.isPinned !== undefined && req.userRole === "admin") updates.isPinned = parsed.isPinned;
 
       const updated = await storage.updateThread(req.params.id, updates);
       res.json(updated);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating thread:", error);
       res.status(500).json({ error: "Failed to update thread" });
     }
@@ -920,21 +924,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      const parsed = updateSwapShopListingSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
-      const { title, description, price, condition, location, localPickup, willShip, imageUrl, isActive } = req.body;
-      if (title !== undefined) updates.title = title;
-      if (description !== undefined) updates.description = description;
-      if (price !== undefined) updates.price = price;
-      if (condition !== undefined) updates.condition = condition;
-      if (location !== undefined) updates.location = location;
-      if (localPickup !== undefined) updates.localPickup = localPickup;
-      if (willShip !== undefined) updates.willShip = willShip;
-      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
-      if (isActive !== undefined) updates.isActive = isActive;
+      if (parsed.title !== undefined) updates.title = parsed.title;
+      if (parsed.description !== undefined) updates.description = parsed.description;
+      if (parsed.price !== undefined) updates.price = parsed.price;
+      if (parsed.condition !== undefined) updates.condition = parsed.condition;
+      if (parsed.location !== undefined) updates.location = parsed.location;
+      if (parsed.localPickup !== undefined) updates.localPickup = parsed.localPickup;
+      if (parsed.willShip !== undefined) updates.willShip = parsed.willShip;
+      if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
+      if (parsed.isActive !== undefined) updates.isActive = parsed.isActive;
 
       const updated = await storage.updateSwapShopListing(req.params.id, updates);
       res.json(updated);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating listing:", error);
       res.status(500).json({ error: "Failed to update listing" });
     }

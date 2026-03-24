@@ -331,6 +331,55 @@ export const insertReportSchema = createInsertSchema(reports).pick({
   details: true,
 });
 
+export const updateVehicleSchema = z.object({
+  vin: z.string().nullable().optional(),
+  year: z.number().nullable().optional(),
+  make: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
+  nickname: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+});
+
+export const updateVehicleNoteSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  isPrivate: z.boolean().optional(),
+});
+
+export const updateThreadSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  hasSolution: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+});
+
+export const updateSwapShopListingSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().nullable().optional(),
+  price: z.string().optional(),
+  condition: z.string().optional(),
+  location: z.string().nullable().optional(),
+  localPickup: z.boolean().optional(),
+  willShip: z.boolean().optional(),
+  imageUrl: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateProductSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().nullable().optional(),
+  whyItMatters: z.string().nullable().optional(),
+  price: z.string().nullable().optional(),
+  priceRange: z.string().nullable().optional(),
+  category: z.enum(PRODUCT_CATEGORIES).optional(),
+  affiliateLink: z.string().nullable().optional(),
+  vendor: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+  isSponsored: z.boolean().optional(),
+  submissionStatus: z.enum(SUBMISSION_STATUSES).optional(),
+  featuredExpiration: z.string().nullable().optional(),
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Garage = typeof garages.$inferSelect;
