@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import * as Haptics from "expo-haptics";
@@ -117,16 +118,10 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
   };
 
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: theme.backgroundSecondary,
-          borderColor: theme.cardBorder,
-          opacity: pressed ? 0.9 : 1,
-        },
-      ]}
+    <Card
+      elevation={2}
       onPress={() => onPress(item)}
+      style={styles.card}
       testID={`swap-item-${item.id}`}
     >
       <View style={styles.cardContent}>
@@ -205,7 +200,7 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
           In-app only
         </Text>
       </View>
-    </Pressable>
+    </Card>
   );
 }
 
@@ -488,9 +483,9 @@ const styles = StyleSheet.create({
     ...Typography.h4,
   },
   card: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    marginBottom: Spacing.md,
     overflow: "hidden",
+    padding: 0,
   },
   cardContent: {
     flexDirection: "row",

@@ -13,6 +13,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { Skeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
@@ -59,6 +60,7 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
@@ -95,10 +97,12 @@ export default function ProfileScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me/profile"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Profile updated", "success");
       setHasChanges(false);
     },
     onError: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      toast.show("Failed to update profile", "error");
     },
   });
 
@@ -108,11 +112,12 @@ export default function ProfileScreen() {
     },
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Account deleted", "success");
       logout();
     },
     onError: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", "Failed to delete account. Please try again.");
+      toast.show("Failed to delete account", "error");
     },
   });
 
@@ -159,8 +164,9 @@ export default function ProfileScreen() {
       await apiRequest("PATCH", "/api/users/me/profile", { avatarUrl: base64DataUrl });
       queryClient.invalidateQueries({ queryKey: ["/api/users/me/profile"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Avatar updated", "success");
     } catch {
-      Alert.alert("Error", "Failed to upload avatar. Please try again.");
+      toast.show("Failed to upload avatar", "error");
     } finally {
       setUploadingAvatar(false);
     }

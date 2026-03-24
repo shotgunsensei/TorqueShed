@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  Pressable,
   RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -17,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates } from "@/constants/brand";
 import { EmptyState } from "@/components/EmptyState";
+import { Card } from "@/components/Card";
 import { FAB } from "@/components/FAB";
 import { Skeleton } from "@/components/Skeleton";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
@@ -40,17 +40,10 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
   const vehicleInfo = [item.year, item.make, item.model].filter(Boolean).join(" ");
 
   return (
-    <Pressable
+    <Card
+      elevation={2}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: theme.backgroundSecondary,
-          borderColor: theme.cardBorder,
-          opacity: pressed ? 0.9 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-        },
-      ]}
+      style={styles.card}
       testID={`vehicle-card-${item.id}`}
     >
       <View style={styles.cardHeader}>
@@ -87,7 +80,7 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
           </Text>
         </View>
       </View>
-    </Pressable>
+    </Card>
   );
 }
 
@@ -187,9 +180,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   card: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    marginBottom: Spacing.md,
     overflow: "hidden",
+    padding: 0,
   },
   cardHeader: {
     flexDirection: "row",
