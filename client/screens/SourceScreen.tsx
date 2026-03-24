@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
-import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
+import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates, microcopy } from "@/constants/brand";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -169,7 +169,7 @@ function SwapCard({ item, onPress, onReport }: { item: SwapListing; onPress: () 
             <Text style={[s.sellerName, { color: theme.text }]}>{item.userName}</Text>
             <Text style={[s.sellerMeta, { color: theme.textMuted }]}>
               Joined {formatJoinDate(item.sellerJoinDate)}
-              {item.sellerListingCount > 1 ? ` \u00B7 ${item.sellerListingCount} listings` : ""}
+              {item.sellerListingCount > 0 ? ` \u00B7 ${item.sellerListingCount} ${item.sellerListingCount === 1 ? "listing" : "listings"}` : ""}
             </Text>
           </View>
           <Pressable
