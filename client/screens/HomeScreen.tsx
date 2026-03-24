@@ -254,10 +254,10 @@ export default function HomeScreen() {
     return <Skeleton.List count={5} />;
   }
 
-  const navigateToTab = (tabName: string) => {
+  const navigateToTab = (tabName: string, params?: object) => {
     const parent = navigation.getParent();
     if (parent) {
-      parent.navigate(tabName);
+      parent.navigate(tabName, params);
     }
   };
 
@@ -387,7 +387,7 @@ export default function HomeScreen() {
         <SectionHeader
           title="New in Swap Shop"
           icon="shopping-bag"
-          onSeeAll={() => navigateToTab("SourceTab")}
+          onSeeAll={() => navigateToTab("SourceTab", { screen: "Source", params: { segment: "swap" } })}
         />
         {recentListings.length > 0 ? (
           <FlatList
@@ -404,7 +404,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.horizontalList}
           />
         ) : (
-          <Card style={styles.promptCard} onPress={() => navigateToTab("SourceTab")}>
+          <Card style={styles.promptCard} onPress={() => navigateToTab("SourceTab", { screen: "Source", params: { segment: "swap" } })}>
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="shopping-bag" size={24} color={theme.primary} />

@@ -11,7 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 export type SourceStackParamList = {
-  Source: undefined;
+  Source: { segment?: "shop" | "swap" | "find" } | undefined;
 };
 
 const Stack = createNativeStackNavigator<SourceStackParamList>();

@@ -573,12 +573,13 @@ function FindPartsSection() {
   );
 }
 
-export default function SourceScreen() {
+export default function SourceScreen({ route }: { route?: { params?: { segment?: SegmentKey } } }) {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
   const { currentUser } = useAuth();
-  const [activeSegment, setActiveSegment] = useState<SegmentKey>("shop");
+  const initialSegment = route?.params?.segment || "shop";
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>(initialSegment);
 
   return (
     <View style={[s.container, { backgroundColor: theme.backgroundRoot }]}>
