@@ -15,6 +15,7 @@ import type { VehicleNote, NoteType } from "@/constants/vehicles";
 interface NoteCardProps {
   note: VehicleNote;
   onPress: () => void;
+  onDiagnose?: () => void;
 }
 
 const TYPE_CONFIG: Record<NoteType, { icon: string; label: string; color: string }> = {
@@ -26,7 +27,7 @@ const TYPE_CONFIG: Record<NoteType, { icon: string; label: string; color: string
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function NoteCard({ note, onPress }: NoteCardProps) {
+export function NoteCard({ note, onPress, onDiagnose }: NoteCardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -51,6 +52,8 @@ export function NoteCard({ note, onPress }: NoteCardProps) {
   };
 
   const typeConfig = TYPE_CONFIG[note.type] || TYPE_CONFIG.general;
+  const hasBefore = note.type === "mod" && note.beforeState;
+  const hasAfter = note.type === "mod" && note.afterState;
 
   return (
     <AnimatedPressable
@@ -90,6 +93,42 @@ export function NoteCard({ note, onPress }: NoteCardProps) {
       >
         {note.content}
       </ThemedText>
+
+      {(hasBefore || hasAfter) ? (
+        <View style={[styles.beforeAfter, { borderColor: theme.border }]}>
+          {hasBefore ? (
+            <View style={styles.beforeAfterItem}>
+              <View style={[styles.beforeAfterLabel, { backgroundColor: "#EF444420" }]}>
+                <Text style={[styles.beforeAfterLabelText, { color: "#EF4444" }]}>Before</Text>
+              </View>
+              <Text style={[styles.beforeAfterText, { color: theme.textSecondary }]} numberOfLines={1}>
+                {note.beforeState}
+              </Text>
+            </View>
+          ) : null}
+          {hasAfter ? (
+            <View style={styles.beforeAfterItem}>
+              <View style={[styles.beforeAfterLabel, { backgroundColor: "#22C55E20" }]}>
+                <Text style={[styles.beforeAfterLabelText, { color: "#22C55E" }]}>After</Text>
+              </View>
+              <Text style={[styles.beforeAfterText, { color: theme.textSecondary }]} numberOfLines={1}>
+                {note.afterState}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {note.type === "issue" && onDiagnose ? (
+        <Pressable
+          onPress={onDiagnose}
+          style={[styles.diagnoseLink, { backgroundColor: "#FF6B3515" }]}
+          testID={`diagnose-${note.id}`}
+        >
+          <Feather name="cpu" size={14} color="#FF6B35" />
+          <Text style={styles.diagnoseLinkText}>Diagnose with TorqueAssist</Text>
+        </Pressable>
+      ) : null}
 
       <View style={[styles.footer, { borderTopColor: theme.border }]}>
         <View style={styles.metaRow}>
@@ -162,6 +201,44 @@ const styles = StyleSheet.create({
   },
   content: {
     marginBottom: Spacing.sm,
+  },
+  beforeAfter: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  beforeAfterItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  beforeAfterLabel: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.xs,
+  },
+  beforeAfterLabelText: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+  },
+  beforeAfterText: {
+    ...Typography.caption,
+    flex: 1,
+  },
+  diagnoseLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.sm,
+  },
+  diagnoseLinkText: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+    color: "#FF6B35",
   },
   footer: {
     borderTopWidth: 1,

@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
+import { Image } from "expo-image";
 import { NoteCard } from "@/components/NoteCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/Skeleton";
@@ -39,6 +40,8 @@ interface ApiNote {
   cost: string | null;
   mileage: number | null;
   partsUsed: string[] | null;
+  beforeState: string | null;
+  afterState: string | null;
   isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
@@ -68,6 +71,8 @@ function transformToNote(apiNote: ApiNote): VehicleNote {
     cost: apiNote.cost,
     mileage: apiNote.mileage,
     partsUsed: apiNote.partsUsed,
+    beforeState: apiNote.beforeState,
+    afterState: apiNote.afterState,
     createdAt: new Date(apiNote.createdAt),
     isPrivate: apiNote.isPrivate,
   };
@@ -245,14 +250,22 @@ export default function VehicleDetailScreen() {
       >
         {renderTabs()}
 
-        <View
-          style={[
-            styles.vehicleImage,
-            { backgroundColor: theme.backgroundSecondary },
-          ]}
-        >
-          <Feather name="truck" size={48} color={theme.textSecondary} />
-        </View>
+        {vehicle?.imageUrl ? (
+          <Image
+            source={{ uri: vehicle.imageUrl }}
+            style={[styles.vehicleImage, { width: "100%" }]}
+            contentFit="cover"
+          />
+        ) : (
+          <View
+            style={[
+              styles.vehicleImage,
+              { backgroundColor: theme.backgroundSecondary },
+            ]}
+          >
+            <Feather name="truck" size={48} color={theme.textSecondary} />
+          </View>
+        )}
 
         <View
           style={[
@@ -432,9 +445,17 @@ export default function VehicleDetailScreen() {
     );
   };
 
+  const handleDiagnose = () => {
+    (navigation as any).navigate("MoreTab", { screen: "TorqueAssist" });
+  };
+
   const renderNotesTab = () => {
     const renderNote = ({ item }: { item: VehicleNote }) => (
-      <NoteCard note={item} onPress={() => {}} />
+      <NoteCard
+        note={item}
+        onPress={() => {}}
+        onDiagnose={item.type === "issue" ? handleDiagnose : undefined}
+      />
     );
 
     const tabConfig = TABS.find((t) => t.key === activeTab);
@@ -522,6 +543,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: Spacing.lg,
+    overflow: "hidden",
   },
   infoCard: {
     padding: Spacing.lg,

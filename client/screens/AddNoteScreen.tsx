@@ -43,11 +43,14 @@ export default function AddNoteScreen() {
   const [cost, setCost] = useState("");
   const [mileage, setMileage] = useState("");
   const [partsInput, setPartsInput] = useState("");
+  const [beforeState, setBeforeState] = useState("");
+  const [afterState, setAfterState] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
 
   const showCostField = type === "maintenance" || type === "mod";
   const showMileageField = type === "maintenance" || type === "issue";
   const showPartsField = type === "maintenance" || type === "mod";
+  const showBeforeAfter = type === "mod";
 
   const createNoteMutation = useMutation({
     mutationFn: async () => {
@@ -61,6 +64,8 @@ export default function AddNoteScreen() {
         cost: cost.trim() || null,
         mileage: mileage.trim() ? parseInt(mileage, 10) : null,
         partsUsed,
+        beforeState: beforeState.trim() || null,
+        afterState: afterState.trim() || null,
         isPrivate,
       });
     },
@@ -206,6 +211,25 @@ export default function AddNoteScreen() {
             leftIcon="navigation"
             keyboardType="number-pad"
           />
+        ) : null}
+
+        {showBeforeAfter ? (
+          <>
+            <Input
+              label="Before"
+              placeholder="e.g., Stock exhaust, 280hp"
+              value={beforeState}
+              onChangeText={setBeforeState}
+              leftIcon="arrow-left"
+            />
+            <Input
+              label="After"
+              placeholder="e.g., Borla cat-back, 295hp"
+              value={afterState}
+              onChangeText={setAfterState}
+              leftIcon="arrow-right"
+            />
+          </>
         ) : null}
 
         {showPartsField ? (

@@ -792,6 +792,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cost: req.body.cost || null,
         mileage: req.body.mileage ? Number(req.body.mileage) : null,
         partsUsed: req.body.partsUsed || null,
+        beforeState: req.body.beforeState?.trim() || null,
+        afterState: req.body.afterState?.trim() || null,
         isPrivate: req.body.isPrivate !== false,
       });
 
@@ -825,6 +827,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.cost !== undefined) updates.cost = parsed.cost;
       if (parsed.mileage !== undefined) updates.mileage = parsed.mileage;
       if (parsed.partsUsed !== undefined) updates.partsUsed = parsed.partsUsed;
+      if (parsed.beforeState !== undefined) updates.beforeState = parsed.beforeState;
+      if (parsed.afterState !== undefined) updates.afterState = parsed.afterState;
       if (parsed.isPrivate !== undefined) updates.isPrivate = parsed.isPrivate;
 
       const updated = await storage.updateNote(req.params.id, updates);

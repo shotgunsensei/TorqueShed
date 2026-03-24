@@ -103,6 +103,8 @@ export const vehicleNotes = pgTable("vehicle_notes", {
   cost: varchar("cost", { length: 20 }),
   mileage: integer("mileage"),
   partsUsed: json("parts_used").$type<string[]>(),
+  beforeState: text("before_state"),
+  afterState: text("after_state"),
   isPrivate: boolean("is_private").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -333,6 +335,8 @@ export const insertVehicleNoteSchema = z.object({
   cost: z.string().max(20).optional().nullable(),
   mileage: z.number().int().positive().optional().nullable(),
   partsUsed: z.array(z.string()).optional().nullable(),
+  beforeState: z.string().optional().nullable(),
+  afterState: z.string().optional().nullable(),
   isPrivate: z.boolean().optional().default(false),
 });
 
@@ -362,6 +366,8 @@ export const updateVehicleNoteSchema = z.object({
   cost: z.string().max(20).optional().nullable(),
   mileage: z.number().int().positive().optional().nullable(),
   partsUsed: z.array(z.string()).optional().nullable(),
+  beforeState: z.string().optional().nullable(),
+  afterState: z.string().optional().nullable(),
   isPrivate: z.boolean().optional(),
 });
 

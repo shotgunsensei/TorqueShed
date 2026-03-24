@@ -20,6 +20,8 @@ export interface VehicleNote {
   cost: string | null;
   mileage: number | null;
   partsUsed: string[] | null;
+  beforeState: string | null;
+  afterState: string | null;
   createdAt: Date;
   isPrivate: boolean;
 }
