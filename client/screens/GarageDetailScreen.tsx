@@ -36,6 +36,7 @@ interface ApiThread {
   userName: string;
   yearsWrenching: number | null;
   focusAreas: string[];
+  solutionCountTotal: number;
 }
 
 interface ApiGarageDetail {
@@ -72,7 +73,7 @@ function formatTimeAgo(dateString: string): string {
   return "Just now";
 }
 
-function transformToThread(apiThread: ApiThread): Thread & { yearsWrenching: number | null; focusAreas: string[] } {
+function transformToThread(apiThread: ApiThread): Thread & { yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number } {
   const lastActivityTime = new Date(apiThread.lastActivityAt).getTime();
   const createdAt = new Date(apiThread.createdAt).getTime();
   const isNew = Date.now() - lastActivityTime < 24 * 60 * 60 * 1000;
@@ -90,6 +91,7 @@ function transformToThread(apiThread: ApiThread): Thread & { yearsWrenching: num
     createdAt,
     yearsWrenching: apiThread.yearsWrenching,
     focusAreas: apiThread.focusAreas || [],
+    solutionCountTotal: apiThread.solutionCountTotal || 0,
   };
 }
 
@@ -177,72 +179,83 @@ export default function GarageDetailScreen() {
     return filtered;
   }, [apiThreads, activeTab, searchQuery]);
 
-  const renderThread = useCallback(({ item }: { item: Thread & { yearsWrenching: number | null; focusAreas: string[] } }) => (
-    <Pressable
-      style={({ pressed }) => [
-        styles.threadCard,
-        {
-          backgroundColor: theme.backgroundDefault,
-          borderColor: item.isNew ? theme.primary + "40" : theme.cardBorder,
-          borderLeftWidth: item.isNew ? 3 : 1,
-          borderLeftColor: item.isNew ? theme.primary : theme.cardBorder,
-          opacity: pressed ? 0.9 : 1,
-        },
-      ]}
-      onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
-      testID={`thread-card-${item.id}`}
-    >
-      <View style={styles.threadHeader}>
-        <ThemedText type="h4" numberOfLines={2} style={styles.threadTitle}>
-          {item.title}
-        </ThemedText>
-        <View style={styles.threadBadges}>
-          {item.isNew ? (
-            <View style={[styles.badge, { backgroundColor: theme.primary + "20" }]}>
-              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
-                {microcopy.new}
-              </ThemedText>
-            </View>
-          ) : null}
-          {item.hasSolution ? (
-            <View style={[styles.badge, { backgroundColor: theme.success + "20" }]}>
-              <Feather name="check-circle" size={10} color={theme.success} />
-              <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600", marginLeft: 2 }}>
-                {microcopy.solved}
-              </ThemedText>
-            </View>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.threadMeta}>
-        <View style={styles.authorInfo}>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            by {item.author}
+  const renderThread = useCallback(({ item }: { item: Thread & { yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number } }) => {
+    const isTrustedSolver = (item.solutionCountTotal || 0) >= 3;
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.threadCard,
+          {
+            backgroundColor: theme.backgroundDefault,
+            borderColor: item.isNew ? theme.primary + "40" : theme.cardBorder,
+            borderLeftWidth: item.isNew ? 3 : 1,
+            borderLeftColor: item.isNew ? theme.primary : theme.cardBorder,
+            opacity: pressed ? 0.9 : 1,
+          },
+        ]}
+        onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
+        testID={`thread-card-${item.id}`}
+      >
+        <View style={styles.threadHeader}>
+          <ThemedText type="h4" numberOfLines={2} style={styles.threadTitle}>
+            {item.title}
           </ThemedText>
-          {item.yearsWrenching ? (
-            <View style={[styles.credBadge, { backgroundColor: theme.backgroundTertiary }]}>
-              <Feather name="tool" size={9} color={theme.textMuted} />
-              <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10, marginLeft: 2 }}>
-                {item.yearsWrenching}yr
-              </ThemedText>
-            </View>
-          ) : null}
+          <View style={styles.threadBadges}>
+            {item.isNew ? (
+              <View style={[styles.badge, { backgroundColor: theme.primary + "20" }]}>
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                  {microcopy.new}
+                </ThemedText>
+              </View>
+            ) : null}
+            {item.hasSolution ? (
+              <View style={[styles.badge, { backgroundColor: theme.success + "20" }]}>
+                <Feather name="check-circle" size={10} color={theme.success} />
+                <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600", marginLeft: 2 }}>
+                  {microcopy.solved}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
         </View>
-        <View style={styles.threadStats}>
-          <Feather name="message-circle" size={12} color={theme.textSecondary} />
-          <ThemedText
-            type="caption"
-            style={[styles.replyCount, { color: theme.textSecondary }]}
-          >
-            {item.replies}
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            {item.lastActivity}
-          </ThemedText>
+        <View style={styles.threadMeta}>
+          <View style={styles.authorInfo}>
+            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+              by {item.author}
+            </ThemedText>
+            {isTrustedSolver ? (
+              <View style={[styles.credBadge, { backgroundColor: theme.success + "18" }]}>
+                <Feather name="award" size={9} color={theme.success} />
+                <ThemedText type="caption" style={{ color: theme.success, fontSize: 10, marginLeft: 2 }}>
+                  Trusted Solver
+                </ThemedText>
+              </View>
+            ) : null}
+            {item.yearsWrenching ? (
+              <View style={[styles.credBadge, { backgroundColor: theme.backgroundTertiary }]}>
+                <Feather name="tool" size={9} color={theme.textMuted} />
+                <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10, marginLeft: 2 }}>
+                  {item.yearsWrenching}yr
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.threadStats}>
+            <Feather name="message-circle" size={12} color={theme.textSecondary} />
+            <ThemedText
+              type="caption"
+              style={[styles.replyCount, { color: theme.textSecondary }]}
+            >
+              {item.replies}
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+              {item.lastActivity}
+            </ThemedText>
+          </View>
         </View>
-      </View>
-    </Pressable>
-  ), [theme, navigation]);
+      </Pressable>
+    );
+  }, [theme, navigation]);
 
   const renderEmptyThreads = () => {
     if (threadsLoading) {

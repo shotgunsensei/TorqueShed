@@ -288,7 +288,7 @@ export class DatabaseStorage implements IStorage {
         nickname: vehicles.nickname,
       })
       .from(vehicles)
-      .where(eq(vehicles.userId, userId))
+      .where(and(eq(vehicles.userId, userId), eq(vehicles.isPublic, true)))
       .orderBy(desc(vehicles.createdAt))
       .limit(10);
 
@@ -553,7 +553,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(vehicleNotes).where(eq(vehicleNotes.id, id));
   }
 
-  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] })[]> {
+  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[]> {
     const garageThreads = await db
       .select({
         id: threads.id,
@@ -576,13 +576,14 @@ export class DatabaseStorage implements IStorage {
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
         yearsWrenching: users.yearsWrenching,
         focusAreas: users.focusAreas,
+        solutionCountTotal: sql<number>`(SELECT COUNT(*) FROM thread_replies r2 WHERE r2.user_id = ${threads.userId} AND r2.is_solution = true)::int`,
       })
       .from(threads)
       .leftJoin(users, eq(threads.userId, users.id))
       .where(eq(threads.garageId, garageId))
       .orderBy(desc(threads.isPinned), desc(threads.lastActivityAt));
     
-    return garageThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] })[];
+    return garageThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[];
   }
 
   async getThread(id: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; vehicleName: string | null }) | undefined> {

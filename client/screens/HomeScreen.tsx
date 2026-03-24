@@ -39,6 +39,8 @@ interface FeedThread {
   userName: string;
   replyCount: number | null;
   hasSolution: boolean | null;
+  yearsWrenching: number | null;
+  solutionCountTotal: number;
 }
 
 interface FeedListing {
@@ -175,6 +177,19 @@ function ThreadCard({
         <ThemedText type="caption" style={{ color: theme.textMuted }}>
           {thread.userName}
         </ThemedText>
+        {(thread.solutionCountTotal || 0) >= 3 ? (
+          <>
+            <View style={styles.threadMetaDot} />
+            <Feather name="award" size={10} color={theme.success} />
+          </>
+        ) : thread.yearsWrenching ? (
+          <>
+            <View style={styles.threadMetaDot} />
+            <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10 }}>
+              {thread.yearsWrenching}yr
+            </ThemedText>
+          </>
+        ) : null}
         <View style={styles.threadMetaDot} />
         <Feather name="message-circle" size={12} color={theme.textMuted} />
         <ThemedText type="caption" style={{ color: theme.textMuted }}>

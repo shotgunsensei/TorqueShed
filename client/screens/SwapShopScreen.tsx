@@ -39,6 +39,8 @@ export interface SwapListing {
   condition: string;
   userName: string;
   userSwapCount: number;
+  sellerJoinDate: string | null;
+  sellerListingCount: number;
   localPickup: boolean;
   willShip: boolean;
   createdAt: string;
@@ -55,6 +57,7 @@ export interface SwapItem {
     name: string;
     successfulSwaps: number;
     memberSince: string;
+    listingCount: number;
   };
   localPickup: boolean;
   willShip: boolean;
@@ -78,6 +81,9 @@ function formatTimeAgo(dateString: string): string {
 }
 
 function transformToSwapItem(listing: SwapListing): SwapItem {
+  const memberYear = listing.sellerJoinDate
+    ? new Date(listing.sellerJoinDate).getFullYear().toString()
+    : new Date(listing.createdAt).getFullYear().toString();
   return {
     id: listing.id,
     title: listing.title,
@@ -87,7 +93,8 @@ function transformToSwapItem(listing: SwapListing): SwapItem {
     seller: {
       name: listing.userName,
       successfulSwaps: listing.userSwapCount || 0,
-      memberSince: new Date(listing.createdAt).getFullYear().toString(),
+      memberSince: memberYear,
+      listingCount: listing.sellerListingCount || 0,
     },
     localPickup: listing.localPickup,
     willShip: listing.willShip,
@@ -187,6 +194,16 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
             <Text style={[styles.timeText, { color: theme.textMuted }]}>
               {item.postedTime}
             </Text>
+          </View>
+          <View style={styles.sellerCredRow}>
+            <Text style={[styles.sellerCredText, { color: theme.textMuted }]}>
+              Member since {item.seller.memberSince}
+            </Text>
+            {item.seller.listingCount > 1 ? (
+              <Text style={[styles.sellerCredText, { color: theme.textMuted }]}>
+                {item.seller.listingCount} listings
+              </Text>
+            ) : null}
           </View>
         </View>
       </View>
@@ -546,6 +563,14 @@ const styles = StyleSheet.create({
   },
   sellerText: {
     ...Typography.caption,
+  },
+  sellerCredRow: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginTop: 2,
+  },
+  sellerCredText: {
+    fontSize: 10,
   },
   swapsBadge: {
     flexDirection: "row",
