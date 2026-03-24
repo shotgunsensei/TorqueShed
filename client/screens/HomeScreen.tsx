@@ -387,7 +387,7 @@ export default function HomeScreen() {
         <SectionHeader
           title="New in Swap Shop"
           icon="shopping-bag"
-          onSeeAll={() => navigateToTab("SwapTab")}
+          onSeeAll={() => navigateToTab("SourceTab")}
         />
         {recentListings.length > 0 ? (
           <FlatList
@@ -404,7 +404,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.horizontalList}
           />
         ) : (
-          <Card style={styles.promptCard} onPress={() => navigateToTab("SwapTab")}>
+          <Card style={styles.promptCard} onPress={() => navigateToTab("SourceTab")}>
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="shopping-bag" size={24} color={theme.primary} />

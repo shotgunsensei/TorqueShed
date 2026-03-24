@@ -1,7 +1,7 @@
 # TorqueShed - Automotive Community Platform
 
 ## Overview
-TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers. It offers features like forums, vehicle tracking, diagnostic tools, and a curated marketplace. The platform's vision is to be "The Garage for Real People," fostering a strong community around automotive interests. Key capabilities include brand-specific communities ("Bays"), discussion threads, vehicle maintenance tracking ("Notes"), a step-by-step diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), and a curated section for tools and gear ("Tool & Gear").
+TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers. It aims to be "The Garage for Real People," fostering a strong community around automotive interests. Key features include brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a step-by-step diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), and a curated marketplace for tools and gear ("Shop").
 
 ## User Preferences
 - Bold, industrial design aesthetic
@@ -13,93 +13,29 @@ TorqueShed is a mobile-first automotive community platform designed to connect m
 ## System Architecture
 
 ### UI/UX Design
-The platform features a custom component system with an automotive-themed design. The brand identity is "TorqueShed" with "The Garage for Real People" as its tagline. The primary color is Racing Orange (#FF6B35), with Industrial Black (#0D0F12) as a secondary and Caution Yellow (#F59E0B) as an accent. Bay-specific brand colors are used for major automotive brands. Typography uses Montserrat for headings and Inter for body text. UI components include cards with subtle shadows, animated press feedback, Floating Action Buttons (FABs), and segmented controls.
+The platform features a custom component system with an automotive theme. The brand identity is "TorqueShed" with "The Garage for Real People" as its tagline. The primary color is Racing Orange (#FF6B35), with Industrial Black (#0D0F12) as a secondary and Caution Yellow (#F59E0B) as an accent. Typography uses Montserrat for headings and Inter for body text. UI components include cards, animated press feedback, Floating Action Buttons (FABs), and segmented controls. The design supports responsive layouts for mobile and desktop, utilizing a sidebar navigation on larger screens.
 
 ### Technical Implementation
 The platform uses a mobile-first approach with a React Native + Expo frontend written in TypeScript. The backend is an Express.js server, also in TypeScript, and data is stored in a PostgreSQL database.
 
 **Key Features:**
-- **Bays**: Brand-specific community forums (Ford, Dodge, Chevy, Jeep, General) with discussion threads.
-- **Forum Threads**: Discussion threads within Bays for community Q&A. Messages display user credibility signals (years wrenching, focus areas). Chat feature has been removed in favor of forum-style discussions.
-- **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general). Each entry can track cost, mileage, and parts used. Cost tracking rolls up into vehicle overview stats. Tab renamed from "Notes" to "Garage".
-- **TorqueAssist**: A step-by-step diagnostic wizard providing interactive checklists, torque specs, and suggested parts. Uses category-based navigation (Brakes, Engine, Electrical, Suspension) with symptom selection and progress tracking. No AI/external API required - all diagnostics run locally with predefined patterns.
-- **Swap Shop**: A peer-to-peer marketplace for buying, selling, and trading automotive parts.
-- **Tool & Gear**: A curated marketplace for automotive tools and gear, with a vendor submission process for admin approval.
-- **User Profiles**: Detailed profiles with credibility fields such as `focusAreas`, `vehiclesWorkedOn`, `yearsWrenching`, and `shopAffiliation`.
-- **Content Moderation**: Reporting system for inappropriate content.
+- **Bays**: Brand-specific community forums with discussion threads and user credibility signals.
+- **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general), tracking cost, mileage, and parts.
+- **TorqueAssist**: A step-by-step diagnostic wizard providing interactive checklists and suggested parts, running locally with predefined patterns.
+- **Source Tab**: A unified parts sourcing hub featuring a curated "Shop", a peer-to-peer "Swap Shop", and a "Find Parts" search across major vendors.
+- **User Profiles**: Detailed profiles with credibility fields like `focusAreas` and `yearsWrenching`.
+- **Content Moderation**: A reporting system for inappropriate content.
 
 ### System Design Choices
-- **Responsive Web Layout**: The app supports both mobile and desktop viewports. On desktop (width >= 1024px), a sidebar navigation replaces bottom tabs. Screens use responsive grid layouts (1 column on mobile, 2-3 columns on tablet, 3-4 columns on desktop). The `useResponsive` hook provides breakpoint detection.
-- **Navigation**: Utilizes React Navigation with a `RootStackNavigator` encompassing a `ResponsiveNavigator` that switches between bottom tabs (mobile) and sidebar navigation (desktop). Modal screens for adding vehicles, notes, submitting products, and user profiles.
-- **Data Management**: React Query is used for client-side data fetching and caching.
-- **Database Schema**: PostgreSQL with Drizzle ORM managing users, garages, garage members, vehicles, vehicle notes, threads, and reports. User credibility fields are stored in the `users` table.
-- **API**: A RESTful API under `/api/*` for managing garages, user profiles, reports, threads, and products.
-- **CORS Configuration**: Production domain (torqueshed.pro) is configured with proper CORS headers. Custom domains can be added via ALLOWED_ORIGINS env var.
-- **Monetization Ethics**: TorqueAssist features ethical monetization with transparent disclosure of affiliate links, offering multiple vendors (mixing affiliate and non-affiliate), prioritizing relevance over commission, and requiring explicit user action for external links.
-- **Tool & Gear Monetization**: Curated product discovery with `whyItMatters` context boxes, sponsored product badges (yellow "Sponsored" in top-left), "View Deal" CTAs, admin-only CRUD via x-admin-user-id header authentication. Products table includes: title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored, isApproved.
-
-### Recent Updates (Feb 2026)
-- **UserAvatar Component**: Reusable avatar component showing user initials, avatar image, or fallback icon. Used across DesktopSidebar and profiles.
-- **Role Display**: Only Admin/Moderator roles are shown - regular users ("enthusiast") don't display a role label.
-- **ErrorBoundary for TorqueAssist**: TorqueAssist screen wrapped in ErrorBoundary with user-friendly fallback and "Try Again" button.
-- **EditListingScreen**: Full listing editing capability for Swap Shop with PATCH endpoint integration.
-- **Improved Validation**: AddThreadScreen and EditListingScreen show explicit validation error messages.
-- **Delete Functionality**: Both Swap Shop listings and forum threads can now be deleted by their owners with confirmation dialogs.
-- **Forum-Style Thread View**: ThreadDetailScreen shows original post, author avatar, replies, and "Replying to thread" label above the input field. Not chat-like - full message board view.
-- **Add Vehicle Button**: NotesScreen displays an "Add Vehicle" button at the top of the vehicle list, or a prominent "Add Your First Vehicle" button when empty.
-
-### API Integration (Feb 2026)
-All major features now use real database storage instead of stub data:
-- **Vehicles API** (`/api/vehicles`): Full CRUD for user vehicles with VIN/YMM tracking. Requires authentication. Frontend screens: NotesScreen, AddVehicleScreen.
-- **Vehicle Notes API** (`/api/vehicles/:vehicleId/notes`, `/api/notes/:id`): Maintenance and modification notes per vehicle. Frontend screens: VehicleDetailScreen, AddNoteScreen.
-- **Threads API** (`/api/garages/:garageId/threads`, `/api/threads/:id`, `/api/threads/:threadId/replies`): Bay discussion threads with replies and solution marking. Frontend: GarageDetailScreen (Threads tab), AddThreadScreen, ThreadDetailScreen with reply functionality.
-- **Swap Shop API** (`/api/swap-shop`, `/api/swap-shop/:id`): Peer-to-peer parts marketplace with condition ratings and shipping options. Supports PATCH for editing listings. Frontend: SwapShopScreen, AddListingScreen, ListingDetailScreen, EditListingScreen.
-
-## Project Structure
-
-### Folder Layout
-- `client/` - React Native + Expo frontend (TypeScript)
-- `server/` - Express.js backend (TypeScript)
-- `shared/` - Server-only shared code (Drizzle schema, TorqueAssist types)
-- `assets/` - Static assets (images, fonts)
-- `scripts/` - Build scripts
-
-### Path Aliases
-- `@/*` → `./client/*` (frontend imports)
-- `@shared/*` → `./shared/*` (server-only, NOT for client use)
-
-### Important Notes
-- The `shared/` folder contains Drizzle ORM schema and is server-only
-- Client types are defined locally in `client/` (e.g., `client/constants/products.ts`)
-- Do not import from `@shared/*` in client code
-- Use `useSafeTabBarHeight()` hook instead of `useBottomTabBarHeight()` for screens that need tab bar padding - it safely returns 0 on desktop where sidebar navigation is used instead of bottom tabs
-- Use the `Screen` wrapper component (`client/components/Screen.tsx`) for consistent scrolling, padding, and keyboard awareness across screens
+- **Responsive Layout**: Adapts for mobile and desktop viewports, switching between bottom tabs and sidebar navigation.
+- **Navigation**: Uses React Navigation with a `RootStackNavigator` and `ResponsiveNavigator`.
+- **Data Management**: React Query for client-side data fetching and caching.
+- **Database Schema**: PostgreSQL with Drizzle ORM managing users, garages, vehicles, notes, threads, and marketplace items.
+- **API**: A RESTful API under `/api/*` for managing all platform data.
+- **Monetization Ethics**: TorqueAssist transparently uses affiliate links, prioritizing relevance and user action. The "Shop" features curated products with context boxes and sponsored product badges.
 
 ## External Dependencies
 - **React Native + Expo**: For mobile application development.
 - **Express.js**: For the backend server.
 - **PostgreSQL**: As the primary database.
 - **Drizzle ORM**: For interacting with the PostgreSQL database.
-
-## Recent Changes (Mar 2026)
-- **Phase 7: Structured Solve Flow**: "Ask for Help" multi-step flow guides users through describing issues with structured metadata (vehicle, symptoms, OBD codes, severity, drivability, recent changes, target Bay). Threads gain optional fields: `vehicleId`, `symptoms`, `obdCodes`, `severity`, `drivability`, `recentChanges`. Solution marking enhanced: when marking a reply as solution, thread owner can add difficulty (1-5), estimated cost, tools used, and parts used. ThreadDetailScreen shows structured metadata block (vehicle, symptoms, OBD codes, severity/drivability ratings) and a solved summary card at the top for resolved threads. AskForHelpScreen accessible from HomeScreen. Schema additions: metadata fields on `threads`, solution metadata fields (`solutionDifficulty`, `solutionCost`, `solutionTools`, `solutionParts`) on `thread_replies`.
-
-- **Phase 6: Build Journal**: Notes tab renamed to "Garage". Vehicle notes transformed into typed journal entries (maintenance, mod, issue, general) with cost, mileage, and parts tracking. VehicleDetailScreen redesigned with overview stats (total invested, entry counts by type) and filterable tabs (All/Maintenance/Mods/Issues). AddNoteScreen now type-aware with adaptive form fields per entry type. Vehicle cards on Garage screen show total cost invested. Schema additions: `type`, `cost`, `mileage`, `partsUsed` on `vehicle_notes`; `isPublic` on `vehicles`. NoteCard component updated with type badges, cost/mileage/parts metadata.
-- **Phase 5: Bays Community Redesign**: Complete redesign of Bays screens. GaragesScreen: brand-colored accent strip on cards, latest activity timestamps, compact joined badge. GarageDetailScreen: hero header with brand gradient, segmented tabs (All/Solved/Pinned), thread search/filter, top contributors section, FAB for new threads. ThreadDetailScreen: accepted solution surfaced to top with green banner, author credibility signals (years wrenching, focus areas). API additions: `GET /api/garages/:garageId/top-contributors` returns most active repliers with credibility data. Thread queries enriched with `yearsWrenching` and `focusAreas`. Garages list includes `latestActivityAt`. Dependency: `expo-linear-gradient` for hero gradients.
-- **Phase 4: Personalized Home Feed Tab**: Added Home as the first/default tab. New files: `client/screens/HomeScreen.tsx`, `client/navigation/HomeStackNavigator.tsx`, `client/screens/MoreScreen.tsx`, `client/navigation/MoreStackNavigator.tsx`. API: `GET /api/feed` returns user's vehicles, recent bay threads (from joined garages), solved threads matching vehicle makes ("For Your Garage"), swap shop listings filtered by vehicle makes, and onboarding goals. Home screen sections ordered by user's primary onboarding goal: Your Vehicles, Recent Activity, For Your Garage, New in Swap Shop. Tab order: Home, Bays, Swap Shop, Notes, More. TorqueAssist and Tool & Gear moved under More tab. DesktopSidebar updated with new tab structure.
-- **Phase 3: Multi-Step Onboarding Flow**: New users see a 4-step onboarding after signup: (1) Add primary vehicle with VIN decode or manual entry, (2) Select brand Bays to auto-join, (3) Choose goals, (4) Summary/confirmation. Existing users skip onboarding automatically. Schema additions: `onboardingCompleted` boolean, `onboardingGoals` json on users table. API: `PATCH /api/users/me/onboarding`. Navigation gated via `needsOnboarding` in AuthContext. OnboardingScreen at `client/screens/OnboardingScreen.tsx`.
-- **Phase 1 Foundation Cleanup**: Removed 7 orphaned navigator files and 4 orphaned screen files. Renamed `password` field to `passwordHash` in schema/server code (same DB column). Removed `chat_messages` table and all related code. React Query keys audited for consistency.
-- **Eliminated all hardcoded/fake data**: Removed SAMPLE_THREADS, SAMPLE_MESSAGES, SAMPLE_VEHICLES, SAMPLE_NOTES, SAMPLE_PRODUCTS, FALLBACK_PRODUCTS, STUB_GARAGES, STUB_SWAP_ITEMS from all client code. Every screen now displays only real data from the database.
-- **Real member/thread counts**: GaragesScreen fetches from `/api/garages` which computes memberCount from `garage_members` table and threadCount from `threads` table in real-time.
-- **Removed fake indicators**: No more hardcoded "online" counts, "active now" counts, or "hot threads" sections. These were artificial metrics not backed by real data.
-- **PartsFinderScreen**: Search now generates direct links to vendor search pages (RockAuto, AutoZone, O'Reilly, Amazon) instead of returning mock results with fake prices.
-- **MarketplaceScreen and TrendingScreen**: Now fetch products from `/api/products` API instead of using hardcoded sample product arrays.
-- **MyGarageScreen**: Now fetches vehicles from `/api/vehicles` instead of using hardcoded sample vehicles.
-- **SwapShopScreen**: Uses only real listings from `/api/swap-shop`, shows empty state when no listings exist.
-
-## Previous Changes (Feb 2026)
-- Removed real-time chat feature (WebSocket) in favor of forum-style threads
-- Redesigned TorqueAssist from API-based to wizard/checklist approach
-- Added CORS support for torqueshed.pro production domain
-- Created reusable Screen wrapper component for consistent layout
-- Fixed API URL fallback logic for production environments

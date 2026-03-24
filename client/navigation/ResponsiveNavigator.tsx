@@ -7,7 +7,7 @@ import { Platform } from "react-native";
 
 import HomeStackNavigator from "@/navigation/HomeStackNavigator";
 import GaragesStackNavigator from "@/navigation/GaragesStackNavigator";
-import SwapShopStackNavigator from "@/navigation/SwapShopStackNavigator";
+import SourceStackNavigator from "@/navigation/SourceStackNavigator";
 import NotesStackNavigator from "@/navigation/NotesStackNavigator";
 import MoreStackNavigator from "@/navigation/MoreStackNavigator";
 import DesktopSidebar from "@/components/DesktopSidebar";
@@ -17,7 +17,7 @@ import { useResponsive } from "@/hooks/useResponsive";
 export type MainTabParamList = {
   HomeTab: undefined;
   GaragesTab: undefined;
-  SwapTab: undefined;
+  SourceTab: undefined;
   NotesTab: undefined;
   MoreTab: undefined;
 };
@@ -27,7 +27,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_SCREENS = {
   HomeTab: HomeStackNavigator,
   GaragesTab: GaragesStackNavigator,
-  SwapTab: SwapShopStackNavigator,
+  SourceTab: SourceStackNavigator,
   NotesTab: NotesStackNavigator,
   MoreTab: MoreStackNavigator,
 } as const;
@@ -87,12 +87,12 @@ function MobileTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="SwapTab"
-        component={SwapShopStackNavigator}
+        name="SourceTab"
+        component={SourceStackNavigator}
         options={{
-          title: "Swap Shop",
+          title: "Source",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="shopping-bag" size={size} color={color} />
+            <Feather name="compass" size={size} color={color} />
           ),
         }}
       />

@@ -29,12 +29,6 @@ const MENU_ITEMS: MenuItem[] = [
     screen: "TorqueAssist",
     description: "Diagnostic wizard and checklists",
   },
-  {
-    label: "Tool & Gear",
-    icon: "box",
-    screen: "ToolAndGear",
-    description: "Curated tools and gear marketplace",
-  },
 ];
 
 export default function MoreScreen() {
