@@ -355,7 +355,15 @@ export class DatabaseStorage implements IStorage {
         .select({ count: sql<number>`count(*)` })
         .from(vehicleNotes)
         .where(eq(vehicleNotes.vehicleId, vehicle.id));
-      return { ...vehicle, notesCount: Number(countResult?.count || 0) };
+      const [costResult] = await db
+        .select({ total: sql<string>`COALESCE(SUM(CAST(NULLIF(cost, '') AS NUMERIC)), 0)` })
+        .from(vehicleNotes)
+        .where(eq(vehicleNotes.vehicleId, vehicle.id));
+      return {
+        ...vehicle,
+        notesCount: Number(countResult?.count || 0),
+        totalCost: costResult?.total || "0",
+      };
     }));
     
     return result;

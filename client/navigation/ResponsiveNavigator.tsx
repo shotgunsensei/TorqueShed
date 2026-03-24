@@ -100,9 +100,9 @@ function MobileTabNavigator() {
         name="NotesTab"
         component={NotesStackNavigator}
         options={{
-          title: "Notes",
+          title: "Garage",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="file-text" size={size} color={color} />
+            <Feather name="tool" size={size} color={color} />
           ),
         }}
       />

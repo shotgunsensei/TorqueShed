@@ -675,6 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: req.body.model || null,
         nickname: req.body.nickname?.trim(),
         imageUrl: req.body.imageUrl || null,
+        isPublic: req.body.isPublic === true,
       });
 
       const vehicle = await storage.createVehicle(parsed, req.userId!);
@@ -707,6 +708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.model !== undefined) updates.model = parsed.model;
       if (parsed.nickname !== undefined) updates.nickname = parsed.nickname;
       if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
+      if (parsed.isPublic !== undefined) updates.isPublic = parsed.isPublic;
 
       const updated = await storage.updateVehicle(req.params.id, updates);
       res.json(updated);
@@ -786,6 +788,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vehicleId: req.params.vehicleId,
         title: req.body.title?.trim(),
         content: req.body.content?.trim(),
+        type: req.body.type || "general",
+        cost: req.body.cost || null,
+        mileage: req.body.mileage ? Number(req.body.mileage) : null,
+        partsUsed: req.body.partsUsed || null,
         isPrivate: req.body.isPrivate !== false,
       });
 
@@ -815,6 +821,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates: Record<string, unknown> = {};
       if (parsed.title !== undefined) updates.title = parsed.title;
       if (parsed.content !== undefined) updates.content = parsed.content;
+      if (parsed.type !== undefined) updates.type = parsed.type;
+      if (parsed.cost !== undefined) updates.cost = parsed.cost;
+      if (parsed.mileage !== undefined) updates.mileage = parsed.mileage;
+      if (parsed.partsUsed !== undefined) updates.partsUsed = parsed.partsUsed;
       if (parsed.isPrivate !== undefined) updates.isPrivate = parsed.isPrivate;
 
       const updated = await storage.updateNote(req.params.id, updates);

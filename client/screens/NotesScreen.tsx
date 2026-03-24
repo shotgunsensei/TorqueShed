@@ -32,6 +32,7 @@ interface VehicleItem {
   model: string | null;
   vin?: string | null;
   notesCount: number;
+  totalCost: string;
 }
 
 function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void }) {
@@ -48,7 +49,7 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
     >
       <View style={styles.cardHeader}>
         <View style={[styles.vehicleIcon, { backgroundColor: theme.primary + "20" }]}>
-          <Feather name="truck" size={24} color={theme.primary} />
+          <Feather name="tool" size={24} color={theme.primary} />
         </View>
         <View style={styles.cardTitleRow}>
           <Text style={[styles.nickname, { color: theme.text }]}>
@@ -76,9 +77,17 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
         <View style={styles.notesCount}>
           <Feather name="file-text" size={14} color={theme.textMuted} />
           <Text style={[styles.notesCountText, { color: theme.textMuted }]}>
-            {item.notesCount} notes
+            {item.notesCount} {item.notesCount === 1 ? "entry" : "entries"}
           </Text>
         </View>
+        {parseFloat(item.totalCost) > 0 ? (
+          <View style={styles.notesCount}>
+            <Feather name="dollar-sign" size={14} color={theme.primary} />
+            <Text style={[styles.notesCountText, { color: theme.primary }]}>
+              {parseFloat(item.totalCost).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} invested
+            </Text>
+          </View>
+        ) : null}
       </View>
     </Card>
   );
@@ -139,7 +148,7 @@ export default function NotesScreen() {
           ListHeaderComponent={
             <View style={styles.headerSection}>
               <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-                Your Vehicles ({vehicles.length})
+                Your Builds ({vehicles.length})
               </Text>
             </View>
           }

@@ -9,11 +9,17 @@ export interface Vehicle {
   notesCount: number;
 }
 
+export type NoteType = "maintenance" | "mod" | "issue" | "general";
+
 export interface VehicleNote {
   id: string;
   vehicleId: string;
   title: string;
   content: string;
+  type: NoteType;
+  cost: string | null;
+  mileage: number | null;
+  partsUsed: string[] | null;
   createdAt: Date;
   isPrivate: boolean;
 }

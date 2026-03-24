@@ -8,7 +8,7 @@ export const brand = {
 export const screenTitles = {
   home: 'TorqueShed',
   bays: 'Bays',
-  notes: 'Notes',
+  notes: 'Garage',
   torqueAssist: 'TorqueAssist',
   toolGear: 'Tool & Gear',
   swapShop: 'Swap Shop',
@@ -190,9 +190,9 @@ export const emptyStates = {
     action: 'Add Vehicle',
   },
   notes: {
-    title: 'No Notes Yet',
-    message: 'Start documenting your maintenance, mods, and project progress.',
-    action: 'Add Note',
+    title: 'No Journal Entries Yet',
+    message: 'Start documenting your maintenance, mods, and build progress.',
+    action: 'Add Entry',
   },
   parts: {
     title: 'Find the Right Part',

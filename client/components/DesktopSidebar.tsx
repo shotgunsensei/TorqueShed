@@ -20,7 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "HomeTab", label: "Home", icon: "home" },
   { key: "GaragesTab", label: "Bays", icon: "message-circle" },
   { key: "SwapTab", label: "Swap Shop", icon: "shopping-bag" },
-  { key: "NotesTab", label: "Notes", icon: "file-text" },
+  { key: "NotesTab", label: "Garage", icon: "tool" },
   { key: "MoreTab", label: "More", icon: "more-horizontal" },
 ];
 

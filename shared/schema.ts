@@ -79,6 +79,7 @@ export const vehicles = pgTable("vehicles", {
   model: varchar("model", { length: 100 }),
   nickname: varchar("nickname", { length: 100 }),
   imageUrl: text("image_url"),
+  isPublic: boolean("is_public").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -88,6 +89,8 @@ export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
   notes: many(vehicleNotes),
 }));
 
+export const NOTE_TYPES = ["maintenance", "mod", "issue", "general"] as const;
+
 export const vehicleNotes = pgTable("vehicle_notes", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -96,6 +99,10 @@ export const vehicleNotes = pgTable("vehicle_notes", {
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull(),
   content: text("content").notNull(),
+  type: varchar("type", { length: 20 }).default("general"),
+  cost: varchar("cost", { length: 20 }),
+  mileage: integer("mileage"),
+  partsUsed: json("parts_used").$type<string[]>(),
   isPrivate: boolean("is_private").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -315,12 +322,17 @@ export const insertVehicleSchema = z.object({
   model: z.string().max(100).nullable().optional(),
   nickname: z.string().max(100).nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  isPublic: z.boolean().optional().default(false),
 });
 
 export const insertVehicleNoteSchema = z.object({
   vehicleId: z.string().min(1, "Vehicle ID is required"),
   title: z.string().min(1, "Title is required").max(255),
   content: z.string().min(1, "Content is required"),
+  type: z.enum(["maintenance", "mod", "issue", "general"]).optional().default("general"),
+  cost: z.string().max(20).optional().nullable(),
+  mileage: z.number().int().positive().optional().nullable(),
+  partsUsed: z.array(z.string()).optional().nullable(),
   isPrivate: z.boolean().optional().default(false),
 });
 
@@ -340,11 +352,16 @@ export const updateVehicleSchema = z.object({
   model: z.string().max(100).nullable().optional(),
   nickname: z.string().max(100).nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export const updateVehicleNoteSchema = z.object({
   title: z.string().min(1, "Title cannot be empty").max(255).optional(),
   content: z.string().min(1, "Content cannot be empty").optional(),
+  type: z.enum(["maintenance", "mod", "issue", "general"]).optional(),
+  cost: z.string().max(20).optional().nullable(),
+  mileage: z.number().int().positive().optional().nullable(),
+  partsUsed: z.array(z.string()).optional().nullable(),
   isPrivate: z.boolean().optional(),
 });
 

@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Switch } from "react-native";
+import { View, Text, StyleSheet, Switch, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
+import { Feather } from "@expo/vector-icons";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
@@ -12,11 +13,19 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
-import { Spacing } from "@/constants/theme";
+import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import type { NoteType } from "@/constants/vehicles";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type RoutePropType = RouteProp<RootStackParamList, "AddNote">;
+
+const NOTE_TYPES: { key: NoteType; label: string; icon: string; color: string; description: string }[] = [
+  { key: "maintenance", label: "Maintenance", icon: "settings", color: "#3B82F6", description: "Oil changes, brake jobs, fluid flushes" },
+  { key: "mod", label: "Mod", icon: "zap", color: "#8B5CF6", description: "Upgrades, performance parts, cosmetics" },
+  { key: "issue", label: "Issue", icon: "alert-triangle", color: "#EF4444", description: "Problems, diagnostics, things to fix" },
+  { key: "general", label: "General", icon: "file-text", color: "#6B7280", description: "Notes, reminders, anything else" },
+];
 
 export default function AddNoteScreen() {
   const insets = useSafeAreaInsets();
@@ -28,26 +37,42 @@ export default function AddNoteScreen() {
   const toast = useToast();
   const { vehicleId } = route.params;
 
+  const [type, setType] = useState<NoteType>("general");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [cost, setCost] = useState("");
+  const [mileage, setMileage] = useState("");
+  const [partsInput, setPartsInput] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
+
+  const showCostField = type === "maintenance" || type === "mod";
+  const showMileageField = type === "maintenance" || type === "issue";
+  const showPartsField = type === "maintenance" || type === "mod";
 
   const createNoteMutation = useMutation({
     mutationFn: async () => {
+      const partsUsed = partsInput.trim()
+        ? partsInput.split(",").map((p) => p.trim()).filter(Boolean)
+        : null;
       return apiRequest("POST", `/api/vehicles/${vehicleId}/notes`, {
         title: title.trim(),
         content: content.trim(),
+        type,
+        cost: cost.trim() || null,
+        mileage: mileage.trim() ? parseInt(mileage, 10) : null,
+        partsUsed,
         isPrivate,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${vehicleId}/notes`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Note saved", "success");
+      toast.show("Entry saved", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      toast.show(error.message || "Failed to save note", "error");
+      toast.show(error.message || "Failed to save entry", "error");
     },
   });
 
@@ -56,6 +81,8 @@ export default function AddNoteScreen() {
   };
 
   const isValid = title.trim() && content.trim();
+
+  const selectedType = NOTE_TYPES.find((t) => t.key === type);
 
   return (
     <KeyboardAwareScrollViewCompat
@@ -67,25 +94,91 @@ export default function AddNoteScreen() {
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
-      <ThemedText type="h2" style={styles.title}>
-        Add Note
+      <ThemedText type="h2" style={styles.heading}>
+        Add Journal Entry
       </ThemedText>
       <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-        Document maintenance, modifications, or any info about your vehicle
+        Document your work, mods, or issues
       </ThemedText>
+
+      <View style={styles.section}>
+        <ThemedText type="h4" style={styles.label}>
+          Entry Type
+        </ThemedText>
+        <View style={styles.typeGrid}>
+          {NOTE_TYPES.map((t) => {
+            const isActive = type === t.key;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => setType(t.key)}
+                style={[
+                  styles.typeCard,
+                  {
+                    backgroundColor: isActive
+                      ? t.color + "15"
+                      : theme.backgroundDefault,
+                    borderColor: isActive ? t.color : theme.cardBorder,
+                  },
+                ]}
+                testID={`type-${t.key}`}
+              >
+                <View
+                  style={[
+                    styles.typeIcon,
+                    { backgroundColor: t.color + "20" },
+                  ]}
+                >
+                  <Feather name={t.icon as any} size={16} color={t.color} />
+                </View>
+                <Text
+                  style={[
+                    styles.typeLabel,
+                    { color: isActive ? t.color : theme.text },
+                  ]}
+                >
+                  {t.label}
+                </Text>
+                <Text
+                  style={[styles.typeDesc, { color: theme.textMuted }]}
+                  numberOfLines={2}
+                >
+                  {t.description}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       <View style={styles.section}>
         <Input
           label="Title"
-          placeholder="e.g., Oil Change"
+          placeholder={
+            type === "maintenance"
+              ? "e.g., Oil Change at 75k"
+              : type === "mod"
+                ? "e.g., Cold Air Intake Install"
+                : type === "issue"
+                  ? "e.g., Rough Idle on Cold Start"
+                  : "e.g., Quick Note"
+          }
           value={title}
           onChangeText={setTitle}
-          leftIcon="file-text"
+          leftIcon={selectedType?.icon || "file-text"}
         />
 
         <Input
           label="Details"
-          placeholder="Describe what you did..."
+          placeholder={
+            type === "maintenance"
+              ? "Describe the work done..."
+              : type === "mod"
+                ? "Describe the modification..."
+                : type === "issue"
+                  ? "Describe the problem and symptoms..."
+                  : "Write your note..."
+          }
           value={content}
           onChangeText={setContent}
           multiline
@@ -93,11 +186,43 @@ export default function AddNoteScreen() {
           style={styles.contentInput}
         />
 
+        {showCostField ? (
+          <Input
+            label="Cost"
+            placeholder="e.g., 85.50"
+            value={cost}
+            onChangeText={setCost}
+            leftIcon="dollar-sign"
+            keyboardType="decimal-pad"
+          />
+        ) : null}
+
+        {showMileageField ? (
+          <Input
+            label="Mileage"
+            placeholder="e.g., 75000"
+            value={mileage}
+            onChangeText={setMileage}
+            leftIcon="navigation"
+            keyboardType="number-pad"
+          />
+        ) : null}
+
+        {showPartsField ? (
+          <Input
+            label="Parts Used"
+            placeholder="Comma-separated, e.g., K&N Filter, Mobil 1 5W-30"
+            value={partsInput}
+            onChangeText={setPartsInput}
+            leftIcon="package"
+          />
+        ) : null}
+
         <View style={styles.switchRow}>
           <View>
             <ThemedText type="body">Keep Private</ThemedText>
             <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-              Only you can see this note
+              Only you can see this entry
             </ThemedText>
           </View>
           <Switch
@@ -110,7 +235,7 @@ export default function AddNoteScreen() {
       </View>
 
       <Button onPress={handleSave} disabled={!isValid || createNoteMutation.isPending}>
-        {createNoteMutation.isPending ? "Saving..." : "Save Note"}
+        {createNoteMutation.isPending ? "Saving..." : "Save Entry"}
       </Button>
     </KeyboardAwareScrollViewCompat>
   );
@@ -120,7 +245,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  title: {
+  heading: {
     marginBottom: Spacing.sm,
   },
   subtitle: {
@@ -128,6 +253,39 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: Spacing.xl,
+  },
+  label: {
+    marginBottom: Spacing.md,
+  },
+  typeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  typeCard: {
+    width: "48%",
+    flexGrow: 1,
+    flexBasis: "45%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+  },
+  typeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.sm,
+  },
+  typeLabel: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+    marginBottom: 2,
+  },
+  typeDesc: {
+    ...Typography.caption,
+    lineHeight: 16,
   },
   contentInput: {
     height: 120,
