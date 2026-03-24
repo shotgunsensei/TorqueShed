@@ -541,7 +541,7 @@ export default function OnboardingScreen() {
     }
   };
 
-  const canSkip = step >= 2 && step < TOTAL_STEPS - 1;
+  const canSkip = step === 3;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
