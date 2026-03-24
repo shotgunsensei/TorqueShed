@@ -150,6 +150,7 @@ export default function OnboardingScreen() {
     if (step === 0) return vehicleValid;
     if (step === 1) return selectedBays.length > 0;
     if (step === 2) return selectedGoals.length > 0;
+    if (step === 3) return !!selectedAction;
     return true;
   };
 
@@ -456,54 +457,75 @@ export default function OnboardingScreen() {
     </Animated.View>
   );
 
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+
+  const FIRST_ACTIONS = [
+    { id: "thread", label: "Ask a question in a Bay", icon: "message-circle" as const, description: "Jump into a community discussion" },
+    { id: "note", label: "Log your first maintenance note", icon: "edit-3" as const, description: "Start tracking work on your vehicle" },
+    { id: "browse", label: "Browse the Swap Shop", icon: "shopping-bag" as const, description: "See what parts are available" },
+    { id: "explore", label: "Explore TorqueAssist", icon: "activity" as const, description: "Diagnose an issue step by step" },
+  ] as const;
+
   const renderStep3 = () => (
     <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(100)} style={styles.stepContent}>
-      {renderStepHeader("You are All Set", "Here is what is waiting for you")}
+      {renderStepHeader("What Do You Want to Do First?", "Pick an action to get started -- you can always do more later")}
 
-      <View style={styles.summaryList}>
-        {nickname.trim().length > 0 ? (
-          <View style={[styles.summaryItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
-            <Feather name="truck" size={20} color={theme.primary} />
-            <View style={styles.summaryText}>
-              <ThemedText type="h4">{nickname}</ThemedText>
-              <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                {[year, make, model].filter(Boolean).join(" ") || "Your ride"}
-              </ThemedText>
-            </View>
-          </View>
-        ) : null}
-
-        {selectedBays.length > 0 ? (
-          <View style={[styles.summaryItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
-            <Feather name="users" size={20} color={theme.primary} />
-            <View style={styles.summaryText}>
-              <ThemedText type="h4">
-                {selectedBays.length} {selectedBays.length === 1 ? "Bay" : "Bays"} joined
-              </ThemedText>
-              <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                {selectedBays
-                  .map((id) => BAYS.find((b) => b.id === id)?.name)
-                  .filter(Boolean)
-                  .join(", ")}
-              </ThemedText>
-            </View>
-          </View>
-        ) : null}
-
-        {selectedGoals.length > 0 ? (
-          <View style={[styles.summaryItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
-            <Feather name="target" size={20} color={theme.primary} />
-            <View style={styles.summaryText}>
-              <ThemedText type="h4">Your goals</ThemedText>
-              <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                {selectedGoals
-                  .map((id) => GOALS.find((g) => g.id === id)?.label)
-                  .filter(Boolean)
-                  .join(", ")}
-              </ThemedText>
-            </View>
-          </View>
-        ) : null}
+      <View style={styles.goalsList}>
+        {FIRST_ACTIONS.map((action) => {
+          const selected = selectedAction === action.id;
+          return (
+            <Pressable
+              key={action.id}
+              testID={`button-action-${action.id}`}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedAction(action.id);
+              }}
+              style={[
+                styles.goalCard,
+                {
+                  backgroundColor: selected
+                    ? theme.primary + "15"
+                    : theme.backgroundSecondary,
+                  borderColor: selected ? theme.primary : theme.cardBorder,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.goalIcon,
+                  {
+                    backgroundColor: selected
+                      ? theme.primary + "20"
+                      : theme.backgroundTertiary,
+                  },
+                ]}
+              >
+                <Feather
+                  name={action.icon}
+                  size={18}
+                  color={selected ? theme.primary : theme.textSecondary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText
+                  type="body"
+                  style={{ color: selected ? theme.text : theme.textSecondary, fontWeight: "600" }}
+                >
+                  {action.label}
+                </ThemedText>
+                <ThemedText type="small" style={{ color: theme.textMuted }}>
+                  {action.description}
+                </ThemedText>
+              </View>
+              {selected ? (
+                <Feather name="check-circle" size={18} color={theme.primary} />
+              ) : (
+                <View style={[styles.goalCircle, { borderColor: theme.border }]} />
+              )}
+            </Pressable>
+          );
+        })}
       </View>
     </Animated.View>
   );
@@ -523,7 +545,7 @@ export default function OnboardingScreen() {
     }
   };
 
-  const canSkip = step >= 1 && step < TOTAL_STEPS - 1;
+  const canSkip = step >= 2 && step < TOTAL_STEPS - 1;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -743,21 +765,6 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 1.5,
-  },
-  summaryList: {
-    gap: Spacing.md,
-  },
-  summaryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  summaryText: {
-    flex: 1,
-    gap: Spacing.xxs,
   },
   footer: {
     paddingHorizontal: Spacing.lg,
