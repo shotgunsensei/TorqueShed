@@ -23,7 +23,7 @@ The platform uses a mobile-first approach with a React Native + Expo frontend wr
 - **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general), tracking cost, mileage, and parts.
 - **TorqueAssist**: A step-by-step diagnostic wizard providing interactive checklists and suggested parts, running locally with predefined patterns.
 - **Source Tab**: A unified parts sourcing hub featuring a curated "Shop", a peer-to-peer "Swap Shop", and a "Find Parts" search across major vendors.
-- **User Profiles**: Detailed profiles with credibility fields like `focusAreas` and `yearsWrenching`.
+- **User Profiles**: Rich profiles with hero section, 5-stat row (vehicles, threads, solutions, replies, listings), public vehicles carousel, recent activity feed, and collapsible edit form. Role badges (Admin/Mod) and "Trusted Solver" indicator (3+ accepted solutions) displayed on profile and thread reply cards.
 - **Content Moderation**: A reporting system for inappropriate content.
 
 ### System Design Choices

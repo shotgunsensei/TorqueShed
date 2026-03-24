@@ -323,11 +323,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/users/:id/profile", async (req: Request, res: Response) => {
     try {
-      const profile = await storage.getPublicProfile(req.params.id);
-      if (!profile) {
+      const fullProfile = await storage.getFullUserProfile(req.params.id);
+      if (!fullProfile) {
         return res.status(404).json({ error: "User not found" });
       }
-      res.json(profile);
+      res.json(fullProfile);
     } catch (error) {
       console.error("Error fetching profile:", error);
       res.status(500).json({ error: "Failed to fetch profile" });

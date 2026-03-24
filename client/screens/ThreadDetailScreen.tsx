@@ -73,6 +73,9 @@ interface ThreadReply {
   solutionParts: string[] | null;
   createdAt: string;
   userName: string;
+  yearsWrenching: number | null;
+  focusAreas: string[];
+  solutionCountTotal: number;
 }
 
 const SEVERITY_LABELS = ["Minor", "Low", "Moderate", "High", "Critical"];
@@ -269,6 +272,34 @@ export default function ThreadDetailScreen() {
     );
   };
 
+  const renderReplyBadges = (item: ThreadReply) => {
+    const isTrustedSolver = (item.solutionCountTotal || 0) >= 3;
+    const signals: string[] = [];
+    if (item.yearsWrenching) {
+      signals.push(`${item.yearsWrenching}yr`);
+    }
+    if (item.focusAreas && item.focusAreas.length > 0) {
+      signals.push(item.focusAreas.slice(0, 2).join(", "));
+    }
+    if (!isTrustedSolver && signals.length === 0) return null;
+    return (
+      <View style={styles.replyBadgeRow}>
+        {isTrustedSolver ? (
+          <View style={[styles.trustedBadge, { backgroundColor: theme.success + "18" }]}>
+            <Feather name="award" size={11} color={theme.success} />
+            <Text style={[styles.trustedBadgeText, { color: theme.success }]}>Trusted Solver</Text>
+          </View>
+        ) : null}
+        {signals.length > 0 ? (
+          <View style={styles.replyCredRow}>
+            <Feather name="tool" size={10} color={theme.textMuted} />
+            <Text style={[styles.replyCredText, { color: theme.textMuted }]}>{signals.join(" / ")}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   const renderReply = ({ item }: { item: ThreadReply }) => {
     if (item.isSolution) {
       return (
@@ -286,6 +317,7 @@ export default function ThreadDetailScreen() {
                 {formatDate(item.createdAt)}
               </ThemedText>
             </View>
+            {renderReplyBadges(item)}
             <ThemedText type="body" style={styles.replyContent}>
               {item.content}
             </ThemedText>
@@ -303,6 +335,7 @@ export default function ThreadDetailScreen() {
             {formatDate(item.createdAt)}
           </ThemedText>
         </View>
+        {renderReplyBadges(item)}
         <ThemedText type="body" style={styles.replyContent}>
           {item.content}
         </ThemedText>
@@ -946,5 +979,32 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  replyBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  trustedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  trustedBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  replyCredRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  replyCredText: {
+    fontSize: 10,
   },
 });

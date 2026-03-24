@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Image, Pressable, ActivityIndicator, Alert, Text } from "react-native";
+import { View, StyleSheet, Image, Pressable, ActivityIndicator, Alert, Text, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserRoleDisplay } from "@/components/UserAvatar";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
@@ -50,8 +51,56 @@ interface UserProfile {
 interface UserStats {
   threadCount: number;
   replyCount: number;
+  solutionCount: number;
   listingCount: number;
   vehicleCount: number;
+}
+
+interface RecentActivity {
+  id: string;
+  type: "thread" | "reply";
+  title: string;
+  garageId: string | null;
+  createdAt: string;
+}
+
+interface PublicVehicle {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  nickname: string | null;
+}
+
+interface FullProfileData {
+  profile: UserProfile;
+  stats: UserStats;
+  role: string | null;
+  recentActivity: RecentActivity[];
+  publicVehicles: PublicVehicle[];
+}
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays > 30) return `${Math.floor(diffDays / 30)}mo ago`;
+  if (diffDays > 0) return `${diffDays}d ago`;
+  const diffHours = Math.floor(diffMs / 3600000);
+  if (diffHours > 0) return `${diffHours}h ago`;
+  return "Just now";
+}
+
+function StatItem({ value, label, icon, color }: { value: number; label: string; icon: keyof typeof Feather.glyphMap; color: string }) {
+  const { theme } = useTheme();
+  return (
+    <View style={styles.statCell}>
+      <Feather name={icon} size={14} color={color} style={{ marginBottom: 2 }} />
+      <Text style={[styles.statNumber, { color }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.textMuted }]}>{label}</Text>
+    </View>
+  );
 }
 
 export default function ProfileScreen() {
@@ -70,14 +119,21 @@ export default function ProfileScreen() {
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<FocusArea[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
 
   const { data: profile, isLoading } = useQuery<UserProfile>({
     queryKey: ["/api/users/me/profile"],
   });
 
-  const { data: stats } = useQuery<UserStats>({
-    queryKey: ["/api/users/me/stats"],
+  const { data: fullProfile } = useQuery<FullProfileData>({
+    queryKey: [`/api/users/${currentUser?.id}/profile`],
+    enabled: !!currentUser?.id,
   });
+
+  const stats = fullProfile?.stats;
+  const recentActivity = fullProfile?.recentActivity || [];
+  const publicVehicles = fullProfile?.publicVehicles || [];
+  const userRole = getUserRoleDisplay(fullProfile?.role || currentUser?.role);
 
   useEffect(() => {
     if (profile) {
@@ -96,9 +152,11 @@ export default function ProfileScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "profile"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Profile updated", "success");
       setHasChanges(false);
+      setShowEditForm(false);
     },
     onError: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -200,6 +258,8 @@ export default function ProfileScreen() {
     ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : null;
 
+  const isTrustedSolver = (stats?.solutionCount || 0) >= 3;
+
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -207,6 +267,11 @@ export default function ProfileScreen() {
       </View>
     );
   }
+
+  const vehicleLabel = (v: PublicVehicle) => {
+    if (v.nickname) return v.nickname;
+    return [v.year, v.make, v.model].filter(Boolean).join(" ") || "Vehicle";
+  };
 
   return (
     <KeyboardAwareScrollViewCompat
@@ -218,7 +283,7 @@ export default function ProfileScreen() {
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
-      <View style={styles.avatarSection}>
+      <View style={styles.heroSection}>
         <View style={styles.avatarWrapper}>
           <View
             style={[
@@ -249,129 +314,241 @@ export default function ProfileScreen() {
             )}
           </Pressable>
         </View>
+
         <ThemedText type="h2" style={styles.username}>
           {currentUser?.username || profile?.username || "TorqueShed User"}
         </ThemedText>
-        {joinDate ? (
-          <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 2 }}>
-            Wrenching since {joinDate}
-          </ThemedText>
+
+        <View style={styles.heroMeta}>
+          {userRole ? (
+            <View style={[styles.roleBadge, { backgroundColor: theme.primary + "20" }]}>
+              <Feather name="shield" size={12} color={theme.primary} />
+              <Text style={[styles.roleBadgeText, { color: theme.primary }]}>{userRole}</Text>
+            </View>
+          ) : null}
+          {isTrustedSolver ? (
+            <View style={[styles.roleBadge, { backgroundColor: theme.success + "20" }]}>
+              <Feather name="check-circle" size={12} color={theme.success} />
+              <Text style={[styles.roleBadgeText, { color: theme.success }]}>Trusted Solver</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.heroDetails}>
+          {profile?.location ? (
+            <View style={styles.heroDetailRow}>
+              <Feather name="map-pin" size={13} color={theme.textMuted} />
+              <Text style={[styles.heroDetailText, { color: theme.textSecondary }]}>{profile.location}</Text>
+            </View>
+          ) : null}
+          {joinDate ? (
+            <View style={styles.heroDetailRow}>
+              <Feather name="calendar" size={13} color={theme.textMuted} />
+              <Text style={[styles.heroDetailText, { color: theme.textSecondary }]}>Member since {joinDate}</Text>
+            </View>
+          ) : null}
+          {profile?.yearsWrenching ? (
+            <View style={styles.heroDetailRow}>
+              <Feather name="clock" size={13} color={theme.textMuted} />
+              <Text style={[styles.heroDetailText, { color: theme.textSecondary }]}>
+                {profile.yearsWrenching} {profile.yearsWrenching === 1 ? "year" : "years"} wrenching
+              </Text>
+            </View>
+          ) : null}
+          {profile?.shopAffiliation ? (
+            <View style={styles.heroDetailRow}>
+              <Feather name="home" size={13} color={theme.textMuted} />
+              <Text style={[styles.heroDetailText, { color: theme.textSecondary }]}>{profile.shopAffiliation}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {profile?.bio ? (
+          <Text style={[styles.bioText, { color: theme.text }]}>{profile.bio}</Text>
+        ) : null}
+
+        {selectedFocusAreas.length > 0 ? (
+          <View style={styles.focusChipsRow}>
+            {selectedFocusAreas.map((area) => (
+              <View key={area} style={[styles.focusChipDisplay, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "30" }]}>
+                <Text style={[styles.focusChipText, { color: theme.primary }]}>{area}</Text>
+              </View>
+            ))}
+          </View>
         ) : null}
       </View>
 
       {stats ? (
         <View style={[styles.statsRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
-          <View style={styles.statCell}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.vehicleCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Vehicles</Text>
-          </View>
+          <StatItem value={stats.vehicleCount} label="Vehicles" icon="truck" color={theme.primary} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statCell}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.threadCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Threads</Text>
-          </View>
+          <StatItem value={stats.threadCount} label="Threads" icon="message-circle" color={theme.primary} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statCell}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.replyCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Replies</Text>
-          </View>
+          <StatItem value={stats.solutionCount} label="Solutions" icon="check-circle" color={theme.success} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statCell}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.listingCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Listings</Text>
-          </View>
+          <StatItem value={stats.replyCount} label="Replies" icon="message-square" color={theme.primary} />
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+          <StatItem value={stats.listingCount} label="Listings" icon="tag" color={theme.primary} />
         </View>
       ) : null}
 
-      <View style={styles.formSection}>
-        <Input
-          label="Bio"
-          placeholder="Tell us about yourself and your automotive experience"
-          value={bio}
-          onChangeText={handleFieldChange(setBio)}
-          leftIcon="user"
-          multiline
-          maxLength={500}
-        />
-
-        <Input
-          label="Location"
-          placeholder="City, State"
-          value={location}
-          onChangeText={handleFieldChange(setLocation)}
-          leftIcon="map-pin"
-          maxLength={100}
-        />
-
-        <View style={styles.fieldGroup}>
-          <ThemedText type="caption" style={styles.label}>
-            Focus Areas
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
-            Select areas where you have expertise
-          </ThemedText>
-          <View style={styles.focusAreasGrid}>
-            {FOCUS_AREAS.map((area) => {
-              const isSelected = selectedFocusAreas.includes(area);
-              return (
-                <Pressable
-                  key={area}
-                  style={[
-                    styles.focusAreaChip,
-                    {
-                      backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
-                      borderColor: isSelected ? theme.primary : theme.border,
-                    },
-                  ]}
-                  onPress={() => toggleFocusArea(area)}
-                >
-                  <ThemedText
-                    type="caption"
-                    style={{ color: isSelected ? "#FFFFFF" : theme.text }}
-                  >
-                    {area}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+      {publicVehicles.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Feather name="truck" size={16} color={theme.primary} />
+            <ThemedText type="h4" style={styles.sectionTitle}>Vehicles</ThemedText>
           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vehiclesScroller}>
+            {publicVehicles.map((v) => (
+              <View key={v.id} style={[styles.vehicleCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
+                <Feather name="truck" size={20} color={theme.primary} style={{ marginBottom: Spacing.xs }} />
+                <Text style={[styles.vehicleCardTitle, { color: theme.text }]} numberOfLines={1}>{vehicleLabel(v)}</Text>
+                {v.nickname ? (
+                  <Text style={[styles.vehicleCardSub, { color: theme.textMuted }]} numberOfLines={1}>
+                    {[v.year, v.make, v.model].filter(Boolean).join(" ")}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </ScrollView>
         </View>
+      ) : null}
 
-        <Input
-          label="Vehicles Worked On"
-          placeholder="e.g., Ford F-150, Chevy Silverado, Jeep Wrangler..."
-          value={vehiclesWorkedOn}
-          onChangeText={handleFieldChange(setVehiclesWorkedOn)}
-          leftIcon="truck"
-          multiline
-          maxLength={1000}
-        />
+      {recentActivity.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Feather name="activity" size={16} color={theme.primary} />
+            <ThemedText type="h4" style={styles.sectionTitle}>Recent Activity</ThemedText>
+          </View>
+          {recentActivity.slice(0, 5).map((activity) => (
+            <View
+              key={`${activity.type}-${activity.id}`}
+              style={[styles.activityItem, { borderBottomColor: theme.border }]}
+            >
+              <View style={[styles.activityIcon, { backgroundColor: activity.type === "thread" ? theme.primary + "15" : theme.success + "15" }]}>
+                <Feather
+                  name={activity.type === "thread" ? "message-circle" : "corner-down-right"}
+                  size={14}
+                  color={activity.type === "thread" ? theme.primary : theme.success}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.activityTitle, { color: theme.text }]} numberOfLines={1}>
+                  {activity.type === "thread" ? "Started: " : "Replied to: "}
+                  {activity.title}
+                </Text>
+                <Text style={[styles.activityTime, { color: theme.textMuted }]}>{formatTimeAgo(activity.createdAt)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
-        <Input
-          label="Years Wrenching"
-          placeholder="How many years of experience?"
-          value={yearsWrenching}
-          onChangeText={handleFieldChange(setYearsWrenching)}
-          leftIcon="clock"
-          keyboardType="number-pad"
-        />
+      <Pressable
+        style={[styles.editToggle, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}
+        onPress={() => setShowEditForm(!showEditForm)}
+        testID="button-toggle-edit"
+      >
+        <View style={styles.menuItemLeft}>
+          <Feather name="edit-2" size={18} color={theme.primary} />
+          <Text style={[styles.editToggleText, { color: theme.text }]}>
+            {showEditForm ? "Hide Edit Form" : "Edit Profile"}
+          </Text>
+        </View>
+        <Feather name={showEditForm ? "chevron-up" : "chevron-down"} size={20} color={theme.textMuted} />
+      </Pressable>
 
-        <Input
-          label="Shop Affiliation (Optional)"
-          placeholder="Are you affiliated with a shop or brand?"
-          value={shopAffiliation}
-          onChangeText={handleFieldChange(setShopAffiliation)}
-          leftIcon="home"
-          maxLength={200}
-        />
+      {showEditForm ? (
+        <View style={styles.formSection}>
+          <Input
+            label="Bio"
+            placeholder="Tell us about yourself and your automotive experience"
+            value={bio}
+            onChangeText={handleFieldChange(setBio)}
+            leftIcon="user"
+            multiline
+            maxLength={500}
+          />
 
-        <Button
-          onPress={handleSave}
-          disabled={!hasChanges || updateMutation.isPending}
-        >
-          {updateMutation.isPending ? "Saving..." : "Save Profile"}
-        </Button>
-      </View>
+          <Input
+            label="Location"
+            placeholder="City, State"
+            value={location}
+            onChangeText={handleFieldChange(setLocation)}
+            leftIcon="map-pin"
+            maxLength={100}
+          />
+
+          <View style={styles.fieldGroup}>
+            <ThemedText type="caption" style={styles.label}>
+              Focus Areas
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+              Select areas where you have expertise
+            </ThemedText>
+            <View style={styles.focusAreasGrid}>
+              {FOCUS_AREAS.map((area) => {
+                const isSelected = selectedFocusAreas.includes(area);
+                return (
+                  <Pressable
+                    key={area}
+                    style={[
+                      styles.focusAreaChip,
+                      {
+                        backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
+                        borderColor: isSelected ? theme.primary : theme.border,
+                      },
+                    ]}
+                    onPress={() => toggleFocusArea(area)}
+                  >
+                    <ThemedText
+                      type="caption"
+                      style={{ color: isSelected ? "#FFFFFF" : theme.text }}
+                    >
+                      {area}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <Input
+            label="Vehicles Worked On"
+            placeholder="e.g., Ford F-150, Chevy Silverado, Jeep Wrangler..."
+            value={vehiclesWorkedOn}
+            onChangeText={handleFieldChange(setVehiclesWorkedOn)}
+            leftIcon="truck"
+            multiline
+            maxLength={1000}
+          />
+
+          <Input
+            label="Years Wrenching"
+            placeholder="How many years of experience?"
+            value={yearsWrenching}
+            onChangeText={handleFieldChange(setYearsWrenching)}
+            leftIcon="clock"
+            keyboardType="number-pad"
+          />
+
+          <Input
+            label="Shop Affiliation (Optional)"
+            placeholder="Are you affiliated with a shop or brand?"
+            value={shopAffiliation}
+            onChangeText={handleFieldChange(setShopAffiliation)}
+            leftIcon="home"
+            maxLength={200}
+          />
+
+          <Button
+            onPress={handleSave}
+            disabled={!hasChanges || updateMutation.isPending}
+          >
+            {updateMutation.isPending ? "Saving..." : "Save Profile"}
+          </Button>
+        </View>
+      ) : null}
 
       <View style={styles.menuSection}>
         <ThemedText type="h3" style={styles.menuTitle}>
@@ -494,9 +671,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  avatarSection: {
+  heroSection: {
     alignItems: "center",
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   avatarWrapper: {
     position: "relative",
@@ -529,14 +706,67 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   username: {
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  heroMeta: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  heroDetails: {
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  heroDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  heroDetailText: {
+    ...Typography.caption,
+  },
+  bioText: {
+    ...Typography.body,
+    textAlign: "center",
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  focusChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  focusChipDisplay: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  focusChipText: {
+    fontSize: 11,
+    fontWeight: "500",
   },
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     paddingVertical: Spacing.md,
   },
   statCell: {
@@ -544,17 +774,86 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   statNumber: {
-    ...Typography.h3,
-    fontSize: 22,
+    ...Typography.h4,
+    fontSize: 18,
     fontWeight: "700",
   },
   statLabel: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 10,
+    marginTop: 1,
   },
   statDivider: {
     width: 1,
     height: 32,
+  },
+  section: {
+    marginBottom: Spacing.lg,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    flex: 1,
+  },
+  vehiclesScroller: {
+    gap: Spacing.sm,
+  },
+  vehicleCard: {
+    width: 140,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  vehicleCardTitle: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
+  vehicleCardSub: {
+    ...Typography.caption,
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 2,
+  },
+  activityItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    gap: Spacing.sm,
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activityTitle: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+  },
+  activityTime: {
+    fontSize: 10,
+    marginTop: 1,
+  },
+  editToggle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  editToggleText: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+    marginLeft: Spacing.md,
   },
   formSection: {
     marginBottom: Spacing.xl,

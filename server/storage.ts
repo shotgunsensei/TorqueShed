@@ -57,8 +57,33 @@ export interface PublicProfile {
 export interface UserStats {
   threadCount: number;
   replyCount: number;
+  solutionCount: number;
   listingCount: number;
   vehicleCount: number;
+}
+
+export interface UserRecentActivity {
+  id: string;
+  type: "thread" | "reply";
+  title: string;
+  garageId: string | null;
+  createdAt: string;
+}
+
+export interface UserPublicVehicle {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  nickname: string | null;
+}
+
+export interface FullUserProfile {
+  profile: PublicProfile;
+  stats: UserStats;
+  role: string | null;
+  recentActivity: UserRecentActivity[];
+  publicVehicles: UserPublicVehicle[];
 }
 
 export interface IStorage {
@@ -69,6 +94,8 @@ export interface IStorage {
   getPublicProfile(id: string): Promise<PublicProfile | undefined>;
   updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined>;
   getUserStats(userId: string): Promise<UserStats>;
+  getFullUserProfile(userId: string): Promise<FullUserProfile | undefined>;
+  getUserSolutionCount(userId: string): Promise<number>;
   
   getGarages(): Promise<Garage[]>;
   getGarage(id: string): Promise<Garage | undefined>;
@@ -162,6 +189,10 @@ export class DatabaseStorage implements IStorage {
       .select({ count: sql<number>`count(*)` })
       .from(threadReplies)
       .where(eq(threadReplies.userId, userId));
+    const [solutionResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(threadReplies)
+      .where(and(eq(threadReplies.userId, userId), eq(threadReplies.isSolution, true)));
     const [listingResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(swapShopListings)
@@ -173,8 +204,100 @@ export class DatabaseStorage implements IStorage {
     return {
       threadCount: Number(threadResult?.count || 0),
       replyCount: Number(replyResult?.count || 0),
+      solutionCount: Number(solutionResult?.count || 0),
       listingCount: Number(listingResult?.count || 0),
       vehicleCount: Number(vehicleResult?.count || 0),
+    };
+  }
+
+  async getUserSolutionCount(userId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(threadReplies)
+      .where(and(eq(threadReplies.userId, userId), eq(threadReplies.isSolution, true)));
+    return Number(result?.count || 0);
+  }
+
+  async getFullUserProfile(userId: string): Promise<FullUserProfile | undefined> {
+    const profile = await this.getPublicProfile(userId);
+    if (!profile) return undefined;
+
+    const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
+    const stats = await this.getUserStats(userId);
+
+    const recentThreads = await db
+      .select({
+        id: threads.id,
+        title: threads.title,
+        garageId: threads.garageId,
+        createdAt: threads.createdAt,
+      })
+      .from(threads)
+      .where(eq(threads.userId, userId))
+      .orderBy(desc(threads.createdAt))
+      .limit(5);
+
+    const recentReplies = await db
+      .select({
+        id: threadReplies.id,
+        threadId: threadReplies.threadId,
+        createdAt: threadReplies.createdAt,
+      })
+      .from(threadReplies)
+      .where(eq(threadReplies.userId, userId))
+      .orderBy(desc(threadReplies.createdAt))
+      .limit(5);
+
+    const replyThreadIds = recentReplies.map(r => r.threadId);
+    let replyThreads: { id: string; title: string; garageId: string | null }[] = [];
+    if (replyThreadIds.length > 0) {
+      replyThreads = await db
+        .select({ id: threads.id, title: threads.title, garageId: threads.garageId })
+        .from(threads)
+        .where(sql`${threads.id} = ANY(ARRAY[${sql.join(replyThreadIds.map(id => sql`${id}`), sql`, `)}])`);
+    }
+
+    const recentActivity: UserRecentActivity[] = [
+      ...recentThreads.map(t => ({
+        id: t.id,
+        type: "thread" as const,
+        title: t.title,
+        garageId: t.garageId,
+        createdAt: t.createdAt?.toISOString() || "",
+      })),
+      ...recentReplies.map(r => {
+        const thread = replyThreads.find(t => t.id === r.threadId);
+        return {
+          id: r.id,
+          type: "reply" as const,
+          title: thread?.title || "Thread",
+          garageId: thread?.garageId || null,
+          createdAt: r.createdAt?.toISOString() || "",
+        };
+      }),
+    ]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10);
+
+    const publicVehicles = await db
+      .select({
+        id: vehicles.id,
+        year: vehicles.year,
+        make: vehicles.make,
+        model: vehicles.model,
+        nickname: vehicles.nickname,
+      })
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId))
+      .orderBy(desc(vehicles.createdAt))
+      .limit(10);
+
+    return {
+      profile,
+      stats,
+      role: user?.role || null,
+      recentActivity,
+      publicVehicles,
     };
   }
 
@@ -515,7 +638,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(threads).where(eq(threads.id, id));
   }
 
-  async getRepliesByThread(threadId: string): Promise<(ThreadReply & { userName: string })[]> {
+  async getRepliesByThread(threadId: string): Promise<(ThreadReply & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[]> {
     const replies = await db
       .select({
         id: threadReplies.id,
@@ -530,13 +653,16 @@ export class DatabaseStorage implements IStorage {
         createdAt: threadReplies.createdAt,
         updatedAt: threadReplies.updatedAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+        yearsWrenching: users.yearsWrenching,
+        focusAreas: sql<string[]>`COALESCE(${users.focusAreas}, '[]'::json)`,
+        solutionCountTotal: sql<number>`(SELECT COUNT(*) FROM thread_replies r2 WHERE r2.user_id = ${threadReplies.userId} AND r2.is_solution = true)::int`,
       })
       .from(threadReplies)
       .leftJoin(users, eq(threadReplies.userId, users.id))
       .where(eq(threadReplies.threadId, threadId))
       .orderBy(threadReplies.createdAt);
     
-    return replies as (ThreadReply & { userName: string })[];
+    return replies as (ThreadReply & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[];
   }
 
   async createThreadReply(reply: InsertThreadReply, userId: string): Promise<ThreadReply> {
