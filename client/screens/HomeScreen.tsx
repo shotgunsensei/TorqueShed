@@ -14,7 +14,6 @@ import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
-import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/Skeleton";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -195,6 +194,11 @@ function ThreadCard({
   );
 }
 
+function formatPrice(price: string): string {
+  const trimmed = price.trim();
+  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
+}
+
 function ListingCard({
   listing,
   onPress,
@@ -213,7 +217,7 @@ function ListingCard({
         {listing.title}
       </ThemedText>
       <ThemedText type="body" style={{ color: theme.primary, fontWeight: "700", marginTop: Spacing.xs }}>
-        ${listing.price}
+        {formatPrice(listing.price)}
       </ThemedText>
       <View style={styles.threadMeta}>
         <View style={[styles.conditionBadge, { backgroundColor: theme.backgroundTertiary }]}>
@@ -301,75 +305,123 @@ export default function HomeScreen() {
         )}
       </View>
     ),
-    bayThreads: bayThreads.length > 0 ? (
+    bayThreads: (
       <View style={styles.section} key="bayThreads">
         <SectionHeader
           title="Recent Activity"
           icon="activity"
           onSeeAll={() => navigateToTab("GaragesTab")}
         />
-        <FlatList
-          horizontal
-          data={bayThreads}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ThreadCard
-              thread={item}
-              onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
-            />
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-        />
+        {bayThreads.length > 0 ? (
+          <FlatList
+            horizontal
+            data={bayThreads}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ThreadCard
+                thread={item}
+                onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        ) : (
+          <Card style={styles.promptCard} onPress={() => navigateToTab("GaragesTab")}>
+            <View style={styles.promptContent}>
+              <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
+                <Feather name="message-circle" size={24} color={theme.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="h4">Join a Bay</ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                  See what the community is talking about
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={20} color={theme.textMuted} />
+            </View>
+          </Card>
+        )}
       </View>
-    ) : null,
-    garageThreads: garageThreads.length > 0 ? (
+    ),
+    garageThreads: (
       <View style={styles.section} key="garageThreads">
         <SectionHeader
           title="For Your Garage"
           icon="check-circle"
           onSeeAll={() => navigateToTab("GaragesTab")}
         />
-        <FlatList
-          horizontal
-          data={garageThreads}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ThreadCard
-              thread={item}
-              onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
-            />
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-        />
+        {garageThreads.length > 0 ? (
+          <FlatList
+            horizontal
+            data={garageThreads}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ThreadCard
+                thread={item}
+                onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        ) : (
+          <Card style={styles.promptCard}>
+            <View style={styles.promptContent}>
+              <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
+                <Feather name="check-circle" size={24} color={theme.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="h4">No solved threads yet</ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                  Solved threads matching your vehicles will appear here
+                </ThemedText>
+              </View>
+            </View>
+          </Card>
+        )}
       </View>
-    ) : null,
-    listings: recentListings.length > 0 ? (
+    ),
+    listings: (
       <View style={styles.section} key="listings">
         <SectionHeader
           title="New in Swap Shop"
           icon="shopping-bag"
           onSeeAll={() => navigateToTab("SwapTab")}
         />
-        <FlatList
-          horizontal
-          data={recentListings}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ListingCard
-              listing={item}
-              onPress={() => navigation.navigate("ListingDetail", { listingId: item.id })}
-            />
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-        />
+        {recentListings.length > 0 ? (
+          <FlatList
+            horizontal
+            data={recentListings}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ListingCard
+                listing={item}
+                onPress={() => navigation.navigate("ListingDetail", { listingId: item.id })}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        ) : (
+          <Card style={styles.promptCard} onPress={() => navigateToTab("SwapTab")}>
+            <View style={styles.promptContent}>
+              <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
+                <Feather name="shopping-bag" size={24} color={theme.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="h4">Browse the Swap Shop</ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                  Find parts or list something for sale
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={20} color={theme.textMuted} />
+            </View>
+          </Card>
+        )}
       </View>
-    ) : null,
+    ),
   };
-
-  const hasContent = vehicles.length > 0 || bayThreads.length > 0 || garageThreads.length > 0 || recentListings.length > 0;
 
   return (
     <ScrollView
@@ -393,14 +445,6 @@ export default function HomeScreen() {
       </View>
 
       {sectionOrder.map((key) => sections[key])}
-
-      {!hasContent ? (
-        <EmptyState
-          icon="compass"
-          title="Your feed is empty"
-          message="Add a vehicle, join some Bays, or check out the Swap Shop to get started"
-        />
-      ) : null}
     </ScrollView>
   );
 }
