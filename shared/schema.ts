@@ -23,7 +23,7 @@ export const users = pgTable("users", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  passwordHash: text("password").notNull(),
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
   location: varchar("location", { length: 100 }),
@@ -36,7 +36,6 @@ export const users = pgTable("users", {
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
-  chatMessages: many(chatMessages),
   vehicles: many(vehicles),
   reports: many(reports),
 }));
@@ -51,7 +50,6 @@ export const garages = pgTable("garages", {
 });
 
 export const garagesRelations = relations(garages, ({ many }) => ({
-  chatMessages: many(chatMessages),
   members: many(garageMembers),
 }));
 
@@ -66,23 +64,6 @@ export const garageMembers = pgTable("garage_members", {
 export const garageMembersRelations = relations(garageMembers, ({ one }) => ({
   user: one(users, { fields: [garageMembers.userId], references: [users.id] }),
   garage: one(garages, { fields: [garageMembers.garageId], references: [garages.id] }),
-}));
-
-export const chatMessages = pgTable("chat_messages", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  garageId: varchar("garage_id", { length: 50 }).notNull().references(() => garages.id, { onDelete: "cascade" }),
-  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
-  content: text("content").notNull(),
-  isDeleted: boolean("is_deleted").default(false),
-  deletedBy: varchar("deleted_by", { length: 36 }).references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
-  user: one(users, { fields: [chatMessages.userId], references: [users.id] }),
-  garage: one(garages, { fields: [chatMessages.garageId], references: [garages.id] }),
 }));
 
 export const vehicles = pgTable("vehicles", {
@@ -267,6 +248,11 @@ export const swapShopListingsRelations = relations(swapShopListings, ({ one }) =
   user: one(users, { fields: [swapShopListings.userId], references: [users.id] }),
 }));
 
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  passwordHash: true,
+});
+
 export const insertThreadSchema = createInsertSchema(threads).pick({
   garageId: true,
   title: true,
@@ -305,17 +291,6 @@ export const insertVehicleNoteSchema = createInsertSchema(vehicleNotes).pick({
   isPrivate: true,
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export const insertChatMessageSchema = createInsertSchema(chatMessages).pick({
-  garageId: true,
-  userId: true,
-  content: true,
-});
-
 export const insertReportSchema = createInsertSchema(reports).pick({
   reporterId: true,
   reportedUserId: true,
@@ -328,8 +303,6 @@ export const insertReportSchema = createInsertSchema(reports).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Garage = typeof garages.$inferSelect;
-export type ChatMessage = typeof chatMessages.$inferSelect;
-export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type Vehicle = typeof vehicles.$inferSelect;
 export type VehicleNote = typeof vehicleNotes.$inferSelect;
 export type Report = typeof reports.$inferSelect;

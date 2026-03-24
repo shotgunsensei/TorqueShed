@@ -1,0 +1,524 @@
+You are working inside the EXISTING TorqueShed repository. This is an in-place transformation, not a greenfield rewrite.
+
+Your job is to convert TorqueShed into a production-ready, visually elite, feature-rich automotive platform that feels premium, trustworthy, addictive, and genuinely useful to mechanics, DIY owners, builders, and enthusiasts.
+
+You must think and execute like:
+- a senior staff engineer,
+- a senior product designer,
+- a mobile UX lead,
+- a marketplace trust architect,
+- and a growth-oriented founder.
+
+Do not produce prototype-grade polish. Do not add fake completeness. Do not leave “nice looking” but shallow workflows. Do not preserve weak architecture for convenience.
+
+The end state must feel like a real launch candidate.
+
+==================================================
+1. PRODUCT VISION
+==================================================
+
+TorqueShed is not just a forum, not just a marketplace, not just a garage log.
+
+TorqueShed must become:
+
+THE HOME BASE FOR PEOPLE WHO OWN, BUILD, FIX, IMPROVE, AND TRADE VEHICLES.
+
+The core value proposition is:
+
+- Track your rig
+- Solve issues faster
+- Build public credibility
+- Discover the right parts
+- Buy and sell with trust
+- Belong to the right enthusiast communities
+
+The product must combine 5 emotional and practical hooks:
+1. Identity: “this is my garage / my build / my platform”
+2. Utility: “this helps me actually solve problems”
+3. Trust: “the advice and sellers here feel credible”
+4. Status: “my knowledge and build progress matter here”
+5. Belonging: “these are my people”
+
+Every feature and screen should reinforce at least one of those hooks.
+If it does not, redesign it or remove it.
+
+==================================================
+2. NON-NEGOTIABLE PRINCIPLES
+==================================================
+
+- Preserve the current core stack unless absolutely necessary:
+  - Expo / React Native frontend
+  - Express backend
+  - Drizzle ORM
+  - PostgreSQL
+  - TypeScript
+
+- Use strict TypeScript and eliminate unsafe patterns.
+- Do not leave dead code, duplicate routes, duplicate navigation, or placeholder screens.
+- Do not leave misleading labels for features that are not truly implemented.
+- Do not rely on mock data for core user-facing flows.
+- Do not create visually flashy but structurally weak interfaces.
+- Do not just add features. Improve the product system.
+- Do not silently break existing functionality.
+
+When making design decisions, prioritize:
+1. clarity
+2. trust
+3. conversion
+4. retention
+5. performance
+6. elegance
+
+==================================================
+3. FIRST TASK: AUDIT BEFORE CHANGING
+==================================================
+
+Start by auditing the repo and identifying:
+- duplicate navigation systems
+- inconsistent route patterns
+- screens using mock constants instead of live data
+- stale or weak React Query patterns
+- incomplete backend contracts
+- weak validation
+- inconsistent naming
+- broken or orphaned screens
+- incomplete trust/seller/profile systems
+- layout flaws, overlap issues, form spacing defects
+- inconsistent card hierarchy
+- poor empty states / loading states / error states
+- anything that makes the app feel unfinished
+
+Then fix foundational flaws first before adding major new capabilities.
+
+Refactor with discipline. Consolidate instead of stacking.
+
+==================================================
+4. PRODUCT RESTRUCTURE
+==================================================
+
+Reorganize the app around these primary pillars:
+
+A. HOME
+B. BAYS
+C. GARAGE
+D. SOLVE
+E. SOURCE
+F. PROFILE
+
+These are product systems, not just tabs.
+
+----------------------------------
+A. HOME
+----------------------------------
+
+Create a high-retention personalized home experience.
+
+Home should immediately show the user:
+- activity relevant to their vehicle(s)
+- relevant bays
+- solved issues relevant to their platform
+- trending builds
+- saved/watchlisted items
+- local or regional swap/shop signals
+- intelligent next actions
+
+Suggested modules:
+- For Your Garage
+- Solved This Week
+- Trending Builds
+- Recommended Bays
+- Parts & Tools Worth Saving
+- Local Swap Picks
+- Continue Your Activity
+
+Every card on home should have:
+- strong visual hierarchy
+- freshness indicators
+- credibility indicators
+- a clear CTA
+- no generic filler
+
+----------------------------------
+B. BAYS
+----------------------------------
+
+Bays are brand/platform communities, not generic forums.
+
+Redesign bays to feel alive and tribe-specific.
+
+Each bay should have:
+- hero header with identity and stats
+- member count
+- contributor highlights
+- top solved issues
+- pinned content
+- strong “ask question” entry point
+- search and filtering
+
+Bay content should be typed:
+- Questions
+- Builds
+- Solved
+- Deals
+- Local
+
+This content typing must influence feed rendering and metadata.
+
+----------------------------------
+C. GARAGE
+----------------------------------
+
+Transform “vehicle notes” into a real garage and build journal system.
+
+Each vehicle should support:
+- vehicle identity card
+- trim / engine / drivetrain / mileage
+- maintenance log
+- repair history
+- mod list
+- issue tracker
+- parts used
+- cost tracking
+- media gallery
+- future plans
+- public/private visibility per entry
+
+Garage must feel like a trophy case plus a service history system.
+
+Public build pages must be compelling, useful, and shareable.
+
+----------------------------------
+D. SOLVE
+----------------------------------
+
+Create a structured “Fix My Issue” workflow.
+
+A solve thread must support:
+- vehicle
+- symptoms
+- engine / trim if relevant
+- codes
+- recent changes
+- severity
+- drivability
+- environmental conditions if useful
+- AI-assisted triage
+- community replies
+- accepted solution
+- tools used
+- parts used
+- estimated cost
+- estimated difficulty
+- resolution summary
+
+The key rule:
+AI assists the intake and summarization, but community trust remains the center of gravity.
+
+Solved outcomes must become reusable knowledge assets, not dead conversations.
+
+----------------------------------
+E. SOURCE
+----------------------------------
+
+Unify parts discovery + marketplace + trust.
+
+Source should feel like the place to:
+- find the right part
+- understand whether it fits
+- compare vendors
+- see real-world usage
+- save/buy/sell intelligently
+
+Parts discovery should show:
+- relevance
+- fitment confidence
+- compatible vehicles where possible
+- why this part matters
+- install difficulty
+- linked builds/threads
+- vendor links/pricing if available
+
+Marketplace / swap shop must become much stronger:
+- better listing cards
+- better detail pages
+- seller trust data
+- save listing
+- share listing
+- report listing
+- inquire/message seller
+- location handling
+- local pickup / shipping indicators
+- image gallery quality
+- listing condition taxonomy
+- strong CTA and trust framing
+
+----------------------------------
+F. PROFILE
+----------------------------------
+
+Profile must communicate credibility, contribution, and identity.
+
+Add/support:
+- avatar
+- display name
+- bio
+- region
+- specialties
+- years wrenching
+- vehicles owned / worked on
+- solved thread count
+- build count
+- successful swaps
+- seller rating / review count
+- trust badges
+- joined bays
+- saved items / watchlists / recent activity
+
+Profiles must feel earned, not decorative.
+
+==================================================
+5. ONBOARDING REDESIGN
+==================================================
+
+Implement a conversion-oriented onboarding experience.
+
+Required flow:
+1. create account
+2. add primary vehicle
+3. select brands/platforms of interest
+4. select goals:
+   - fix issues
+   - track maintenance
+   - build/project
+   - buy/sell parts
+   - learn from experts
+5. join suggested bays
+6. complete one meaningful first action:
+   - ask a question
+   - add a maintenance entry
+   - save a part
+   - create a listing
+
+Onboarding must personalize the app immediately.
+After onboarding, Home must feel custom, not generic.
+
+==================================================
+6. VISUAL DESIGN SYSTEM
+==================================================
+
+Create or refine a cohesive premium visual system.
+
+Design direction:
+- modern industrial
+- premium dark surfaces
+- strong neutral palette
+- orange accent used with discipline
+- tactile card surfaces
+- sharp but not harsh
+- clean, confident, enthusiast-focused
+- not cartoonish
+- not generic startup SaaS
+- not cluttered
+- not cheap
+
+Create a consistent design language across:
+- typography
+- spacing
+- cards
+- chips
+- forms
+- headers
+- image containers
+- buttons
+- tabs
+- skeleton loaders
+- empty states
+- badges
+- status indicators
+
+Every screen must have:
+- a clear focal point
+- a strong primary action
+- clean spacing rhythm
+- polished loading and empty states
+- no overlap
+- no unlabeled visual ambiguity
+- no giant dead zones of empty space
+
+Form UX must be premium:
+- labels must never collide or overlap
+- spacing must be intentional
+- validation must be obvious and humane
+- helper text must be useful
+- success/error feedback must be polished
+
+==================================================
+7. TRUST AND RETENTION SYSTEMS
+==================================================
+
+Build trust into the product rather than treating it as decoration.
+
+Implement or strengthen:
+- verified owner badge concept
+- verified seller badge concept
+- reputation summaries
+- seller response stats
+- review/rating framework
+- successful transaction count
+- solved issue count
+- contribution quality markers
+- moderation/reporting hooks
+- listing/report workflows
+- admin review surfaces where relevant
+
+Retention features to support:
+- saved threads
+- saved listings
+- saved parts
+- watchlists
+- notification center
+- recent activity
+- “continue where you left off”
+- profile progress / garage completeness
+
+==================================================
+8. TECHNICAL QUALITY BAR
+==================================================
+
+Harden the codebase.
+
+You must:
+- centralize and strengthen validation with shared schemas where appropriate
+- normalize API contracts
+- clean up query keys and invalidation patterns
+- improve optimistic updates where safe
+- eliminate stale-data anti-patterns
+- improve error boundaries and retry handling
+- improve loading-state consistency
+- remove misleading or duplicated code paths
+- improve schema naming clarity and migration safety
+- improve auth robustness
+- improve configuration hygiene
+- improve admin/moderation scaffolding
+- add analytics event hooks for critical flows
+- create clean abstractions, not over-engineered complexity
+
+For production readiness, add or scaffold clearly:
+- password reset flow
+- email verification hooks
+- media upload architecture interfaces
+- moderation/report escalation hooks
+- safer server error responses
+- rate-limit-aware endpoints where relevant
+- logging/observability touchpoints
+
+==================================================
+9. GROWTH AND CONVERSION THINKING
+==================================================
+
+Make the product more likely to attract and retain enthusiasts.
+
+The app should persuade users to join because it feels like:
+- the fastest way to get credible help
+- the best place to track a build
+- the most trustworthy place to buy/sell parts in-community
+- the most relevant space for their specific platform
+
+Design and structure content for:
+- belonging
+- proof
+- utility
+- visible progress
+- earned status
+- repeat visits
+
+Ensure the product highlights:
+- solved fixes
+- real builds
+- real vehicles
+- real contributor identity
+- useful parts context
+- social proof without noise
+
+==================================================
+10. IMPLEMENTATION ORDER
+==================================================
+
+Use this execution priority:
+
+PHASE 1: FOUNDATION
+- audit repo
+- remove dead/duplicate flows
+- unify navigation
+- fix validation and API inconsistencies
+- fix layout polish issues everywhere
+- improve loading/empty/error states
+- correct misleading labels and stale behavior
+
+PHASE 2: PRODUCT SPINE
+- onboarding redesign
+- home redesign
+- bays redesign
+- garage/build journal redesign
+- structured solve flow
+- marketplace/swap trust improvements
+
+PHASE 3: CREDIBILITY + RETENTION
+- richer profile system
+- trust badges
+- saved items/watchlists
+- notification center
+- contribution/reputation summaries
+
+PHASE 4: HARDENING
+- auth hardening
+- production scaffolding
+- analytics hooks
+- moderation/reporting improvements
+- migration notes
+- config cleanup
+
+PHASE 5: NICE-TO-HAVE DIFFERENTIATORS
+- advanced fitment intelligence
+- deeper AI summarization
+- local density features
+- monetization-ready vendor/promoted surfaces
+
+==================================================
+11. OUTPUT EXPECTATIONS
+==================================================
+
+When your work is complete, provide:
+
+1. Architecture summary
+2. What was refactored
+3. What major bugs or design flaws were fixed
+4. What new features were added
+5. Any migrations required
+6. Any new environment variables required
+7. Any remaining TODO items that depend on external services
+8. A brief production-readiness checklist
+
+Do not provide vague summaries.
+Be specific and engineering-useful.
+
+==================================================
+12. CODING STANDARD
+==================================================
+
+- Prefer maintainable code over clever code
+- Prefer reusable systems over one-off patches
+- Prefer typed interfaces over implicit shape assumptions
+- Prefer clear naming over short naming
+- Prefer polished UX over rushed feature count
+- Prefer complete workflows over decorative surfaces
+
+Every screen should feel launch-ready.
+Every important action should feel trustworthy.
+Every major workflow should be coherent from end to end.
+
+No prototype vibes.
+No fake depth.
+No brittle polish.
+
+Start by auditing the repository and then implement the transformation in-place.

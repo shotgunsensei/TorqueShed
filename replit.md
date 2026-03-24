@@ -82,6 +82,7 @@ All major features now use real database storage instead of stub data:
 - **Drizzle ORM**: For interacting with the PostgreSQL database.
 
 ## Recent Changes (Mar 2026)
+- **Phase 1 Foundation Cleanup**: Removed 7 orphaned navigator files and 4 orphaned screen files. Renamed `password` field to `passwordHash` in schema/server code (same DB column). Removed `chat_messages` table and all related code. React Query keys audited for consistency.
 - **Eliminated all hardcoded/fake data**: Removed SAMPLE_THREADS, SAMPLE_MESSAGES, SAMPLE_VEHICLES, SAMPLE_NOTES, SAMPLE_PRODUCTS, FALLBACK_PRODUCTS, STUB_GARAGES, STUB_SWAP_ITEMS from all client code. Every screen now displays only real data from the database.
 - **Real member/thread counts**: GaragesScreen fetches from `/api/garages` which computes memberCount from `garage_members` table and threadCount from `threads` table in real-time.
 - **Removed fake indicators**: No more hardcoded "online" counts, "active now" counts, or "hot threads" sections. These were artificial metrics not backed by real data.

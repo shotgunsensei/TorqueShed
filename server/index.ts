@@ -612,14 +612,14 @@ async function seedAccount(
     const hashedPassword = await bcrypt.hash(password, 10);
     const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
-      await db.update(users).set({ password: hashedPassword, role }).where(eq(users.id, existingUser.id));
+      await db.update(users).set({ passwordHash: hashedPassword, role }).where(eq(users.id, existingUser.id));
       log(`${label} account synced: ${username} (role: ${role})`);
       return;
     }
 
     const user = await storage.createUser({
       username,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
     });
     await db.update(users).set({ role }).where(eq(users.id, user.id));
 

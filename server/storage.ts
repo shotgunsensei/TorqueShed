@@ -2,7 +2,6 @@ import {
   users, 
   garages, 
   garageMembers,
-  chatMessages, 
   vehicles,
   vehicleNotes,
   reports,
@@ -13,8 +12,6 @@ import {
   type User, 
   type InsertUser,
   type Garage,
-  type ChatMessage,
-  type InsertChatMessage,
   type Report,
   type InsertReport,
   type Product,
@@ -32,7 +29,7 @@ import {
   type InsertSwapShopListing,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, sql, or, isNull, gt } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull, gt } from "drizzle-orm";
 
 export interface ProfileUpdate {
   bio?: string;
@@ -79,10 +76,6 @@ export interface IStorage {
   leaveGarage(userId: string, garageId: string): Promise<void>;
   isGarageMember(userId: string, garageId: string): Promise<boolean>;
   
-  getChatMessages(garageId: string, limit?: number, before?: string): Promise<(ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[]>;
-  createChatMessage(message: InsertChatMessage): Promise<ChatMessage & { userName: string }>;
-  deleteChatMessage(id: string, deletedBy: string): Promise<void>;
-  
   createReport(report: InsertReport): Promise<Report>;
   
   getApprovedProducts(): Promise<Product[]>;
@@ -121,7 +114,6 @@ export class DatabaseStorage implements IStorage {
     }
     await db.delete(vehicles).where(eq(vehicles.userId, id));
     await db.delete(garageMembers).where(eq(garageMembers.userId, id));
-    await db.delete(chatMessages).where(eq(chatMessages.userId, id));
     await db.delete(reports).where(eq(reports.reporterId, id));
     await db.delete(users).where(eq(users.id, id));
   }
@@ -242,59 +234,6 @@ export class DatabaseStorage implements IStorage {
       memberCount: Number(memberResult?.count || 0),
       threadCount: Number(threadResult?.count || 0),
     };
-  }
-
-  async getChatMessages(garageId: string, limit = 50, before?: string): Promise<(ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[]> {
-    let query = db
-      .select({
-        id: chatMessages.id,
-        garageId: chatMessages.garageId,
-        userId: chatMessages.userId,
-        content: chatMessages.content,
-        isDeleted: chatMessages.isDeleted,
-        deletedBy: chatMessages.deletedBy,
-        createdAt: chatMessages.createdAt,
-        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
-        userFocusAreas: users.focusAreas,
-        userYearsWrenching: users.yearsWrenching,
-      })
-      .from(chatMessages)
-      .leftJoin(users, eq(chatMessages.userId, users.id))
-      .where(
-        before 
-          ? and(eq(chatMessages.garageId, garageId), lt(chatMessages.id, before))
-          : eq(chatMessages.garageId, garageId)
-      )
-      .orderBy(desc(chatMessages.createdAt))
-      .limit(limit);
-
-    const messages = await query;
-    return messages.map(m => ({
-      ...m,
-      userFocusAreas: (m.userFocusAreas as FocusArea[]) || [],
-      userYearsWrenching: m.userYearsWrenching || null,
-    })) as (ChatMessage & { userName: string; userFocusAreas: FocusArea[]; userYearsWrenching: number | null })[];
-  }
-
-  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage & { userName: string }> {
-    const [newMessage] = await db
-      .insert(chatMessages)
-      .values(message)
-      .returning();
-    
-    const user = message.userId ? await this.getUser(message.userId) : null;
-    
-    return {
-      ...newMessage,
-      userName: user?.username || 'Unknown',
-    };
-  }
-
-  async deleteChatMessage(id: string, deletedBy: string): Promise<void> {
-    await db
-      .update(chatMessages)
-      .set({ isDeleted: true, deletedBy })
-      .where(eq(chatMessages.id, id));
   }
 
   async createReport(report: InsertReport): Promise<Report> {

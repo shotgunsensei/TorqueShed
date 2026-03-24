@@ -45,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.createUser({
         username: username.trim(),
-        password: hashedPassword,
+        passwordHash: hashedPassword,
       });
 
       const token = signJWT({ sub: user.id, role: user.role || "user" });
@@ -90,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       if (!isValidPassword) {
         return res.status(401).json({ 
           error: "Unauthorized", 
