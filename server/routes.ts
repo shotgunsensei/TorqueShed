@@ -4,12 +4,12 @@ import bcrypt from "bcrypt";
 import { ZodError } from "zod";
 import { storage, type ProfileUpdate } from "./storage";
 import { 
-  validateRequest, 
   checkRateLimitAsync, 
   getCachedResponse, 
   cacheResponse, 
   generateTorqueAssistResponse 
 } from "./torque-assist";
+import { torqueAssistRequestSchema } from "@shared/torque-assist";
 import { 
   signupSchema,
   loginSchema,
@@ -343,7 +343,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/torque-assist", async (req: Request, res: Response) => {
     try {
-      // req.ip correctly uses X-Forwarded-For when trust proxy is enabled
       const clientId = req.ip || "unknown";
       
       const allowed = await checkRateLimitAsync(clientId);
@@ -356,22 +355,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const validation = validateRequest(req.body);
+      const parsed = torqueAssistRequestSchema.parse(req.body);
       
-      if (!validation.valid) {
-        return res.status(400).json({ error: validation.error });
-      }
-      
-      const cached = getCachedResponse(validation.data);
+      const cached = getCachedResponse(parsed);
       if (cached) {
         return res.json(cached);
       }
       
-      const response = generateTorqueAssistResponse(validation.data);
-      cacheResponse(validation.data, response);
+      const response = generateTorqueAssistResponse(parsed);
+      cacheResponse(parsed, response);
       
       res.json(response);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          error: { 
+            code: "INVALID_REQUEST", 
+            message: error.errors.map(e => e.message).join(", ") 
+          } 
+        });
+      }
       console.error("Error in TorqueAssist:", error);
       res.status(500).json({ 
         error: { 

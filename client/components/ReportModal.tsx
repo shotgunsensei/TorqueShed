@@ -13,7 +13,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 interface ReportModalProps {
   visible: boolean;
   onClose: () => void;
-  contentType: "chat_message" | "forum_thread" | "forum_reply" | "user";
+  contentType: "forum_thread" | "forum_reply" | "user";
   contentId?: string;
   reportedUserId?: string;
 }
