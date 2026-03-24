@@ -29,7 +29,7 @@ import {
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, garageMembers } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const BCRYPT_ROUNDS = 12;
@@ -542,6 +542,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting product:", error);
       res.status(500).json({ error: "Failed to delete product" });
+    }
+  });
+
+  // ========== Feed Routes ==========
+  app.get("/api/feed", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+
+      const userVehicles = await storage.getVehiclesByUser(userId);
+
+      const memberRows = await db
+        .select({ garageId: garageMembers.garageId })
+        .from(garageMembers)
+        .where(eq(garageMembers.userId, userId));
+      const joinedGarageIds = memberRows.map((r) => r.garageId);
+
+      let bayThreads: any[] = [];
+      if (joinedGarageIds.length > 0) {
+        const allThreads = await Promise.all(
+          joinedGarageIds.map((gid) => storage.getThreadsByGarage(gid))
+        );
+        bayThreads = allThreads
+          .flat()
+          .sort((a, b) => {
+            const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+            const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+            return bTime - aTime;
+          })
+          .slice(0, 10);
+      }
+
+      const vehicleMakes = userVehicles
+        .map((v) => v.make?.toLowerCase())
+        .filter(Boolean) as string[];
+
+      let garageThreads: any[] = [];
+      if (vehicleMakes.length > 0) {
+        const makeToGarageId: Record<string, string> = {
+          ford: "ford",
+          chevrolet: "chevy",
+          chevy: "chevy",
+          dodge: "dodge",
+          ram: "dodge",
+          jeep: "jeep",
+        };
+        const relevantGarageIds = [...new Set(
+          vehicleMakes
+            .map((m) => makeToGarageId[m] || "general")
+        )];
+        const relThreads = await Promise.all(
+          relevantGarageIds.map((gid) => storage.getThreadsByGarage(gid))
+        );
+        garageThreads = relThreads
+          .flat()
+          .filter((t) => t.hasSolution)
+          .sort((a, b) => {
+            const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+            const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+            return bTime - aTime;
+          })
+          .slice(0, 6);
+      }
+
+      const allListings = await storage.getSwapShopListings();
+      const recentListings = allListings.slice(0, 8);
+
+      res.json({
+        vehicles: userVehicles,
+        bayThreads,
+        garageThreads,
+        recentListings,
+        joinedGarageIds,
+      });
+    } catch (error) {
+      console.error("Error fetching feed:", error);
+      res.status(500).json({ error: "Failed to fetch feed" });
     }
   });
 

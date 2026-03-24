@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform } from "react-native";
 
+import HomeStackNavigator from "@/navigation/HomeStackNavigator";
 import GaragesStackNavigator from "@/navigation/GaragesStackNavigator";
 import SwapShopStackNavigator from "@/navigation/SwapShopStackNavigator";
 import NotesStackNavigator from "@/navigation/NotesStackNavigator";
@@ -15,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 
 export type MainTabParamList = {
+  HomeTab: undefined;
   GaragesTab: undefined;
   SwapTab: undefined;
   NotesTab: undefined;
@@ -25,6 +27,7 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TAB_SCREENS = {
+  HomeTab: HomeStackNavigator,
   GaragesTab: GaragesStackNavigator,
   SwapTab: SwapShopStackNavigator,
   NotesTab: NotesStackNavigator,
@@ -37,7 +40,7 @@ function MobileTabNavigator() {
 
   return (
     <Tab.Navigator
-      initialRouteName="GaragesTab"
+      initialRouteName="HomeTab"
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -66,6 +69,16 @@ function MobileTabNavigator() {
         },
       }}
     >
+      <Tab.Screen
+        name="HomeTab"
+        component={HomeStackNavigator}
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="home" size={size} color={color} />
+          ),
+        }}
+      />
       <Tab.Screen
         name="GaragesTab"
         component={GaragesStackNavigator}
@@ -122,7 +135,7 @@ function MobileTabNavigator() {
 
 function DesktopNavigator() {
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<keyof typeof TAB_SCREENS>("GaragesTab");
+  const [activeTab, setActiveTab] = useState<keyof typeof TAB_SCREENS>("HomeTab");
 
   const handleTabPress = (key: string) => {
     setActiveTab(key as keyof typeof TAB_SCREENS);
