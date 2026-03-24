@@ -120,7 +120,7 @@ function formatJoinDate(dateString: string | null): string {
   return `${month} ${date.getFullYear()}`;
 }
 
-function SwapCard({ item, onPress }: { item: SwapListing; onPress: () => void }) {
+function SwapCard({ item, onPress, onReport }: { item: SwapListing; onPress: () => void; onReport: () => void }) {
   const { theme } = useTheme();
   const condColor = CONDITION_COLORS[item.condition] || theme.textMuted;
 
@@ -172,6 +172,14 @@ function SwapCard({ item, onPress }: { item: SwapListing; onPress: () => void })
               {item.sellerListingCount > 1 ? ` \u00B7 ${item.sellerListingCount} listings` : ""}
             </Text>
           </View>
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); onReport(); }}
+            hitSlop={8}
+            style={s.reportBtn}
+            testID={`report-listing-${item.id}`}
+          >
+            <Feather name="flag" size={14} color={theme.textMuted} />
+          </Pressable>
           <Text style={[s.swapTime, { color: theme.textMuted }]}>{formatTimeAgo(item.createdAt)}</Text>
         </View>
       </View>
@@ -354,7 +362,15 @@ function SwapSection() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <SwapCard item={item} onPress={() => navigation.navigate("ListingDetail", { listingId: item.id })} />
+          <SwapCard
+            item={item}
+            onPress={() => navigation.navigate("ListingDetail", { listingId: item.id })}
+            onReport={() => {
+              setSelectedItem(item);
+              setSelectedReason(null);
+              setReportModalVisible(true);
+            }}
+          />
         )}
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl }}
         showsVerticalScrollIndicator={false}
@@ -655,6 +671,7 @@ const s = StyleSheet.create({
   sellerAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   sellerName: { ...Typography.caption, fontFamily: "Inter_500Medium" },
   sellerMeta: { ...Typography.caption, fontSize: 10 },
+  reportBtn: { padding: Spacing.xs },
   swapTime: { ...Typography.caption, fontSize: 10 },
 
   productCard: { flex: 1, borderRadius: BorderRadius.md, overflow: "hidden", marginBottom: Spacing.md },
