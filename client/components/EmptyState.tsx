@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Image, ImageSourcePropType } from "react-native";
+import { View, ViewStyle, StyleSheet, Image, ImageSourcePropType } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -14,6 +14,7 @@ interface EmptyStateProps {
   description: string;
   actionLabel?: string;
   onAction?: () => void;
+  style?: ViewStyle;
 }
 
 export function EmptyState({
@@ -23,11 +24,12 @@ export function EmptyState({
   description,
   actionLabel,
   onAction,
+  style,
 }: EmptyStateProps) {
   const { theme } = useTheme();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       {icon ? (
         <View style={[styles.iconCircle, { backgroundColor: theme.primary + "15" }]}>
           <Feather name={icon} size={48} color={theme.primary} />

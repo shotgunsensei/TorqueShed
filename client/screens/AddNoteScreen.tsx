@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Switch, Alert } from "react-native";
+import { View, StyleSheet, Switch } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";

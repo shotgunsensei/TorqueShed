@@ -110,7 +110,7 @@ export default function AdminProductsScreen() {
     getAuthToken().then(setAuthToken);
   }, []);
 
-  const { data: products, isLoading, refetch, isRefetching } = useQuery<Product[]>({
+  const { data: products, isLoading, isError, error: queryError, refetch, isRefetching } = useQuery<Product[]>({
     queryKey: ["/api/admin/products", authToken],
     queryFn: async () => {
       const url = new URL("/api/admin/products", getApiUrl());
@@ -461,9 +461,18 @@ export default function AdminProductsScreen() {
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       {isLoading ? (
         <Skeleton.List count={4} style={{ paddingTop: headerHeight + Spacing.lg }} />
+      ) : isError ? (
+        <EmptyState
+          icon="alert-circle"
+          title="Failed to Load Products"
+          description={queryError?.message || "Could not load products. Pull down to retry."}
+          actionLabel="Retry"
+          onAction={refetch}
+          style={{ paddingTop: headerHeight + Spacing.lg }}
+        />
       ) : (
         <FlatList
-          data={products}
+          data={products ?? []}
           keyExtractor={(item) => item.id}
           renderItem={renderProduct}
           contentContainerStyle={[
