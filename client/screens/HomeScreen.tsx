@@ -7,8 +7,9 @@ import {
   Pressable,
   FlatList,
 } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -19,7 +20,44 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, BorderRadius, BrandColors } from "@/constants/theme";
-import { brand } from "@/constants/brand";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+interface FeedVehicle {
+  id: string;
+  nickname: string | null;
+  year: string | null;
+  make: string | null;
+  model: string | null;
+  notesCount: number;
+}
+
+interface FeedThread {
+  id: string;
+  garageId: string;
+  title: string;
+  userName: string;
+  replyCount: number | null;
+  hasSolution: boolean | null;
+}
+
+interface FeedListing {
+  id: string;
+  title: string;
+  price: string;
+  condition: string;
+  userName: string;
+}
+
+interface FeedData {
+  vehicles: FeedVehicle[];
+  bayThreads: FeedThread[];
+  garageThreads: FeedThread[];
+  recentListings: FeedListing[];
+  joinedGarageIds: string[];
+  onboardingGoals: string[];
+}
 
 const GARAGE_LABELS: Record<string, { name: string; color: string }> = {
   ford: { name: "Ford Bay", color: BrandColors.ford },
@@ -28,6 +66,23 @@ const GARAGE_LABELS: Record<string, { name: string; color: string }> = {
   jeep: { name: "Jeep Bay", color: BrandColors.jeep },
   general: { name: "General Bay", color: BrandColors.general },
 };
+
+const GOAL_TO_SECTION_ORDER: Record<string, string[]> = {
+  build: ["vehicles", "garageThreads", "bayThreads", "listings"],
+  diagnose: ["garageThreads", "vehicles", "bayThreads", "listings"],
+  community: ["bayThreads", "garageThreads", "listings", "vehicles"],
+  trade: ["listings", "bayThreads", "garageThreads", "vehicles"],
+  "find-parts": ["listings", "garageThreads", "bayThreads", "vehicles"],
+  learn: ["garageThreads", "bayThreads", "vehicles", "listings"],
+};
+
+const DEFAULT_SECTION_ORDER = ["vehicles", "bayThreads", "garageThreads", "listings"];
+
+function getSectionOrder(goals: string[]): string[] {
+  if (goals.length === 0) return DEFAULT_SECTION_ORDER;
+  const primaryGoal = goals[0];
+  return GOAL_TO_SECTION_ORDER[primaryGoal] || DEFAULT_SECTION_ORDER;
+}
 
 function SectionHeader({
   title,
@@ -62,7 +117,7 @@ function VehicleCard({
   vehicle,
   onPress,
 }: {
-  vehicle: any;
+  vehicle: FeedVehicle;
   onPress: () => void;
 }) {
   const { theme } = useTheme();
@@ -95,7 +150,7 @@ function ThreadCard({
   thread,
   onPress,
 }: {
-  thread: any;
+  thread: FeedThread;
   onPress: () => void;
 }) {
   const { theme } = useTheme();
@@ -144,7 +199,7 @@ function ListingCard({
   listing,
   onPress,
 }: {
-  listing: any;
+  listing: FeedListing;
   onPress: () => void;
 }) {
   const { theme } = useTheme();
@@ -177,11 +232,10 @@ function ListingCard({
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { currentUser } = useAuth();
-  const navigation = useNavigation<any>();
-  const queryClient = useQueryClient();
+  const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
 
-  const { data, isLoading, isRefetching, refetch } = useQuery<any>({
+  const { data, isLoading, isRefetching, refetch } = useQuery<FeedData>({
     queryKey: ["/api/feed"],
   });
 
@@ -189,43 +243,33 @@ export default function HomeScreen() {
   const bayThreads = data?.bayThreads || [];
   const garageThreads = data?.garageThreads || [];
   const recentListings = data?.recentListings || [];
+  const onboardingGoals = data?.onboardingGoals || [];
+  const sectionOrder = getSectionOrder(onboardingGoals);
 
   if (isLoading) {
     return <Skeleton.List count={5} />;
   }
 
-  return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={{
-        paddingBottom: tabBarHeight + Spacing.xl,
-      }}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          tintColor={theme.primary}
-        />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.greeting}>
-        <ThemedText type="h2">
-          Welcome back{currentUser?.username ? `, ${currentUser.username}` : ""}
-        </ThemedText>
-      </View>
+  const navigateToTab = (tabName: string) => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate(tabName);
+    }
+  };
 
-      <View style={styles.section}>
+  const sections: Record<string, React.ReactNode> = {
+    vehicles: (
+      <View style={styles.section} key="vehicles">
         <SectionHeader
           title="Your Vehicles"
           icon="truck"
-          onSeeAll={() => navigation.navigate("NotesTab")}
+          onSeeAll={() => navigateToTab("NotesTab")}
         />
         {vehicles.length > 0 ? (
           <FlatList
             horizontal
             data={vehicles}
-            keyExtractor={(item: any) => item.id}
+            keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <VehicleCard
                 vehicle={item}
@@ -256,76 +300,101 @@ export default function HomeScreen() {
           </Card>
         )}
       </View>
+    ),
+    bayThreads: bayThreads.length > 0 ? (
+      <View style={styles.section} key="bayThreads">
+        <SectionHeader
+          title="Recent Activity"
+          icon="activity"
+          onSeeAll={() => navigateToTab("GaragesTab")}
+        />
+        <FlatList
+          horizontal
+          data={bayThreads}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ThreadCard
+              thread={item}
+              onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
+            />
+          )}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalList}
+        />
+      </View>
+    ) : null,
+    garageThreads: garageThreads.length > 0 ? (
+      <View style={styles.section} key="garageThreads">
+        <SectionHeader
+          title="For Your Garage"
+          icon="check-circle"
+          onSeeAll={() => navigateToTab("GaragesTab")}
+        />
+        <FlatList
+          horizontal
+          data={garageThreads}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ThreadCard
+              thread={item}
+              onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
+            />
+          )}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalList}
+        />
+      </View>
+    ) : null,
+    listings: recentListings.length > 0 ? (
+      <View style={styles.section} key="listings">
+        <SectionHeader
+          title="New in Swap Shop"
+          icon="shopping-bag"
+          onSeeAll={() => navigateToTab("SwapTab")}
+        />
+        <FlatList
+          horizontal
+          data={recentListings}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ListingCard
+              listing={item}
+              onPress={() => navigation.navigate("ListingDetail", { listingId: item.id })}
+            />
+          )}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalList}
+        />
+      </View>
+    ) : null,
+  };
 
-      {bayThreads.length > 0 ? (
-        <View style={styles.section}>
-          <SectionHeader
-            title="Recent Activity"
-            icon="activity"
-            onSeeAll={() => navigation.navigate("GaragesTab")}
-          />
-          <FlatList
-            horizontal
-            data={bayThreads}
-            keyExtractor={(item: any) => item.id}
-            renderItem={({ item }) => (
-              <ThreadCard
-                thread={item}
-                onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
-              />
-            )}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
-      ) : null}
+  const hasContent = vehicles.length > 0 || bayThreads.length > 0 || garageThreads.length > 0 || recentListings.length > 0;
 
-      {garageThreads.length > 0 ? (
-        <View style={styles.section}>
-          <SectionHeader
-            title="For Your Garage"
-            icon="check-circle"
-          />
-          <FlatList
-            horizontal
-            data={garageThreads}
-            keyExtractor={(item: any) => item.id}
-            renderItem={({ item }) => (
-              <ThreadCard
-                thread={item}
-                onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
-              />
-            )}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
-      ) : null}
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      contentContainerStyle={{
+        paddingBottom: tabBarHeight + Spacing.xl,
+      }}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          tintColor={theme.primary}
+        />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.greeting}>
+        <ThemedText type="h2">
+          Welcome back{currentUser?.username ? `, ${currentUser.username}` : ""}
+        </ThemedText>
+      </View>
 
-      {recentListings.length > 0 ? (
-        <View style={styles.section}>
-          <SectionHeader
-            title="New in Swap Shop"
-            icon="shopping-bag"
-            onSeeAll={() => navigation.navigate("SwapTab")}
-          />
-          <FlatList
-            horizontal
-            data={recentListings}
-            keyExtractor={(item: any) => item.id}
-            renderItem={({ item }) => (
-              <ListingCard
-                listing={item}
-                onPress={() => navigation.navigate("ListingDetail", { listingId: item.id })}
-              />
-            )}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
-      ) : null}
+      {sectionOrder.map((key) => sections[key])}
 
-      {bayThreads.length === 0 && garageThreads.length === 0 && recentListings.length === 0 && vehicles.length === 0 ? (
+      {!hasContent ? (
         <EmptyState
           icon="compass"
           title="Your feed is empty"

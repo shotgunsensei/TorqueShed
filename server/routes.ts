@@ -69,6 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           role: user.role,
           onboardingCompleted: user.onboardingCompleted ?? false,
+          onboardingGoals: user.onboardingGoals ?? [],
         },
         token,
       });
@@ -116,6 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           role: user.role,
           onboardingCompleted: user.onboardingCompleted ?? true,
+          onboardingGoals: user.onboardingGoals ?? [],
         },
         token,
       });
@@ -219,6 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         role: user.role,
         onboardingCompleted: user.onboardingCompleted ?? true,
+        onboardingGoals: user.onboardingGoals ?? [],
       });
     } catch (error) {
       console.error("Error fetching current user:", error);
@@ -550,6 +553,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.userId!;
 
+      const user = await storage.getUser(userId);
+      const userGoals: string[] = user?.onboardingGoals ?? [];
+
       const userVehicles = await storage.getVehiclesByUser(userId);
 
       const memberRows = await db
@@ -558,7 +564,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(garageMembers.userId, userId));
       const joinedGarageIds = memberRows.map((r) => r.garageId);
 
-      let bayThreads: any[] = [];
+      type ThreadWithUser = Awaited<ReturnType<typeof storage.getThreadsByGarage>>[number];
+      let bayThreads: ThreadWithUser[] = [];
       if (joinedGarageIds.length > 0) {
         const allThreads = await Promise.all(
           joinedGarageIds.map((gid) => storage.getThreadsByGarage(gid))
@@ -577,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .map((v) => v.make?.toLowerCase())
         .filter(Boolean) as string[];
 
-      let garageThreads: any[] = [];
+      let garageThreads: ThreadWithUser[] = [];
       if (vehicleMakes.length > 0) {
         const makeToGarageId: Record<string, string> = {
           ford: "ford",
@@ -606,7 +613,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allListings = await storage.getSwapShopListings();
-      const recentListings = allListings.slice(0, 8);
+      let recentListings;
+      if (vehicleMakes.length > 0) {
+        const makePatterns = vehicleMakes.map((m) => m.toLowerCase());
+        const matched = allListings.filter((l) => {
+          const text = `${l.title} ${l.description || ""}`.toLowerCase();
+          return makePatterns.some((m) => text.includes(m));
+        });
+        recentListings = matched.length > 0 ? matched.slice(0, 8) : allListings.slice(0, 8);
+      } else {
+        recentListings = allListings.slice(0, 8);
+      }
 
       res.json({
         vehicles: userVehicles,
@@ -614,6 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         garageThreads,
         recentListings,
         joinedGarageIds,
+        onboardingGoals: userGoals,
       });
     } catch (error) {
       console.error("Error fetching feed:", error);

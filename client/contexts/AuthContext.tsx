@@ -10,6 +10,7 @@ export interface User {
   username: string;
   role: string;
   onboardingCompleted: boolean;
+  onboardingGoals: string[];
 }
 
 interface AuthContextType {
