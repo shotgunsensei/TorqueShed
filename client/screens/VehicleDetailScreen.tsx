@@ -4,14 +4,16 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   RefreshControl,
   Pressable,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { NoteCard } from "@/components/NoteCard";
@@ -19,11 +21,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/Skeleton";
 import { FAB } from "@/components/FAB";
 import { ThemedText } from "@/components/ThemedText";
-import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { type VehicleNote, type NoteType } from "@/constants/vehicles";
 import { emptyStates } from "@/constants/brand";
+import { apiRequest } from "@/lib/query-client";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -39,6 +42,20 @@ interface ApiNote {
   isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ApiVehicle {
+  id: string;
+  userId: string;
+  vin: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  nickname: string | null;
+  imageUrl: string | null;
+  isPublic: boolean;
+  notesCount: number;
+  totalCost: string;
 }
 
 function transformToNote(apiNote: ApiNote): VehicleNote {
@@ -61,10 +78,10 @@ type NavigationProp = NativeStackNavigationProp<
   NotesStackParamList & RootStackParamList
 >;
 
-type TabKey = "all" | "maintenance" | "mod" | "issue";
+type TabKey = "overview" | "maintenance" | "mod" | "issue";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "all", label: "All", icon: "list" },
+  { key: "overview", label: "Overview", icon: "info" },
   { key: "maintenance", label: "Maintenance", icon: "settings" },
   { key: "mod", label: "Mods", icon: "zap" },
   { key: "issue", label: "Issues", icon: "alert-triangle" },
@@ -73,7 +90,10 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
 function formatCost(val: string): string {
   const num = parseFloat(val);
   if (isNaN(num) || num === 0) return "$0";
-  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `$${num.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 export default function VehicleDetailScreen() {
@@ -82,22 +102,41 @@ export default function VehicleDetailScreen() {
   const { theme } = useTheme();
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const { vehicleId, vehicleName } = route.params;
-  const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
   const {
     data: apiNotes = [],
-    isLoading,
-    refetch,
-    isRefetching,
+    isLoading: notesLoading,
+    refetch: refetchNotes,
+    isRefetching: notesRefetching,
   } = useQuery<ApiNote[]>({
     queryKey: [`/api/vehicles/${vehicleId}/notes`],
+  });
+
+  const { data: vehicle, refetch: refetchVehicle } = useQuery<ApiVehicle>({
+    queryKey: [`/api/vehicles/${vehicleId}`],
+  });
+
+  const togglePublicMutation = useMutation({
+    mutationFn: async (isPublic: boolean) => {
+      return apiRequest("PATCH", `/api/vehicles/${vehicleId}`, { isPublic });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${vehicleId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+    },
+    onError: (error: Error) => {
+      toast.show(error.message || "Failed to update", "error");
+    },
   });
 
   const notes = useMemo(() => apiNotes.map(transformToNote), [apiNotes]);
 
   const filteredNotes = useMemo(() => {
-    if (activeTab === "all") return notes;
+    if (activeTab === "overview") return notes;
     return notes.filter((n) => n.type === activeTab);
   }, [notes, activeTab]);
 
@@ -122,97 +161,25 @@ export default function VehicleDetailScreen() {
     navigation.navigate("AddNote", { vehicleId });
   };
 
-  const renderOverview = () => (
-    <View style={styles.overviewSection}>
-      <View
-        style={[
-          styles.vehicleImage,
-          { backgroundColor: theme.backgroundSecondary },
-        ]}
-      >
-        <Feather name="truck" size={48} color={theme.textSecondary} />
-      </View>
+  const refetch = () => {
+    refetchNotes();
+    refetchVehicle();
+  };
 
-      <View style={styles.statsRow}>
-        <View
-          style={[
-            styles.statCard,
-            { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
-          ]}
-        >
-          <Text style={[styles.statValue, { color: theme.primary }]}>
-            {formatCost(String(stats.totalCost))}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-            Total Invested
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.statCard,
-            { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
-          ]}
-        >
-          <Text style={[styles.statValue, { color: theme.text }]}>
-            {notes.length}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-            Journal Entries
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        <View
-          style={[
-            styles.miniStat,
-            { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
-          ]}
-        >
-          <Feather name="settings" size={14} color={theme.textSecondary} />
-          <Text style={[styles.miniStatText, { color: theme.text }]}>
-            {stats.maintenanceCount}
-          </Text>
-          <Text style={[styles.miniStatLabel, { color: theme.textMuted }]}>
-            Maint.
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.miniStat,
-            { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
-          ]}
-        >
-          <Feather name="zap" size={14} color={theme.textSecondary} />
-          <Text style={[styles.miniStatText, { color: theme.text }]}>
-            {stats.modCount}
-          </Text>
-          <Text style={[styles.miniStatLabel, { color: theme.textMuted }]}>
-            Mods
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.miniStat,
-            { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
-          ]}
-        >
-          <Feather name="alert-triangle" size={14} color={theme.textSecondary} />
-          <Text style={[styles.miniStatText, { color: theme.text }]}>
-            {stats.issueCount}
-          </Text>
-          <Text style={[styles.miniStatLabel, { color: theme.textMuted }]}>
-            Issues
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
+  const isRefetching = notesRefetching;
 
   const renderTabs = () => (
     <View style={[styles.tabBar, { borderColor: theme.border }]}>
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
+        const count =
+          tab.key === "maintenance"
+            ? stats.maintenanceCount
+            : tab.key === "mod"
+              ? stats.modCount
+              : tab.key === "issue"
+                ? stats.issueCount
+                : null;
         return (
           <Pressable
             key={tab.key}
@@ -220,7 +187,10 @@ export default function VehicleDetailScreen() {
             style={[
               styles.tab,
               isActive
-                ? { backgroundColor: theme.primary + "20", borderColor: theme.primary }
+                ? {
+                    backgroundColor: theme.primary + "20",
+                    borderColor: theme.primary,
+                  }
                 : { borderColor: "transparent" },
             ]}
             testID={`tab-${tab.key}`}
@@ -237,6 +207,7 @@ export default function VehicleDetailScreen() {
               ]}
             >
               {tab.label}
+              {count !== null ? ` (${count})` : ""}
             </Text>
           </Pressable>
         );
@@ -244,45 +215,244 @@ export default function VehicleDetailScreen() {
     </View>
   );
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      {renderOverview()}
-      {renderTabs()}
-      {filteredNotes.length > 0 ? (
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          {activeTab === "all"
-            ? `All Entries (${filteredNotes.length})`
-            : `${TABS.find((t) => t.key === activeTab)?.label} (${filteredNotes.length})`}
-        </Text>
-      ) : null}
-    </View>
-  );
+  const renderOverviewTab = () => {
+    const vehicleInfo = [vehicle?.year, vehicle?.make, vehicle?.model]
+      .filter(Boolean)
+      .join(" ");
 
-  const renderNote = ({ item }: { item: VehicleNote }) => (
-    <NoteCard note={item} onPress={() => {}} />
-  );
-
-  const renderEmpty = () => {
-    if (isLoading) {
-      return <Skeleton.List count={3} />;
-    }
-    const emptyMessage =
-      activeTab === "all"
-        ? emptyStates.notes.message
-        : `No ${TABS.find((t) => t.key === activeTab)?.label.toLowerCase()} entries yet.`;
     return (
-      <EmptyState
-        icon={activeTab === "all" ? "file-text" : (TABS.find((t) => t.key === activeTab)?.icon as any) || "file-text"}
-        title={activeTab === "all" ? emptyStates.notes.title : `No ${TABS.find((t) => t.key === activeTab)?.label}`}
-        description={emptyMessage}
-        actionLabel={emptyStates.notes.action}
-        onAction={handleAddNote}
-      />
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: headerHeight + Spacing.lg,
+            paddingBottom: insets.bottom + Spacing.xl + 80,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
+      >
+        {renderTabs()}
+
+        <View
+          style={[
+            styles.vehicleImage,
+            { backgroundColor: theme.backgroundSecondary },
+          ]}
+        >
+          <Feather name="truck" size={48} color={theme.textSecondary} />
+        </View>
+
+        <View
+          style={[
+            styles.infoCard,
+            {
+              backgroundColor: theme.backgroundDefault,
+              borderColor: theme.cardBorder,
+            },
+          ]}
+        >
+          <ThemedText type="h3">{vehicleName}</ThemedText>
+          {vehicleInfo ? (
+            <Text style={[styles.infoSubtext, { color: theme.textSecondary }]}>
+              {vehicleInfo}
+            </Text>
+          ) : null}
+          {vehicle?.vin ? (
+            <View style={styles.vinRow}>
+              <Text style={[styles.vinLabel, { color: theme.textMuted }]}>
+                VIN
+              </Text>
+              <Text style={[styles.vinValue, { color: theme.textSecondary }]}>
+                {vehicle.vin}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.statsRow}>
+          <View
+            style={[
+              styles.statCard,
+              {
+                backgroundColor: theme.backgroundDefault,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.statValue, { color: theme.primary }]}>
+              {formatCost(String(stats.totalCost))}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Total Invested
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              {
+                backgroundColor: theme.backgroundDefault,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {notes.length}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Journal Entries
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View
+            style={[
+              styles.miniStat,
+              {
+                backgroundColor: theme.backgroundDefault,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <Feather name="settings" size={14} color="#3B82F6" />
+            <Text style={[styles.miniStatText, { color: theme.text }]}>
+              {stats.maintenanceCount}
+            </Text>
+            <Text style={[styles.miniStatLabel, { color: theme.textMuted }]}>
+              Maint.
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.miniStat,
+              {
+                backgroundColor: theme.backgroundDefault,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <Feather name="zap" size={14} color="#8B5CF6" />
+            <Text style={[styles.miniStatText, { color: theme.text }]}>
+              {stats.modCount}
+            </Text>
+            <Text style={[styles.miniStatLabel, { color: theme.textMuted }]}>
+              Mods
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.miniStat,
+              {
+                backgroundColor: theme.backgroundDefault,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <Feather name="alert-triangle" size={14} color="#EF4444" />
+            <Text style={[styles.miniStatText, { color: theme.text }]}>
+              {stats.issueCount}
+            </Text>
+            <Text style={[styles.miniStatLabel, { color: theme.textMuted }]}>
+              Issues
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.privacyCard,
+            {
+              backgroundColor: theme.backgroundDefault,
+              borderColor: theme.cardBorder,
+            },
+          ]}
+        >
+          <View style={styles.privacyInfo}>
+            <Feather
+              name={vehicle?.isPublic ? "globe" : "lock"}
+              size={18}
+              color={theme.textSecondary}
+            />
+            <View style={styles.privacyText}>
+              <Text style={[styles.privacyTitle, { color: theme.text }]}>
+                {vehicle?.isPublic ? "Public Build" : "Private Build"}
+              </Text>
+              <Text
+                style={[styles.privacyDesc, { color: theme.textSecondary }]}
+              >
+                {vehicle?.isPublic
+                  ? "Others can view this build"
+                  : "Only you can see this build"}
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={vehicle?.isPublic ?? false}
+            onValueChange={(val) => togglePublicMutation.mutate(val)}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            disabled={togglePublicMutation.isPending}
+          />
+        </View>
+
+        {notes.length > 0 ? (
+          <View style={styles.recentSection}>
+            <ThemedText type="h4" style={styles.recentTitle}>
+              Recent Entries
+            </ThemedText>
+            {notes.slice(0, 3).map((note) => (
+              <NoteCard key={note.id} note={note} onPress={() => {}} />
+            ))}
+            {notes.length > 3 ? (
+              <Pressable
+                onPress={() => setActiveTab("maintenance")}
+                style={styles.viewAllRow}
+              >
+                <Text style={[styles.viewAllText, { color: theme.primary }]}>
+                  View all {notes.length} entries
+                </Text>
+                <Feather name="arrow-right" size={16} color={theme.primary} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </ScrollView>
     );
   };
 
-  return (
-    <>
+  const renderNotesTab = () => {
+    const renderNote = ({ item }: { item: VehicleNote }) => (
+      <NoteCard note={item} onPress={() => {}} />
+    );
+
+    const tabConfig = TABS.find((t) => t.key === activeTab);
+    const tabLabel = tabConfig?.label || "Entries";
+
+    const renderEmpty = () => {
+      if (notesLoading) {
+        return <Skeleton.List count={3} />;
+      }
+      return (
+        <EmptyState
+          icon={(tabConfig?.icon as any) || "file-text"}
+          title={`No ${tabLabel}`}
+          description={`No ${tabLabel.toLowerCase()} entries yet.`}
+          actionLabel={emptyStates.notes.action}
+          onAction={handleAddNote}
+        />
+      );
+    };
+
+    return (
       <FlatList
         style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
         contentContainerStyle={[
@@ -291,12 +461,23 @@ export default function VehicleDetailScreen() {
             paddingTop: headerHeight + Spacing.lg,
             paddingBottom: insets.bottom + Spacing.xl + 80,
           },
-          filteredNotes.length === 0 && !isLoading ? styles.emptyContainer : null,
+          filteredNotes.length === 0 && !notesLoading
+            ? styles.emptyContainer
+            : null,
         ]}
         data={filteredNotes}
         renderItem={renderNote}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            {renderTabs()}
+            <Text
+              style={[styles.sectionLabel, { color: theme.textSecondary }]}
+            >
+              {tabLabel} ({filteredNotes.length})
+            </Text>
+          </View>
+        }
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -308,9 +489,13 @@ export default function VehicleDetailScreen() {
           />
         }
       />
-      {notes.length > 0 ? (
-        <FAB icon="plus" onPress={handleAddNote} bottom={insets.bottom + 20} />
-      ) : null}
+    );
+  };
+
+  return (
+    <>
+      {activeTab === "overview" ? renderOverviewTab() : renderNotesTab()}
+      <FAB icon="plus" onPress={handleAddNote} bottom={insets.bottom + 20} />
     </>
   );
 }
@@ -325,7 +510,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flex: 1,
   },
-  header: {
+  listHeader: {
     marginBottom: Spacing.md,
   },
   vehicleImage: {
@@ -335,8 +520,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: Spacing.lg,
   },
-  overviewSection: {
+  infoCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
     marginBottom: Spacing.lg,
+  },
+  infoSubtext: {
+    ...Typography.small,
+    marginTop: 4,
+  },
+  vinRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+  },
+  vinLabel: {
+    ...Typography.caption,
+    marginRight: Spacing.sm,
+  },
+  vinValue: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
   },
   statsRow: {
     flexDirection: "row",
@@ -372,6 +577,49 @@ const styles = StyleSheet.create({
   },
   miniStatLabel: {
     ...Typography.caption,
+  },
+  privacyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  privacyInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: Spacing.md,
+  },
+  privacyText: {
+    flex: 1,
+  },
+  privacyTitle: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+  },
+  privacyDesc: {
+    ...Typography.caption,
+    marginTop: 2,
+  },
+  recentSection: {
+    marginBottom: Spacing.lg,
+  },
+  recentTitle: {
+    marginBottom: Spacing.md,
+  },
+  viewAllRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+  },
+  viewAllText: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
   },
   tabBar: {
     flexDirection: "row",
