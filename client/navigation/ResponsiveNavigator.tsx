@@ -9,8 +9,7 @@ import HomeStackNavigator from "@/navigation/HomeStackNavigator";
 import GaragesStackNavigator from "@/navigation/GaragesStackNavigator";
 import SwapShopStackNavigator from "@/navigation/SwapShopStackNavigator";
 import NotesStackNavigator from "@/navigation/NotesStackNavigator";
-import PartsStackNavigator from "@/navigation/PartsStackNavigator";
-import TrendingStackNavigator from "@/navigation/TrendingStackNavigator";
+import MoreStackNavigator from "@/navigation/MoreStackNavigator";
 import DesktopSidebar from "@/components/DesktopSidebar";
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -20,8 +19,7 @@ export type MainTabParamList = {
   GaragesTab: undefined;
   SwapTab: undefined;
   NotesTab: undefined;
-  PartsTab: undefined;
-  TrendingTab: undefined;
+  MoreTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -31,8 +29,7 @@ const TAB_SCREENS = {
   GaragesTab: GaragesStackNavigator,
   SwapTab: SwapShopStackNavigator,
   NotesTab: NotesStackNavigator,
-  PartsTab: PartsStackNavigator,
-  TrendingTab: TrendingStackNavigator,
+  MoreTab: MoreStackNavigator,
 } as const;
 
 function MobileTabNavigator() {
@@ -110,22 +107,12 @@ function MobileTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="PartsTab"
-        component={PartsStackNavigator}
+        name="MoreTab"
+        component={MoreStackNavigator}
         options={{
-          title: "TorqueAssist",
+          title: "More",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="tool" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="TrendingTab"
-        component={TrendingStackNavigator}
-        options={{
-          title: "Tool & Gear",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="box" size={size} color={color} />
+            <Feather name="more-horizontal" size={size} color={color} />
           ),
         }}
       />

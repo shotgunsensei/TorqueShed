@@ -21,8 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "GaragesTab", label: "Bays", icon: "message-circle" },
   { key: "SwapTab", label: "Swap Shop", icon: "shopping-bag" },
   { key: "NotesTab", label: "Notes", icon: "file-text" },
-  { key: "PartsTab", label: "TorqueAssist", icon: "tool" },
-  { key: "TrendingTab", label: "Tool & Gear", icon: "box" },
+  { key: "MoreTab", label: "More", icon: "more-horizontal" },
 ];
 
 interface DesktopSidebarProps {
