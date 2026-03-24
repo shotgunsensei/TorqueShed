@@ -11,13 +11,17 @@ import {
   generateTorqueAssistResponse 
 } from "./torque-assist";
 import { 
-  FOCUS_AREAS, 
-  PRODUCT_CATEGORIES, 
-  type FocusArea,
+  PRODUCT_CATEGORIES,
+  signupSchema,
+  loginSchema,
+  createReportSchema,
+  updateProfileSchema,
   insertThreadSchema,
+  insertThreadReplySchema,
   insertSwapShopListingSchema,
   insertVehicleNoteSchema,
   insertVehicleSchema,
+  insertProductSchema,
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 
@@ -26,23 +30,9 @@ const BCRYPT_ROUNDS = 12;
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
-      const { username, password } = req.body;
-      
-      if (!username || typeof username !== "string" || username.trim().length < 3) {
-        return res.status(400).json({ 
-          error: "Bad Request", 
-          message: "Username must be at least 3 characters" 
-        });
-      }
-      
-      if (!password || typeof password !== "string" || password.length < 8) {
-        return res.status(400).json({ 
-          error: "Bad Request", 
-          message: "Password must be at least 8 characters" 
-        });
-      }
+      const { username, password } = signupSchema.parse(req.body);
 
-      const existingUser = await storage.getUserByUsername(username.trim());
+      const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(409).json({ 
           error: "Conflict", 
@@ -75,6 +65,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token,
       });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Bad Request", message: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error during signup:", error);
       res.status(500).json({ error: "Internal Server Error", message: "Failed to create user" });
     }
@@ -82,14 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { username, password } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ 
-          error: "Bad Request", 
-          message: "Username and password are required" 
-        });
-      }
+      const { username, password } = loginSchema.parse(req.body);
 
       const user = await storage.getUserByUsername(username);
       if (!user) {
@@ -125,6 +111,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token,
       });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Bad Request", message: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error during login:", error);
       res.status(500).json({ error: "Internal Server Error", message: "Failed to login" });
     }
@@ -189,33 +178,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/reports", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { reportedUserId, contentType, contentId, reason, details } = req.body;
-      
-      if (!contentType || !reason) {
-        return res.status(400).json({ error: "Content type and reason are required" });
-      }
-
-      const validContentTypes = ["chat_message", "forum_thread", "forum_reply", "user"];
-      if (!validContentTypes.includes(contentType)) {
-        return res.status(400).json({ error: "Invalid content type" });
-      }
-
-      const validReasons = ["spam", "harassment", "scam", "illegal", "impersonation", "other"];
-      if (!validReasons.includes(reason)) {
-        return res.status(400).json({ error: "Invalid reason" });
-      }
+      const parsed = createReportSchema.parse(req.body);
 
       const report = await storage.createReport({
         reporterId: req.userId!,
-        reportedUserId: reportedUserId || null,
-        contentType,
-        contentId: contentId || null,
-        reason,
-        details: details || null,
+        reportedUserId: parsed.reportedUserId || null,
+        contentType: parsed.contentType,
+        contentId: parsed.contentId || null,
+        reason: parsed.reason,
+        details: parsed.details || null,
       });
       
       res.status(201).json(report);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating report:", error);
       res.status(500).json({ error: "Failed to create report" });
     }
@@ -253,64 +231,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/users/me/profile", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { bio, location, avatarUrl, focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation } = req.body;
+      const parsed = updateProfileSchema.parse(req.body);
       
       const updates: ProfileUpdate = {};
-      
-      if (bio !== undefined) {
-        if (typeof bio !== "string" || bio.length > 500) {
-          return res.status(400).json({ error: "Bio must be a string under 500 characters" });
-        }
-        updates.bio = bio;
-      }
-      
-      if (location !== undefined) {
-        if (typeof location !== "string" || location.length > 100) {
-          return res.status(400).json({ error: "Location must be a string under 100 characters" });
-        }
-        updates.location = location;
-      }
-      
-      if (avatarUrl !== undefined) {
-        if (typeof avatarUrl !== "string") {
-          return res.status(400).json({ error: "Avatar URL must be a string" });
-        }
-        updates.avatarUrl = avatarUrl;
-      }
-      
-      if (focusAreas !== undefined) {
-        if (!Array.isArray(focusAreas)) {
-          return res.status(400).json({ error: "Focus areas must be an array" });
-        }
-        const validAreas = focusAreas.filter((area): area is FocusArea => 
-          FOCUS_AREAS.includes(area as FocusArea)
-        );
-        if (validAreas.length !== focusAreas.length) {
-          return res.status(400).json({ error: "Invalid focus area provided" });
-        }
-        updates.focusAreas = validAreas;
-      }
-      
-      if (vehiclesWorkedOn !== undefined) {
-        if (vehiclesWorkedOn !== null && (typeof vehiclesWorkedOn !== "string" || vehiclesWorkedOn.length > 1000)) {
-          return res.status(400).json({ error: "Vehicles worked on must be a string under 1000 characters" });
-        }
-        updates.vehiclesWorkedOn = vehiclesWorkedOn || undefined;
-      }
-      
-      if (yearsWrenching !== undefined) {
-        if (yearsWrenching !== null && (typeof yearsWrenching !== "number" || yearsWrenching < 0 || yearsWrenching > 100)) {
-          return res.status(400).json({ error: "Years wrenching must be a number between 0 and 100" });
-        }
-        updates.yearsWrenching = yearsWrenching;
-      }
-      
-      if (shopAffiliation !== undefined) {
-        if (shopAffiliation !== null && (typeof shopAffiliation !== "string" || shopAffiliation.length > 200)) {
-          return res.status(400).json({ error: "Shop affiliation must be a string under 200 characters" });
-        }
-        updates.shopAffiliation = shopAffiliation;
-      }
+      if (parsed.bio !== undefined) updates.bio = parsed.bio;
+      if (parsed.location !== undefined) updates.location = parsed.location;
+      if (parsed.avatarUrl !== undefined) updates.avatarUrl = parsed.avatarUrl;
+      if (parsed.focusAreas !== undefined) updates.focusAreas = parsed.focusAreas;
+      if (parsed.vehiclesWorkedOn !== undefined) updates.vehiclesWorkedOn = parsed.vehiclesWorkedOn || undefined;
+      if (parsed.yearsWrenching !== undefined) updates.yearsWrenching = parsed.yearsWrenching;
+      if (parsed.shopAffiliation !== undefined) updates.shopAffiliation = parsed.shopAffiliation;
       
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No valid updates provided" });
@@ -324,6 +254,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await storage.getPublicProfile(req.userId!);
       res.json(profile);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating current user profile:", error);
       res.status(500).json({ error: "Failed to update profile" });
     }
@@ -373,64 +306,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const { bio, location, avatarUrl, focusAreas, vehiclesWorkedOn, yearsWrenching, shopAffiliation } = req.body;
+      const parsed = updateProfileSchema.parse(req.body);
       
       const updates: ProfileUpdate = {};
-      
-      if (bio !== undefined) {
-        if (typeof bio !== "string" || bio.length > 500) {
-          return res.status(400).json({ error: "Bio must be a string under 500 characters" });
-        }
-        updates.bio = bio;
-      }
-      
-      if (location !== undefined) {
-        if (typeof location !== "string" || location.length > 100) {
-          return res.status(400).json({ error: "Location must be a string under 100 characters" });
-        }
-        updates.location = location;
-      }
-      
-      if (avatarUrl !== undefined) {
-        if (typeof avatarUrl !== "string") {
-          return res.status(400).json({ error: "Avatar URL must be a string" });
-        }
-        updates.avatarUrl = avatarUrl;
-      }
-      
-      if (focusAreas !== undefined) {
-        if (!Array.isArray(focusAreas)) {
-          return res.status(400).json({ error: "Focus areas must be an array" });
-        }
-        const validAreas = focusAreas.filter((area): area is FocusArea => 
-          FOCUS_AREAS.includes(area as FocusArea)
-        );
-        if (validAreas.length !== focusAreas.length) {
-          return res.status(400).json({ error: "Invalid focus area provided" });
-        }
-        updates.focusAreas = validAreas;
-      }
-      
-      if (vehiclesWorkedOn !== undefined) {
-        if (vehiclesWorkedOn !== null && (typeof vehiclesWorkedOn !== "string" || vehiclesWorkedOn.length > 1000)) {
-          return res.status(400).json({ error: "Vehicles worked on must be a string under 1000 characters" });
-        }
-        updates.vehiclesWorkedOn = vehiclesWorkedOn || undefined;
-      }
-      
-      if (yearsWrenching !== undefined) {
-        if (yearsWrenching !== null && (typeof yearsWrenching !== "number" || yearsWrenching < 0 || yearsWrenching > 100)) {
-          return res.status(400).json({ error: "Years wrenching must be a number between 0 and 100" });
-        }
-        updates.yearsWrenching = yearsWrenching;
-      }
-      
-      if (shopAffiliation !== undefined) {
-        if (shopAffiliation !== null && (typeof shopAffiliation !== "string" || shopAffiliation.length > 200)) {
-          return res.status(400).json({ error: "Shop affiliation must be a string under 200 characters" });
-        }
-        updates.shopAffiliation = shopAffiliation;
-      }
+      if (parsed.bio !== undefined) updates.bio = parsed.bio;
+      if (parsed.location !== undefined) updates.location = parsed.location;
+      if (parsed.avatarUrl !== undefined) updates.avatarUrl = parsed.avatarUrl;
+      if (parsed.focusAreas !== undefined) updates.focusAreas = parsed.focusAreas;
+      if (parsed.vehiclesWorkedOn !== undefined) updates.vehiclesWorkedOn = parsed.vehiclesWorkedOn || undefined;
+      if (parsed.yearsWrenching !== undefined) updates.yearsWrenching = parsed.yearsWrenching;
+      if (parsed.shopAffiliation !== undefined) updates.shopAffiliation = parsed.shopAffiliation;
       
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No valid updates provided" });
@@ -444,6 +329,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await storage.getPublicProfile(req.params.id);
       res.json(profile);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error updating profile:", error);
       res.status(500).json({ error: "Failed to update profile" });
     }
@@ -543,30 +431,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/products", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const adminUserId = req.userId!;
-      const { title, description, whyItMatters, price, priceRange, category, affiliateLink, vendor, imageUrl, isSponsored } = req.body;
-      
-      if (!title || typeof title !== "string" || title.length > 255) {
-        return res.status(400).json({ error: "Valid title is required (max 255 chars)" });
-      }
-      if (!category || !PRODUCT_CATEGORIES.includes(category)) {
-        return res.status(400).json({ error: "Valid category is required" });
-      }
+      const parsed = insertProductSchema.parse({
+        title: req.body.title,
+        description: req.body.description || null,
+        whyItMatters: req.body.whyItMatters || null,
+        price: req.body.price || null,
+        priceRange: req.body.priceRange || null,
+        category: req.body.category,
+        affiliateLink: req.body.affiliateLink || null,
+        vendor: req.body.vendor || null,
+        imageUrl: req.body.imageUrl || null,
+        isSponsored: req.body.isSponsored || false,
+      });
 
-      const product = await storage.createProduct({
-        title,
-        description: description || null,
-        whyItMatters: whyItMatters || null,
-        price: price || null,
-        priceRange: priceRange || null,
-        category,
-        affiliateLink: affiliateLink || null,
-        vendor: vendor || null,
-        imageUrl: imageUrl || null,
-        isSponsored: isSponsored || false,
-      }, adminUserId);
+      const product = await storage.createProduct(parsed, adminUserId);
 
       res.status(201).json(product);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating product:", error);
       res.status(500).json({ error: "Failed to create product" });
     }
@@ -932,19 +816,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/threads/:threadId/replies", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { content } = req.body;
-      
-      if (!content || typeof content !== "string" || content.trim().length === 0) {
-        return res.status(400).json({ error: "Content is required" });
-      }
-
-      const reply = await storage.createThreadReply({
+      const parsed = insertThreadReplySchema.parse({
         threadId: req.params.threadId,
-        content: content.trim(),
-      }, req.userId!);
+        content: req.body.content?.trim(),
+      });
+
+      const reply = await storage.createThreadReply(parsed, req.userId!);
 
       res.status(201).json(reply);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating reply:", error);
       res.status(500).json({ error: "Failed to create reply" });
     }

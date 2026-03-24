@@ -23,7 +23,7 @@ export const users = pgTable("users", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  passwordHash: text("password").notNull(),
+  passwordHash: text("password_hash").notNull(),
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
   location: varchar("location", { length: 100 }),
@@ -251,6 +251,37 @@ export const swapShopListingsRelations = relations(swapShopListings, ({ one }) =
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   passwordHash: true,
+});
+
+export const signupSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").trim(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const VALID_CONTENT_TYPES = ["forum_thread", "forum_reply", "user"] as const;
+export const VALID_REPORT_REASONS = ["spam", "harassment", "scam", "illegal", "impersonation", "other"] as const;
+
+export const createReportSchema = z.object({
+  reportedUserId: z.string().nullable().optional(),
+  contentType: z.enum(VALID_CONTENT_TYPES),
+  contentId: z.string().nullable().optional(),
+  reason: z.enum(VALID_REPORT_REASONS),
+  details: z.string().nullable().optional(),
+});
+
+export const updateProfileSchema = z.object({
+  bio: z.string().max(500, "Bio must be under 500 characters").optional(),
+  location: z.string().max(100, "Location must be under 100 characters").optional(),
+  avatarUrl: z.string().optional(),
+  focusAreas: z.array(z.enum(FOCUS_AREAS)).optional(),
+  vehiclesWorkedOn: z.string().max(1000, "Vehicles worked on must be under 1000 characters").nullable().optional(),
+  yearsWrenching: z.number().min(0).max(100, "Years wrenching must be between 0 and 100").nullable().optional(),
+  shopAffiliation: z.string().max(200, "Shop affiliation must be under 200 characters").nullable().optional(),
 });
 
 export const insertThreadSchema = createInsertSchema(threads).pick({
