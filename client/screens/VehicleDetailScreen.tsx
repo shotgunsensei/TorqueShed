@@ -78,10 +78,11 @@ type NavigationProp = NativeStackNavigationProp<
   NotesStackParamList & RootStackParamList
 >;
 
-type TabKey = "overview" | "maintenance" | "mod" | "issue";
+type TabKey = "overview" | "all" | "maintenance" | "mod" | "issue";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "overview", label: "Overview", icon: "info" },
+  { key: "all", label: "All", icon: "list" },
   { key: "maintenance", label: "Maintenance", icon: "settings" },
   { key: "mod", label: "Mods", icon: "zap" },
   { key: "issue", label: "Issues", icon: "alert-triangle" },
@@ -136,7 +137,7 @@ export default function VehicleDetailScreen() {
   const notes = useMemo(() => apiNotes.map(transformToNote), [apiNotes]);
 
   const filteredNotes = useMemo(() => {
-    if (activeTab === "overview") return notes;
+    if (activeTab === "overview" || activeTab === "all") return notes;
     return notes.filter((n) => n.type === activeTab);
   }, [notes, activeTab]);
 
@@ -173,13 +174,15 @@ export default function VehicleDetailScreen() {
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         const count =
-          tab.key === "maintenance"
-            ? stats.maintenanceCount
-            : tab.key === "mod"
-              ? stats.modCount
-              : tab.key === "issue"
-                ? stats.issueCount
-                : null;
+          tab.key === "all"
+            ? notes.length
+            : tab.key === "maintenance"
+              ? stats.maintenanceCount
+              : tab.key === "mod"
+                ? stats.modCount
+                : tab.key === "issue"
+                  ? stats.issueCount
+                  : null;
         return (
           <Pressable
             key={tab.key}
@@ -414,7 +417,7 @@ export default function VehicleDetailScreen() {
             ))}
             {notes.length > 3 ? (
               <Pressable
-                onPress={() => setActiveTab("maintenance")}
+                onPress={() => setActiveTab("all")}
                 style={styles.viewAllRow}
               >
                 <Text style={[styles.viewAllText, { color: theme.primary }]}>
@@ -435,7 +438,7 @@ export default function VehicleDetailScreen() {
     );
 
     const tabConfig = TABS.find((t) => t.key === activeTab);
-    const tabLabel = tabConfig?.label || "Entries";
+    const tabLabel = activeTab === "all" ? "Entries" : tabConfig?.label || "Entries";
 
     const renderEmpty = () => {
       if (notesLoading) {
@@ -444,8 +447,8 @@ export default function VehicleDetailScreen() {
       return (
         <EmptyState
           icon={(tabConfig?.icon as any) || "file-text"}
-          title={`No ${tabLabel}`}
-          description={`No ${tabLabel.toLowerCase()} entries yet.`}
+          title={activeTab === "all" ? emptyStates.notes.title : `No ${tabLabel}`}
+          description={activeTab === "all" ? emptyStates.notes.message : `No ${tabLabel.toLowerCase()} entries yet.`}
           actionLabel={emptyStates.notes.action}
           onAction={handleAddNote}
         />
