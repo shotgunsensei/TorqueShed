@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import bcrypt from "bcrypt";
+import { ZodError } from "zod";
 import { storage, type ProfileUpdate } from "./storage";
 import { 
   validateRequest, 
@@ -9,7 +10,15 @@ import {
   cacheResponse, 
   generateTorqueAssistResponse 
 } from "./torque-assist";
-import { FOCUS_AREAS, PRODUCT_CATEGORIES, type FocusArea } from "@shared/schema";
+import { 
+  FOCUS_AREAS, 
+  PRODUCT_CATEGORIES, 
+  type FocusArea,
+  insertThreadSchema,
+  insertSwapShopListingSchema,
+  insertVehicleNoteSchema,
+  insertVehicleSchema,
+} from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 
 const BCRYPT_ROUNDS = 12;
@@ -651,23 +660,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vehicles", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { vin, year, make, model, nickname, imageUrl } = req.body;
-      
-      if (!nickname || typeof nickname !== "string" || nickname.trim().length === 0) {
-        return res.status(400).json({ error: "Nickname is required" });
-      }
+      const parsed = insertVehicleSchema.parse({
+        vin: req.body.vin || null,
+        year: req.body.year ? parseInt(req.body.year) : null,
+        make: req.body.make || null,
+        model: req.body.model || null,
+        nickname: req.body.nickname?.trim(),
+        imageUrl: req.body.imageUrl || null,
+      });
 
-      const vehicle = await storage.createVehicle({
-        vin: vin || null,
-        year: year ? parseInt(year) : null,
-        make: make || null,
-        model: model || null,
-        nickname: nickname.trim(),
-        imageUrl: imageUrl || null,
-      }, req.userId!);
+      const vehicle = await storage.createVehicle(parsed, req.userId!);
 
       res.status(201).json(vehicle);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating vehicle:", error);
       res.status(500).json({ error: "Failed to create vehicle" });
     }
@@ -763,24 +771,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const { title, content, isPrivate } = req.body;
-      
-      if (!title || typeof title !== "string" || title.trim().length === 0) {
-        return res.status(400).json({ error: "Title is required" });
-      }
-      if (!content || typeof content !== "string" || content.trim().length === 0) {
-        return res.status(400).json({ error: "Content is required" });
-      }
-
-      const note = await storage.createNote({
+      const parsed = insertVehicleNoteSchema.parse({
         vehicleId: req.params.vehicleId,
-        title: title.trim(),
-        content: content.trim(),
-        isPrivate: isPrivate !== false,
-      }, req.userId!);
+        title: req.body.title?.trim(),
+        content: req.body.content?.trim(),
+        isPrivate: req.body.isPrivate !== false,
+      });
+
+      const note = await storage.createNote(parsed, req.userId!);
 
       res.status(201).json(note);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating note:", error);
       res.status(500).json({ error: "Failed to create note" });
     }
@@ -854,23 +858,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/garages/:garageId/threads", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { title, content } = req.body;
-      
-      if (!title || typeof title !== "string" || title.trim().length === 0) {
-        return res.status(400).json({ error: "Title is required" });
-      }
-      if (!content || typeof content !== "string" || content.trim().length === 0) {
-        return res.status(400).json({ error: "Content is required" });
-      }
-
-      const thread = await storage.createThread({
+      const parsed = insertThreadSchema.parse({
         garageId: req.params.garageId,
-        title: title.trim(),
-        content: content.trim(),
-      }, req.userId!);
+        title: req.body.title?.trim(),
+        content: req.body.content?.trim(),
+      });
+
+      const thread = await storage.createThread(parsed, req.userId!);
 
       res.status(201).json(thread);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating thread:", error);
       res.status(500).json({ error: "Failed to create thread" });
     }
@@ -1004,31 +1004,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/swap-shop", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { title, description, price, condition, location, localPickup, willShip, imageUrl } = req.body;
-      
-      if (!title || typeof title !== "string" || title.trim().length === 0) {
-        return res.status(400).json({ error: "Title is required" });
-      }
-      if (!price || typeof price !== "string" || price.trim().length === 0) {
-        return res.status(400).json({ error: "Price is required" });
-      }
-      if (!condition) {
-        return res.status(400).json({ error: "Condition is required" });
-      }
+      const parsed = insertSwapShopListingSchema.parse({
+        title: req.body.title?.trim(),
+        description: req.body.description || null,
+        price: req.body.price?.trim(),
+        condition: req.body.condition,
+        location: req.body.location || null,
+        localPickup: req.body.localPickup !== false,
+        willShip: req.body.willShip === true,
+        imageUrl: req.body.imageUrl || null,
+      });
 
-      const listing = await storage.createSwapShopListing({
-        title: title.trim(),
-        description: description || null,
-        price: price.trim(),
-        condition,
-        location: location || null,
-        localPickup: localPickup !== false,
-        willShip: willShip === true,
-        imageUrl: imageUrl || null,
-      }, req.userId!);
+      const listing = await storage.createSwapShopListing(parsed, req.userId!);
 
       res.status(201).json(listing);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
       console.error("Error creating listing:", error);
       res.status(500).json({ error: "Failed to create listing" });
     }
