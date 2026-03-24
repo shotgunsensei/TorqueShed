@@ -16,6 +16,7 @@ import AdminProductsScreen from "@/screens/AdminProductsScreen";
 import GarageDetailScreen from "@/screens/GarageDetailScreen";
 import LoginScreen from "@/screens/LoginScreen";
 import SignupScreen from "@/screens/SignupScreen";
+import OnboardingScreen from "@/screens/OnboardingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
@@ -24,6 +25,7 @@ import { screenTitles } from "@/constants/brand";
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
+  Onboarding: undefined;
   Main: undefined;
   Profile: undefined;
   AddVehicle: undefined;
@@ -42,7 +44,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
   const { theme } = useTheme();
 
   if (isLoading) {
@@ -68,6 +70,12 @@ export default function RootStackNavigator() {
             options={{ headerShown: false }}
           />
         </>
+      ) : needsOnboarding ? (
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
       ) : (
         <>
           <Stack.Screen

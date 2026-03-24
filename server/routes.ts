@@ -28,6 +28,9 @@ import {
   updateProductSchema,
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -65,6 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id,
           username: user.username,
           role: user.role,
+          onboardingCompleted: user.onboardingCompleted ?? false,
         },
         token,
       });
@@ -111,6 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id,
           username: user.username,
           role: user.role,
+          onboardingCompleted: user.onboardingCompleted ?? false,
         },
         token,
       });
@@ -213,6 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: user.id,
         username: user.username,
         role: user.role,
+        onboardingCompleted: user.onboardingCompleted ?? false,
       });
     } catch (error) {
       console.error("Error fetching current user:", error);
@@ -263,6 +269,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating current user profile:", error);
       res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.patch("/api/users/me/onboarding", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { goals, brandIds } = req.body;
+
+      if (goals && Array.isArray(goals)) {
+        await db.update(users).set({ onboardingGoals: goals }).where(eq(users.id, req.userId!));
+      }
+
+      if (brandIds && Array.isArray(brandIds)) {
+        for (const garageId of brandIds) {
+          try {
+            await storage.joinGarage(req.userId!, garageId);
+          } catch {
+          }
+        }
+      }
+
+      await db.update(users).set({ onboardingCompleted: true }).where(eq(users.id, req.userId!));
+
+      res.json({ success: true, onboardingCompleted: true });
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      res.status(500).json({ error: "Failed to complete onboarding" });
     }
   });
 

@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   vehiclesWorkedOn: text("vehicles_worked_on"),
   yearsWrenching: integer("years_wrenching"),
   shopAffiliation: varchar("shop_affiliation", { length: 200 }),
+  onboardingCompleted: boolean("onboarding_completed").default(false),
+  onboardingGoals: json("onboarding_goals").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

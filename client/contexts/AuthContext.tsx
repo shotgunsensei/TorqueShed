@@ -9,6 +9,7 @@ export interface User {
   id: string;
   username: string;
   role: string;
+  onboardingCompleted: boolean;
 }
 
 interface AuthContextType {
@@ -16,9 +17,11 @@ interface AuthContextType {
   currentUser: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  needsOnboarding: boolean;
   login: (username: string, password: string) => Promise<void>;
   signup: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  completeOnboarding: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -146,16 +149,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(null);
   }, []);
 
+  const completeOnboarding = useCallback(() => {
+    setCurrentUser((prev) =>
+      prev ? { ...prev, onboardingCompleted: true } : prev
+    );
+  }, []);
+
+  const isAuthenticated = !!accessToken && !!currentUser;
+  const needsOnboarding = isAuthenticated && !(currentUser?.onboardingCompleted);
+
   return (
     <AuthContext.Provider
       value={{
         accessToken,
         currentUser,
         isLoading,
-        isAuthenticated: !!accessToken && !!currentUser,
+        isAuthenticated,
+        needsOnboarding,
         login,
         signup,
         logout,
+        completeOnboarding,
       }}
     >
       {children}
