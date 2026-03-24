@@ -171,17 +171,17 @@ export const productsRelations = relations(products, ({ one }) => ({
 
 export const productsInsertSchema = createInsertSchema(products);
 
-export const insertProductSchema = createInsertSchema(products).pick({
-  title: true,
-  description: true,
-  whyItMatters: true,
-  price: true,
-  priceRange: true,
-  category: true,
-  affiliateLink: true,
-  vendor: true,
-  imageUrl: true,
-  isSponsored: true,
+export const insertProductSchema = z.object({
+  title: z.string().min(1, "Title is required").max(255),
+  description: z.string().nullable().optional(),
+  whyItMatters: z.string().nullable().optional(),
+  price: z.string().nullable().optional(),
+  priceRange: z.string().nullable().optional(),
+  category: z.enum(PRODUCT_CATEGORIES, { errorMap: () => ({ message: "Valid category is required" }) }),
+  affiliateLink: z.string().nullable().optional(),
+  vendor: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+  isSponsored: z.boolean().optional().default(false),
 });
 
 export const threads = pgTable("threads", {
@@ -284,42 +284,42 @@ export const updateProfileSchema = z.object({
   shopAffiliation: z.string().max(200, "Shop affiliation must be under 200 characters").nullable().optional(),
 });
 
-export const insertThreadSchema = createInsertSchema(threads).pick({
-  garageId: true,
-  title: true,
-  content: true,
+export const insertThreadSchema = z.object({
+  garageId: z.string().min(1, "Garage ID is required"),
+  title: z.string().min(1, "Title is required").max(255),
+  content: z.string().min(1, "Content is required"),
 });
 
-export const insertThreadReplySchema = createInsertSchema(threadReplies).pick({
-  threadId: true,
-  content: true,
+export const insertThreadReplySchema = z.object({
+  threadId: z.string().min(1, "Thread ID is required"),
+  content: z.string().min(1, "Content is required"),
 });
 
-export const insertSwapShopListingSchema = createInsertSchema(swapShopListings).pick({
-  title: true,
-  description: true,
-  price: true,
-  condition: true,
-  location: true,
-  localPickup: true,
-  willShip: true,
-  imageUrl: true,
+export const insertSwapShopListingSchema = z.object({
+  title: z.string().min(1, "Title is required").max(255),
+  description: z.string().nullable().optional(),
+  price: z.string().min(1, "Price is required").max(50),
+  condition: z.enum(ITEM_CONDITIONS, { errorMap: () => ({ message: "Valid condition is required" }) }),
+  location: z.string().max(100).nullable().optional(),
+  localPickup: z.boolean().optional().default(true),
+  willShip: z.boolean().optional().default(false),
+  imageUrl: z.string().nullable().optional(),
 });
 
-export const insertVehicleSchema = createInsertSchema(vehicles).pick({
-  vin: true,
-  year: true,
-  make: true,
-  model: true,
-  nickname: true,
-  imageUrl: true,
+export const insertVehicleSchema = z.object({
+  vin: z.string().max(17).nullable().optional(),
+  year: z.preprocess((val) => (typeof val === "string" ? parseInt(val, 10) : val), z.number().nullable().optional()),
+  make: z.string().max(50).nullable().optional(),
+  model: z.string().max(100).nullable().optional(),
+  nickname: z.string().max(100).nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
 });
 
-export const insertVehicleNoteSchema = createInsertSchema(vehicleNotes).pick({
-  vehicleId: true,
-  title: true,
-  content: true,
-  isPrivate: true,
+export const insertVehicleNoteSchema = z.object({
+  vehicleId: z.string().min(1, "Vehicle ID is required"),
+  title: z.string().min(1, "Title is required").max(255),
+  content: z.string().min(1, "Content is required"),
+  isPrivate: z.boolean().optional().default(false),
 });
 
 export const insertReportSchema = createInsertSchema(reports).pick({
@@ -332,11 +332,11 @@ export const insertReportSchema = createInsertSchema(reports).pick({
 });
 
 export const updateVehicleSchema = z.object({
-  vin: z.string().nullable().optional(),
-  year: z.number().nullable().optional(),
-  make: z.string().nullable().optional(),
-  model: z.string().nullable().optional(),
-  nickname: z.string().nullable().optional(),
+  vin: z.string().max(17).nullable().optional(),
+  year: z.preprocess((val) => (typeof val === "string" ? parseInt(val, 10) : val), z.number().nullable().optional()),
+  make: z.string().max(50).nullable().optional(),
+  model: z.string().max(100).nullable().optional(),
+  nickname: z.string().max(100).nullable().optional(),
   imageUrl: z.string().nullable().optional(),
 });
 
