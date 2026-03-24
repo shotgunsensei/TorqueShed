@@ -115,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id,
           username: user.username,
           role: user.role,
-          onboardingCompleted: user.onboardingCompleted ?? false,
+          onboardingCompleted: user.onboardingCompleted ?? true,
         },
         token,
       });
@@ -218,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: user.id,
         username: user.username,
         role: user.role,
-        onboardingCompleted: user.onboardingCompleted ?? false,
+        onboardingCompleted: user.onboardingCompleted ?? true,
       });
     } catch (error) {
       console.error("Error fetching current user:", error);

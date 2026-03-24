@@ -163,11 +163,7 @@ export default function OnboardingScreen() {
   };
 
   const handleSkip = () => {
-    if (step < TOTAL_STEPS - 1) {
-      setStep(step + 1);
-    } else {
-      handleComplete();
-    }
+    handleComplete();
   };
 
   const handleComplete = async () => {

@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isAuthenticated = !!accessToken && !!currentUser;
-  const needsOnboarding = isAuthenticated && !(currentUser?.onboardingCompleted);
+  const needsOnboarding = isAuthenticated && currentUser?.onboardingCompleted === false;
 
   return (
     <AuthContext.Provider
