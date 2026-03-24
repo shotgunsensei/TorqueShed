@@ -280,7 +280,7 @@ export const updateProfileSchema = z.object({
   avatarUrl: z.string().optional(),
   focusAreas: z.array(z.enum(FOCUS_AREAS)).optional(),
   vehiclesWorkedOn: z.string().max(1000, "Vehicles worked on must be under 1000 characters").nullable().optional(),
-  yearsWrenching: z.number().min(0).max(100, "Years wrenching must be between 0 and 100").nullable().optional(),
+  yearsWrenching: z.preprocess((val) => (typeof val === "string" ? parseInt(val, 10) : val), z.number().min(0).max(100, "Years wrenching must be between 0 and 100").nullable().optional()),
   shopAffiliation: z.string().max(200, "Shop affiliation must be under 200 characters").nullable().optional(),
 });
 
@@ -341,24 +341,24 @@ export const updateVehicleSchema = z.object({
 });
 
 export const updateVehicleNoteSchema = z.object({
-  title: z.string().optional(),
-  content: z.string().optional(),
+  title: z.string().min(1, "Title cannot be empty").max(255).optional(),
+  content: z.string().min(1, "Content cannot be empty").optional(),
   isPrivate: z.boolean().optional(),
 });
 
 export const updateThreadSchema = z.object({
-  title: z.string().optional(),
-  content: z.string().optional(),
+  title: z.string().min(1, "Title cannot be empty").max(255).optional(),
+  content: z.string().min(1, "Content cannot be empty").optional(),
   hasSolution: z.boolean().optional(),
   isPinned: z.boolean().optional(),
 });
 
 export const updateSwapShopListingSchema = z.object({
-  title: z.string().optional(),
+  title: z.string().min(1, "Title cannot be empty").max(255).optional(),
   description: z.string().nullable().optional(),
-  price: z.string().optional(),
-  condition: z.string().optional(),
-  location: z.string().nullable().optional(),
+  price: z.string().min(1, "Price cannot be empty").max(50).optional(),
+  condition: z.enum(ITEM_CONDITIONS, { errorMap: () => ({ message: "Valid condition is required" }) }).optional(),
+  location: z.string().max(100).nullable().optional(),
   localPickup: z.boolean().optional(),
   willShip: z.boolean().optional(),
   imageUrl: z.string().nullable().optional(),
