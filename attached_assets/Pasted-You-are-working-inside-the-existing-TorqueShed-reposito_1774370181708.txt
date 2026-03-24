@@ -1,0 +1,238 @@
+You are working inside the existing TorqueShed repository. This is NOT a greenfield build. Your job is to refactor, redesign, and complete the app into a production-ready, visually premium, feature-rich automotive community platform with zero prototype rough edges.
+
+CORE PRODUCT GOAL
+TorqueShed must become the best mobile-first home base for mechanics, enthusiasts, and DIY owners to:
+1. track their vehicles and builds,
+2. get credible help fast,
+3. discover fitment-aware parts and tools,
+4. buy/sell parts with trust,
+5. build identity and reputation inside vehicle-specific communities.
+
+PRIMARY POSITIONING
+“The Garage for Real People”
+But the actual product experience must feel like:
+- part build journal,
+- part community bay,
+- part diagnostic copilot,
+- part trusted swap marketplace.
+
+NON-NEGOTIABLE OUTCOMES
+- Make the app visually stunning and cohesive across mobile and web.
+- Remove all shallow prototype behavior and incomplete UX.
+- Eliminate architecture drift, duplicate navigation patterns, dead code, placeholder flows, and inconsistent data sources.
+- Preserve and improve the current Expo + React Native + Express + Drizzle + Postgres stack unless a change is absolutely necessary.
+- Use strict TypeScript. No unsafe shortcuts, no silent failures, no hidden regressions.
+- The result must feel premium, trustworthy, and production-ready.
+
+FIRST: AUDIT AND REPAIR
+Before building new features, inspect the existing codebase and fix foundational flaws:
+- remove duplicate or obsolete navigation files and inconsistent screen flows
+- unify data-driven community/garage behavior
+- replace mock or placeholder logic with real app behavior where practical
+- fix stale data patterns and proper React Query invalidation
+- standardize API contracts and Zod validation for all important forms and mutations
+- rename ambiguous schema fields like password -> passwordHash where appropriate through safe migrations
+- improve error handling, empty states, loading states, and optimistic updates
+- ensure every screen is responsive and polished on both mobile and web
+- fix form spacing, label overlap, layout rhythm, card density, and CTA hierarchy everywhere
+- ensure accessibility: touch target size, readable contrast, keyboard support, focus states, semantic labels
+
+PRODUCT RESTRUCTURE
+Restructure the app around these pillars:
+
+1. HOME
+- personalized feed based on user vehicles, joined bays, followed builds, saved searches, and recent activity
+- sections such as:
+  - For Your Garage
+  - Solved This Week
+  - Trending Builds
+  - Parts Deals
+  - Local Swap Picks
+- show credibility and freshness signals on all content
+
+2. BAYS
+- brand/platform-specific communities
+- content tabs inside each bay:
+  - Questions
+  - Builds
+  - Solved
+  - Deals
+  - Local
+- each bay needs strong identity, hero header, member stats, top contributors, recent solved issues
+- support search, filters, pinned content, and “ask question” CTA
+
+3. MY GARAGE
+- transform vehicle notes into full build journals
+- each vehicle should support:
+  - overview
+  - maintenance log
+  - repair history
+  - mod list
+  - issue tracker
+  - photo gallery
+  - parts used
+  - future plans
+  - cost summary
+- allow private/public sharing options for build entries
+- public build pages should be compelling and community-friendly
+
+4. SOLVE FLOW
+- create a structured “Fix My Issue” flow:
+  - vehicle
+  - symptoms
+  - codes
+  - recent changes
+  - severity
+  - drivability
+  - AI-assisted triage
+- AI should help structure the problem, not replace community trust
+- threads should support accepted solution, tools used, parts used, estimated difficulty, estimated cost, and repair summary
+- solved content must become reusable knowledge, not buried conversation
+
+5. SOURCE
+- merge parts finder and marketplace thinking into a stronger discovery experience
+- parts finder must feel fitment-aware even if some vendor integrations remain link-based
+- show:
+  - best matches
+  - fitment confidence
+  - vendor options
+  - price range
+  - why it matters
+  - install difficulty
+  - related threads/builds
+- marketplace and swap shop must include:
+  - better listing cards
+  - seller trust metadata
+  - saved items
+  - share listing
+  - report listing
+  - inquire/message seller
+  - improved media galleries
+
+6. PROFILE AND CREDIBILITY
+- profiles must feel valuable and trustworthy
+- include:
+  - avatar
+  - bio
+  - location
+  - specialties
+  - years wrenching
+  - vehicles owned/worked on
+  - solved thread count
+  - successful swaps
+  - review score
+  - verified owner / verified seller / shop badge states
+- reputation should be visible but tasteful
+
+ONBOARDING REDESIGN
+Build a high-conversion onboarding flow:
+1. create account
+2. add primary vehicle
+3. select preferred brands/platforms
+4. choose goals:
+   - fix issues
+   - track maintenance
+   - build/project
+   - buy/sell parts
+   - learn from experts
+5. join recommended bays
+6. complete first meaningful action:
+   - ask a question
+   - add a maintenance log
+   - save a part
+   - post a listing
+
+This onboarding must personalize the home experience immediately.
+
+VISUAL DESIGN SYSTEM
+Create or refine a premium visual system with:
+- industrial dark theme by default with strong neutral scale
+- racing orange used intentionally for actions and emphasis
+- refined typography hierarchy
+- stronger spacing system
+- premium card surfaces with subtle depth
+- better icon consistency
+- rich chips/badges for states and trust signals
+- improved empty states, skeleton loaders, pull-to-refresh, and success confirmations
+- polished image handling and fallback media states
+- mobile-first but responsive on web/tablet
+- every major screen must have a clear focal point and primary action
+
+DESIGN LANGUAGE
+Target feeling:
+- modern premium garage
+- confidence and competence
+- high trust
+- enthusiast pride
+- not cartoonish, not generic SaaS, not cluttered
+
+TECHNICAL REQUIREMENTS
+- keep Expo/React Native frontend
+- keep Express + Drizzle backend unless absolutely necessary
+- use shared types where possible
+- improve API organization if needed
+- centralize validation
+- add migration-safe schema improvements
+- ensure production-safe auth handling
+- implement robust image upload architecture placeholders/interfaces if full storage is not yet wired
+- improve rate limiting, auditability, moderation hooks, and admin workflows
+- add analytics event hooks for key actions
+- ensure all key forms have validation and useful error feedback
+- make loading, refresh, offline, and retry behavior feel intentional
+
+PRODUCTION READINESS CHECKLIST
+Implement or harden:
+- password reset flow stubs/hooks
+- email verification hooks/stubs
+- better moderation/report handling
+- admin management UX improvements
+- structured logging and safer error responses
+- environment configuration hygiene
+- empty state copy and onboarding copy polish
+- no broken nav paths
+- no dead screens
+- no inconsistent query keys
+- no UI overlap or layout bugs
+- no hardcoded mock data for core flows
+- no misleading labels like “real-time chat” if it is not actually real-time
+
+DELIVERABLES
+When complete, provide:
+1. a concise architecture summary,
+2. a list of what was fixed,
+3. a list of new features added,
+4. a list of any TODO items that still require third-party services,
+5. updated code only, integrated into the existing repo,
+6. any migration notes,
+7. any new environment variables required.
+
+IMPLEMENTATION PRIORITY
+Priority 1:
+- architecture cleanup
+- onboarding
+- home redesign
+- bays/community redesign
+- garage/build journal redesign
+- solved-thread flow
+- swap shop trust improvements
+- visual system polish across app
+
+Priority 2:
+- credibility system
+- saved items/searches/watchlists
+- notification center
+- richer seller and build profiles
+
+Priority 3:
+- vendor intelligence
+- advanced AI summaries
+- local/community density features
+- monetization surfaces
+
+QUALITY BAR
+Every screen should look launch-ready.
+Every major workflow should feel intentional.
+Every feature should reinforce trust, utility, or identity.
+No prototype vibes. No design debt. No fake completeness.
+
+Start by auditing the repo structure and then implement the redesign in-place, step by step, while preserving working functionality and upgrading weak areas.
