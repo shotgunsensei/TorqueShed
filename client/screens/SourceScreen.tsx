@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -578,8 +578,14 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
   const { currentUser } = useAuth();
-  const initialSegment = route?.params?.segment || "shop";
-  const [activeSegment, setActiveSegment] = useState<SegmentKey>(initialSegment);
+  const routeSegment = route?.params?.segment;
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>(routeSegment || "shop");
+
+  useEffect(() => {
+    if (routeSegment) {
+      setActiveSegment(routeSegment);
+    }
+  }, [routeSegment]);
 
   return (
     <View style={[s.container, { backgroundColor: theme.backgroundRoot }]}>
