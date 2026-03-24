@@ -19,6 +19,8 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
+import { Skeleton } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -266,8 +268,8 @@ export default function ThreadDetailScreen() {
 
   if (threadLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <Skeleton.List count={4} style={{ paddingTop: headerHeight + Spacing.lg }} />
       </View>
     );
   }
@@ -285,12 +287,11 @@ export default function ThreadDetailScreen() {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
           !repliesLoading ? (
-            <View style={styles.emptyContainer}>
-              <Feather name="message-circle" size={48} color={theme.textSecondary} />
-              <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.md }}>
-                No replies yet. Be the first to respond!
-              </ThemedText>
-            </View>
+            <EmptyState
+              icon="message-circle"
+              title="No Replies Yet"
+              description="Be the first to respond to this thread!"
+            />
           ) : null
         }
         contentContainerStyle={{
@@ -359,11 +360,6 @@ export default function ThreadDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   headerSection: {
     marginBottom: Spacing.lg,
@@ -449,10 +445,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     marginTop: Spacing.sm,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingVertical: Spacing["2xl"],
   },
   inputContainer: {
     paddingHorizontal: Spacing.lg,
