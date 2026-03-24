@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
+  withSequence,
   runOnJS,
   Easing,
 } from "react-native-reanimated";
@@ -43,20 +44,17 @@ function ToastItem({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () =>
   const opacity = useSharedValue(0);
 
   React.useEffect(() => {
-    translateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) });
-    opacity.value = withTiming(1, { duration: 200 });
-
-    opacity.value = withDelay(
-      2500,
-      withTiming(0, { duration: 300 }, (finished) => {
+    translateY.value = withSequence(
+      withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) }),
+      withDelay(2500, withTiming(-100, { duration: 300 }))
+    );
+    opacity.value = withSequence(
+      withTiming(1, { duration: 200 }),
+      withDelay(2600, withTiming(0, { duration: 300 }, (finished) => {
         if (finished) {
           runOnJS(onDismiss)();
         }
-      })
-    );
-    translateY.value = withDelay(
-      2500,
-      withTiming(-100, { duration: 300 })
+      }))
     );
   }, []);
 
