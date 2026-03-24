@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Pressable,
   Linking,
-  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -15,7 +15,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
-import { microcopy } from "@/constants/brand";
+import { microcopy, emptyStates } from "@/constants/brand";
+import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/Skeleton";
 import { getApiUrl } from "@/lib/query-client";
 
 interface Product {
@@ -143,47 +145,56 @@ export default function TrendingScreen() {
 
   const numColumns = isDesktop ? (width >= 1280 ? 4 : 3) : 2;
 
-  const { data: products, isLoading, error } = useQuery<Product[]>({
+  const { data: products, isLoading, refetch, isRefetching } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
   const displayProducts = products || [];
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <Skeleton.Grid count={6} columns={numColumns} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
-      ) : (
-        <FlatList
-          key={`products-${numColumns}`}
-          data={displayProducts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ProductCard item={item} />}
-          numColumns={numColumns}
-          columnWrapperStyle={displayProducts.length > 0 ? styles.row : undefined}
-          contentContainerStyle={[
-            styles.listContent,
-            {
-              paddingBottom: isDesktop ? Spacing.xl : insets.bottom + 80 + Spacing.lg,
-              maxWidth: isDesktop ? 1400 : undefined,
-              alignSelf: isDesktop ? "center" : undefined,
-              width: isDesktop ? "100%" : undefined,
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={null}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Feather name="package" size={48} color={theme.textMuted} />
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No products available yet
-              </Text>
-            </View>
-          }
-        />
-      )}
+      <FlatList
+        key={`products-${numColumns}`}
+        data={displayProducts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <ProductCard item={item} />}
+        numColumns={numColumns}
+        columnWrapperStyle={displayProducts.length > 0 ? styles.row : undefined}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingBottom: isDesktop ? Spacing.xl : insets.bottom + 80 + Spacing.lg,
+            maxWidth: isDesktop ? 1400 : undefined,
+            alignSelf: isDesktop ? "center" : undefined,
+            width: isDesktop ? "100%" : undefined,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
+        ListHeaderComponent={null}
+        ListEmptyComponent={
+          <EmptyState
+            icon="package"
+            title={emptyStates.products.title}
+            description={emptyStates.products.message}
+          />
+        }
+      />
     </View>
   );
 }
@@ -191,11 +202,6 @@ export default function TrendingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   listContent: {
     padding: Spacing.lg,
@@ -317,14 +323,5 @@ const styles = StyleSheet.create({
   },
   noLinkText: {
     ...Typography.caption,
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.xl * 2,
-    gap: Spacing.md,
-  },
-  emptyText: {
-    ...Typography.body,
   },
 });

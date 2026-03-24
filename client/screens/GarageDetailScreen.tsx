@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, StyleSheet, FlatList, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
@@ -9,13 +9,15 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/Skeleton";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import type { Thread } from "@/constants/garages";
-import { microcopy } from "@/constants/brand";
+import { microcopy, emptyStates } from "@/constants/brand";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { apiRequest } from "@/lib/query-client";
 
@@ -98,9 +100,11 @@ export default function GarageDetailScreen() {
     queryKey: [`/api/garages/${garageId}`],
   });
 
-  const { data: apiThreads = [], isLoading: threadsLoading } = useQuery<ApiThread[]>({
+  const { data: apiThreads = [], isLoading: threadsLoading, refetch: refetchThreads, isRefetching } = useQuery<ApiThread[]>({
     queryKey: [`/api/garages/${garageId}/threads`],
   });
+
+  const toast = useToast();
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -114,6 +118,10 @@ export default function GarageDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: [`/api/garages/${garageId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
+      toast.show(garage?.isJoined ? "Left bay" : "Joined bay", "success");
+    },
+    onError: () => {
+      toast.show("Failed to update membership", "error");
     },
   });
 
@@ -185,18 +193,14 @@ export default function GarageDetailScreen() {
 
   const renderEmptyThreads = () => {
     if (threadsLoading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
-      );
+      return <Skeleton.List count={3} />;
     }
     return (
       <EmptyState
-        image={require("../../assets/images/empty-threads.png")}
-        title="No Discussions Yet"
-        description="Start a new thread and get the conversation going"
-        actionLabel="New Thread"
+        icon="message-circle"
+        title={emptyStates.threads.title}
+        description={emptyStates.threads.message}
+        actionLabel={emptyStates.threads.action}
         onAction={handleNewThread}
       />
     );
@@ -228,6 +232,14 @@ export default function GarageDetailScreen() {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={renderEmptyThreads}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetchThreads}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
         ListHeaderComponent={
           <View>
             <View style={[styles.garageStats, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
@@ -284,12 +296,6 @@ export default function GarageDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 200,
   },
   threadList: {
     flex: 1,

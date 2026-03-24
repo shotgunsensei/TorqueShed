@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
@@ -64,6 +65,7 @@ export default function ThreadDetailScreen() {
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { currentUser } = useAuth();
   const { threadId } = route.params;
 
@@ -89,11 +91,12 @@ export default function ThreadDetailScreen() {
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}/replies`] });
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Reply posted", "success");
       setReplyText("");
       inputRef.current?.blur();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to post reply");
+      toast.show(error.message || "Failed to post reply", "error");
     },
   });
 
@@ -105,9 +108,10 @@ export default function ThreadDetailScreen() {
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}/replies`] });
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Solution marked", "success");
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to mark solution");
+      toast.show(error.message || "Failed to mark solution", "error");
     },
   });
 
@@ -123,10 +127,11 @@ export default function ThreadDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Thread deleted", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to delete thread");
+      toast.show(error.message || "Failed to delete thread", "error");
     },
   });
 

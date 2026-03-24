@@ -12,6 +12,7 @@ import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
@@ -23,6 +24,7 @@ export default function AddListingScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -47,10 +49,11 @@ export default function AddListingScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Listing posted", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to create listing");
+      toast.show(error.message || "Failed to create listing", "error");
     },
   });
 

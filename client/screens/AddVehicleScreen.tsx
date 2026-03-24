@@ -13,6 +13,7 @@ import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
@@ -51,6 +52,7 @@ export default function AddVehicleScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [inputMode, setInputMode] = useState(0);
   const [vin, setVin] = useState("");
@@ -108,10 +110,11 @@ export default function AddVehicleScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Vehicle added", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to add vehicle");
+      toast.show(error.message || "Failed to add vehicle", "error");
     },
   });
 

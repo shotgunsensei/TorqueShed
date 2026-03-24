@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, FlatList, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
@@ -9,6 +9,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { NoteCard } from "@/components/NoteCard";
 import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/Skeleton";
 import { FAB } from "@/components/FAB";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -50,7 +51,7 @@ export default function VehicleDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { vehicleId, vehicleName } = route.params;
 
-  const { data: apiNotes = [], isLoading } = useQuery<ApiNote[]>({
+  const { data: apiNotes = [], isLoading, refetch, isRefetching } = useQuery<ApiNote[]>({
     queryKey: [`/api/vehicles/${vehicleId}/notes`],
   });
 
@@ -98,15 +99,11 @@ export default function VehicleDetailScreen() {
 
   const renderEmpty = () => {
     if (isLoading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
-      );
+      return <Skeleton.List count={3} />;
     }
     return (
       <EmptyState
-        image={require("../../assets/images/empty-threads.png")}
+        icon="file-text"
         title={emptyStates.notes.title}
         description={emptyStates.notes.message}
         actionLabel={emptyStates.notes.action}
@@ -133,6 +130,14 @@ export default function VehicleDetailScreen() {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
       />
       {notes.length > 0 ? (
         <FAB icon="plus" onPress={handleAddNote} bottom={insets.bottom + 20} />
@@ -150,11 +155,6 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   header: {
     marginBottom: Spacing.lg,

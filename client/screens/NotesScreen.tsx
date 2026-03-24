@@ -5,7 +5,7 @@ import {
   FlatList,
   StyleSheet,
   Pressable,
-  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,10 +13,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
-
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates } from "@/constants/brand";
+import { EmptyState } from "@/components/EmptyState";
+import { FAB } from "@/components/FAB";
+import { Skeleton } from "@/components/Skeleton";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -49,6 +51,7 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
           transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}
+      testID={`vehicle-card-${item.id}`}
     >
       <View style={styles.cardHeader}>
         <View style={[styles.vehicleIcon, { backgroundColor: theme.primary + "20" }]}>
@@ -88,37 +91,12 @@ function VehicleCard({ item, onPress }: { item: VehicleItem; onPress: () => void
   );
 }
 
-function EmptyVehicles({ onAdd }: { onAdd: () => void }) {
-  const { theme } = useTheme();
-
-  return (
-    <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIcon, { backgroundColor: theme.primary + "15" }]}>
-        <Feather name="truck" size={48} color={theme.primary} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>
-        {emptyStates.vehicles.title}
-      </Text>
-      <Text style={[styles.emptyMessage, { color: theme.textSecondary }]}>
-        {emptyStates.vehicles.message}
-      </Text>
-      <Pressable
-        onPress={onAdd}
-        style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-      >
-        <Feather name="plus" size={20} color="#FFFFFF" />
-        <Text style={styles.emptyButtonText}>{emptyStates.vehicles.action}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 export default function NotesScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
 
-  const { data: vehicles = [], isLoading } = useQuery<VehicleItem[]>({
+  const { data: vehicles = [], isLoading, refetch, isRefetching } = useQuery<VehicleItem[]>({
     queryKey: ["/api/vehicles"],
   });
 
@@ -136,8 +114,8 @@ export default function NotesScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <Skeleton.List count={3} style={{ paddingTop: Spacing.xl }} />
       </View>
     );
   }
@@ -157,6 +135,14 @@ export default function NotesScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
           ListHeaderComponent={
             <View style={styles.headerSection}>
               <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
@@ -166,24 +152,20 @@ export default function NotesScreen() {
           }
         />
       ) : (
-        <EmptyVehicles onAdd={handleAddVehicle} />
+        <EmptyState
+          icon="truck"
+          title={emptyStates.vehicles.title}
+          description={emptyStates.vehicles.message}
+          actionLabel={emptyStates.vehicles.action}
+          onAction={handleAddVehicle}
+        />
       )}
       {vehicles.length > 0 ? (
-        <Pressable
+        <FAB
+          icon="plus"
           onPress={handleAddVehicle}
-          testID="add-vehicle-fab"
-          style={({ pressed }) => [
-            styles.fab,
-            {
-              backgroundColor: theme.primary,
-              bottom: tabBarHeight + Spacing.lg,
-              opacity: pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.92 : 1 }],
-            },
-          ]}
-        >
-          <Feather name="plus" size={28} color="#FFFFFF" />
-        </Pressable>
+          bottom={tabBarHeight + Spacing.lg}
+        />
       ) : null}
     </View>
   );
@@ -192,10 +174,6 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
   },
   listContent: {
     padding: Spacing.lg,
@@ -207,20 +185,6 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
-  },
-  fab: {
-    position: "absolute",
-    right: Spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   card: {
     borderRadius: BorderRadius.md,
@@ -281,47 +245,7 @@ const styles = StyleSheet.create({
   notesCountText: {
     ...Typography.caption,
   },
-  lastNote: {
-    flex: 1,
-    ...Typography.caption,
-  },
   separator: {
     height: Spacing.md,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: Spacing.xl,
-  },
-  emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Spacing.xl,
-  },
-  emptyTitle: {
-    ...Typography.h2,
-    textAlign: "center",
-    marginBottom: Spacing.sm,
-  },
-  emptyMessage: {
-    ...Typography.body,
-    textAlign: "center",
-    marginBottom: Spacing.xl,
-  },
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-  },
-  emptyButtonText: {
-    color: "#FFFFFF",
-    ...Typography.h4,
   },
 });

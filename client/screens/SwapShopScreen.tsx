@@ -10,7 +10,7 @@ import {
   ScrollView,
   Switch,
   Alert,
-  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/Skeleton";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import * as Haptics from "expo-haptics";
 
@@ -228,7 +229,7 @@ export default function SwapShopScreen() {
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: listings = [], isLoading } = useQuery<SwapListing[]>({
+  const { data: listings = [], isLoading, refetch, isRefetching } = useQuery<SwapListing[]>({
     queryKey: ["/api/swap-shop"],
   });
 
@@ -269,8 +270,8 @@ export default function SwapShopScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <Skeleton.List count={4} />
       </View>
     );
   }
@@ -287,6 +288,14 @@ export default function SwapShopScreen() {
         ]}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
         ListEmptyComponent={
           searchQuery.trim() ? (
             <View style={styles.noResultsState}>
@@ -425,10 +434,6 @@ export default function SwapShopScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
   },
   listContent: {
     padding: Spacing.lg,

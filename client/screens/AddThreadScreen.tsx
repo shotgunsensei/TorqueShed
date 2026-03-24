@@ -11,6 +11,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -24,6 +25,7 @@ export default function AddThreadScreen() {
   const navigation = useNavigation();
   const route = useRoute<RoutePropType>();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { garageId } = route.params;
 
   const [title, setTitle] = useState("");
@@ -39,10 +41,11 @@ export default function AddThreadScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/garages/${garageId}/threads`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Thread posted", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to create thread");
+      toast.show(error.message || "Failed to create thread", "error");
     },
   });
 

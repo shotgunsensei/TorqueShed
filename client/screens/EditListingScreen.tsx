@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Switch, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Switch, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -10,8 +10,10 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { Skeleton } from "@/components/Skeleton";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -41,6 +43,7 @@ export default function EditListingScreen() {
   const navigation = useNavigation();
   const route = useRoute<RoutePropType>();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { listingId } = route.params;
 
   const [title, setTitle] = useState("");
@@ -86,10 +89,11 @@ export default function EditListingScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
       queryClient.invalidateQueries({ queryKey: [`/api/swap-shop/${listingId}`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Listing updated", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to update listing");
+      toast.show(error.message || "Failed to update listing", "error");
     },
   });
 
@@ -110,7 +114,7 @@ export default function EditListingScreen() {
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
+        <Skeleton.List count={4} style={{ paddingTop: headerHeight + Spacing.lg }} />
       </View>
     );
   }

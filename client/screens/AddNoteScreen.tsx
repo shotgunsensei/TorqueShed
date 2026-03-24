@@ -11,6 +11,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/components/Toast";
 import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -24,6 +25,7 @@ export default function AddNoteScreen() {
   const navigation = useNavigation();
   const route = useRoute<RoutePropType>();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { vehicleId } = route.params;
 
   const [title, setTitle] = useState("");
@@ -41,10 +43,11 @@ export default function AddNoteScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${vehicleId}/notes`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Note saved", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      Alert.alert("Error", error.message || "Failed to save note");
+      toast.show(error.message || "Failed to save note", "error");
     },
   });
 

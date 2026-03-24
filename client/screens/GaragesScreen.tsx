@@ -5,7 +5,7 @@ import {
   FlatList,
   StyleSheet,
   Pressable,
-  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -18,6 +18,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand } from "@/constants/brand";
+import { Skeleton } from "@/components/Skeleton";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -98,7 +99,7 @@ export default function GaragesScreen() {
 
   const numColumns = isDesktop ? (width >= 1280 ? 3 : 2) : 1;
 
-  const { data: garages = [], isLoading } = useQuery<ApiGarage[]>({
+  const { data: garages = [], isLoading, refetch, isRefetching } = useQuery<ApiGarage[]>({
     queryKey: ["/api/garages"],
   });
 
@@ -111,8 +112,8 @@ export default function GaragesScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <Skeleton.List count={5} style={{ paddingTop: isDesktop ? Spacing.xl : headerHeight + Spacing.lg }} />
       </View>
     );
   }
@@ -140,6 +141,14 @@ export default function GaragesScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
         ListHeaderComponent={
           <View style={numColumns > 1 ? styles.gridHeader : undefined}>
             <Text style={[styles.tagline, { color: theme.textSecondary }]}>
@@ -155,10 +164,6 @@ export default function GaragesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
   },
   listContent: {
     padding: Spacing.lg,
