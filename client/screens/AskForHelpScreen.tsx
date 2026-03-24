@@ -17,6 +17,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import { lookupObdCode, searchObdCodes, getObdSystemPrefix } from "@/constants/obdCodes";
+import type { ObdCodeInfo } from "@/constants/obdCodes";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -80,6 +82,7 @@ export default function AskForHelpScreen() {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptom, setCustomSymptom] = useState("");
   const [obdCodes, setObdCodes] = useState("");
+  const [obdSearchQuery, setObdSearchQuery] = useState("");
   const [severity, setSeverity] = useState(3);
   const [drivability, setDrivability] = useState(3);
   const [recentChanges, setRecentChanges] = useState("");
@@ -113,6 +116,19 @@ export default function AskForHelpScreen() {
     .split(/[,\s]+/)
     .map((c) => c.trim().toUpperCase())
     .filter((c) => /^[PBCU]\d{4}$/.test(c));
+
+  const obdSearchResults = useMemo(
+    () => searchObdCodes(obdSearchQuery),
+    [obdSearchQuery]
+  );
+
+  const addObdCode = (code: string) => {
+    const upper = code.toUpperCase();
+    if (parsedObdCodes.includes(upper)) return;
+    const updated = obdCodes ? `${obdCodes}, ${upper}` : upper;
+    setObdCodes(updated);
+    setObdSearchQuery("");
+  };
 
   const toggleSymptom = (symptom: string) => {
     setSelectedSymptoms((prev) =>
@@ -332,27 +348,75 @@ export default function AskForHelpScreen() {
     <View>
       <ThemedText type="h3" style={styles.stepTitle}>Any OBD codes?</ThemedText>
       <ThemedText type="body" style={[styles.stepDesc, { color: theme.textSecondary }]}>
-        Enter diagnostic trouble codes if you have them (optional)
+        Search for codes or enter them manually (optional)
       </ThemedText>
+
       <Input
-        label="OBD-II Codes"
-        placeholder="e.g., P0300, P0171, B1234"
-        value={obdCodes}
-        onChangeText={setObdCodes}
-        leftIcon="cpu"
+        label="Search OBD-II Codes"
+        placeholder="Search by code or description..."
+        value={obdSearchQuery}
+        onChangeText={setObdSearchQuery}
+        leftIcon="search"
       />
-      {parsedObdCodes.length > 0 ? (
-        <View style={[styles.chipGrid, { marginTop: Spacing.md }]}>
-          {parsedObdCodes.map((code) => (
-            <View
-              key={code}
-              style={[styles.codeChip, { backgroundColor: "#EF444420", borderColor: "#EF4444" }]}
+
+      {obdSearchResults.length > 0 ? (
+        <View style={[styles.searchResults, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
+          {obdSearchResults.map((result) => (
+            <Pressable
+              key={result.code}
+              style={[styles.searchResultItem, { borderBottomColor: theme.cardBorder }]}
+              onPress={() => addObdCode(result.code)}
+              testID={`obd-result-${result.code}`}
             >
-              <Text style={[styles.codeText, { color: "#EF4444" }]}>{code}</Text>
-            </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.searchResultHeader}>
+                  <Text style={[styles.searchResultCode, { color: theme.primary }]}>{result.code}</Text>
+                  <Text style={[styles.searchResultSystem, { color: theme.textMuted }]}>{result.system}</Text>
+                </View>
+                <Text style={[styles.searchResultDesc, { color: theme.text }]}>{result.description}</Text>
+              </View>
+              <Feather name="plus-circle" size={18} color={theme.primary} />
+            </Pressable>
           ))}
         </View>
       ) : null}
+
+      <View style={{ marginTop: Spacing.md }}>
+        <Input
+          label="Or enter codes manually"
+          placeholder="e.g., P0300, P0171, B1234"
+          value={obdCodes}
+          onChangeText={setObdCodes}
+          leftIcon="cpu"
+        />
+      </View>
+
+      {parsedObdCodes.length > 0 ? (
+        <View style={[styles.chipGrid, { marginTop: Spacing.md }]}>
+          {parsedObdCodes.map((code) => {
+            const info = lookupObdCode(code);
+            return (
+              <View
+                key={code}
+                style={[styles.codeChipWithDesc, { backgroundColor: "#EF444420", borderColor: "#EF4444" }]}
+              >
+                <View style={styles.codeChipHeader}>
+                  <Text style={[styles.codeText, { color: "#EF4444" }]}>{code}</Text>
+                  <Text style={[styles.codeSystemText, { color: theme.textMuted }]}>
+                    {info ? info.system : getObdSystemPrefix(code)}
+                  </Text>
+                </View>
+                {info ? (
+                  <Text style={[styles.codeDescText, { color: theme.textSecondary }]} numberOfLines={2}>
+                    {info.description}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
       <View style={[styles.tipCard, { backgroundColor: theme.backgroundSecondary, marginTop: Spacing.lg }]}>
         <Feather name="info" size={16} color={theme.textSecondary} />
         <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
@@ -698,9 +762,60 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
   },
+  codeChipWithDesc: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    width: "100%",
+  },
+  codeChipHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  codeSystemText: {
+    ...Typography.caption,
+    fontSize: 10,
+  },
+  codeDescText: {
+    ...Typography.caption,
+  },
   codeText: {
     ...Typography.body,
     fontFamily: "Inter_500Medium",
+  },
+  searchResults: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.sm,
+    maxHeight: 220,
+    overflow: "hidden",
+  },
+  searchResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.sm,
+    borderBottomWidth: 1,
+    gap: Spacing.sm,
+  },
+  searchResultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: 2,
+  },
+  searchResultCode: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  searchResultSystem: {
+    ...Typography.caption,
+    fontSize: 10,
+  },
+  searchResultDesc: {
+    ...Typography.caption,
   },
   tipCard: {
     flexDirection: "row",

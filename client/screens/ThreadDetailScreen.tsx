@@ -95,7 +95,7 @@ export default function ThreadDetailScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const [showSolutionModal, setShowSolutionModal] = useState<string | null>(null);
-  const [solDifficulty, setSolDifficulty] = useState(3);
+  const [solDifficulty, setSolDifficulty] = useState<number | null>(null);
   const [solCost, setSolCost] = useState("");
   const [solTools, setSolTools] = useState("");
   const [solParts, setSolParts] = useState("");
@@ -174,7 +174,7 @@ export default function ThreadDetailScreen() {
 
   const handleMarkSolution = (replyId: string) => {
     setShowSolutionModal(replyId);
-    setSolDifficulty(3);
+    setSolDifficulty(null);
     setSolCost("");
     setSolTools("");
     setSolParts("");
@@ -496,7 +496,7 @@ export default function ThreadDetailScreen() {
             return (
               <Pressable
                 key={label}
-                onPress={() => setSolDifficulty(val)}
+                onPress={() => setSolDifficulty(solDifficulty === val ? null : val)}
                 style={[
                   styles.difficultyOption,
                   {
