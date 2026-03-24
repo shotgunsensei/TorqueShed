@@ -441,6 +441,12 @@ export class DatabaseStorage implements IStorage {
         hasSolution: threads.hasSolution,
         isPinned: threads.isPinned,
         replyCount: threads.replyCount,
+        vehicleId: threads.vehicleId,
+        symptoms: threads.symptoms,
+        obdCodes: threads.obdCodes,
+        severity: threads.severity,
+        drivability: threads.drivability,
+        recentChanges: threads.recentChanges,
         lastActivityAt: threads.lastActivityAt,
         createdAt: threads.createdAt,
         updatedAt: threads.updatedAt,
@@ -456,7 +462,7 @@ export class DatabaseStorage implements IStorage {
     return garageThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] })[];
   }
 
-  async getThread(id: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] }) | undefined> {
+  async getThread(id: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; vehicleName: string | null }) | undefined> {
     const [thread] = await db
       .select({
         id: threads.id,
@@ -467,17 +473,24 @@ export class DatabaseStorage implements IStorage {
         hasSolution: threads.hasSolution,
         isPinned: threads.isPinned,
         replyCount: threads.replyCount,
+        vehicleId: threads.vehicleId,
+        symptoms: threads.symptoms,
+        obdCodes: threads.obdCodes,
+        severity: threads.severity,
+        drivability: threads.drivability,
+        recentChanges: threads.recentChanges,
         lastActivityAt: threads.lastActivityAt,
         createdAt: threads.createdAt,
         updatedAt: threads.updatedAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
         yearsWrenching: users.yearsWrenching,
         focusAreas: users.focusAreas,
+        vehicleName: sql<string | null>`(SELECT CONCAT(${vehicles.year}, ' ', ${vehicles.make}, ' ', ${vehicles.model}) FROM ${vehicles} WHERE ${vehicles.id} = ${threads.vehicleId})`,
       })
       .from(threads)
       .leftJoin(users, eq(threads.userId, users.id))
       .where(eq(threads.id, id));
-    return thread ? (thread as Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[] }) : undefined;
+    return thread ? (thread as Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; vehicleName: string | null }) : undefined;
   }
 
   async createThread(thread: InsertThread, userId: string): Promise<Thread> {
@@ -510,6 +523,10 @@ export class DatabaseStorage implements IStorage {
         userId: threadReplies.userId,
         content: threadReplies.content,
         isSolution: threadReplies.isSolution,
+        solutionDifficulty: threadReplies.solutionDifficulty,
+        solutionCost: threadReplies.solutionCost,
+        solutionTools: threadReplies.solutionTools,
+        solutionParts: threadReplies.solutionParts,
         createdAt: threadReplies.createdAt,
         updatedAt: threadReplies.updatedAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
@@ -539,9 +556,15 @@ export class DatabaseStorage implements IStorage {
     return newReply;
   }
 
-  async markReplyAsSolution(replyId: string, threadId: string): Promise<void> {
-    await db.update(threadReplies).set({ isSolution: false }).where(eq(threadReplies.threadId, threadId));
-    await db.update(threadReplies).set({ isSolution: true }).where(eq(threadReplies.id, replyId));
+  async markReplyAsSolution(replyId: string, threadId: string, meta?: { solutionDifficulty: number | null; solutionCost: string | null; solutionTools: string[] | null; solutionParts: string[] | null }): Promise<void> {
+    await db.update(threadReplies).set({ isSolution: false, solutionDifficulty: null, solutionCost: null, solutionTools: null, solutionParts: null }).where(eq(threadReplies.threadId, threadId));
+    await db.update(threadReplies).set({ 
+      isSolution: true,
+      ...(meta?.solutionDifficulty !== undefined ? { solutionDifficulty: meta.solutionDifficulty } : {}),
+      ...(meta?.solutionCost !== undefined ? { solutionCost: meta.solutionCost } : {}),
+      ...(meta?.solutionTools !== undefined ? { solutionTools: meta.solutionTools } : {}),
+      ...(meta?.solutionParts !== undefined ? { solutionParts: meta.solutionParts } : {}),
+    }).where(eq(threadReplies.id, replyId));
     await db.update(threads).set({ hasSolution: true }).where(eq(threads.id, threadId));
   }
 

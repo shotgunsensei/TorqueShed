@@ -11,6 +11,7 @@ import ListingDetailScreen from "@/screens/ListingDetailScreen";
 import EditListingScreen from "@/screens/EditListingScreen";
 import AddThreadScreen from "@/screens/AddThreadScreen";
 import ThreadDetailScreen from "@/screens/ThreadDetailScreen";
+import AskForHelpScreen from "@/screens/AskForHelpScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
 import AdminProductsScreen from "@/screens/AdminProductsScreen";
 import GarageDetailScreen from "@/screens/GarageDetailScreen";
@@ -35,6 +36,7 @@ export type RootStackParamList = {
   EditListing: { listingId: string };
   AddThread: { garageId: string };
   ThreadDetail: { threadId: string };
+  AskForHelp: undefined;
   SubmitProduct: undefined;
   AdminProducts: undefined;
   GarageDetail: { garageId: string; garageName: string };
@@ -142,6 +144,14 @@ export default function RootStackNavigator() {
             component={ThreadDetailScreen}
             options={{
               headerTitle: "Thread",
+            }}
+          />
+          <Stack.Screen
+            name="AskForHelp"
+            component={AskForHelpScreen}
+            options={{
+              presentation: "modal",
+              headerTitle: "Ask for Help",
             }}
           />
           <Stack.Screen

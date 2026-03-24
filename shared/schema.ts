@@ -206,6 +206,12 @@ export const threads = pgTable("threads", {
   hasSolution: boolean("has_solution").default(false),
   isPinned: boolean("is_pinned").default(false),
   replyCount: integer("reply_count").default(0),
+  vehicleId: varchar("vehicle_id", { length: 36 }).references(() => vehicles.id, { onDelete: "set null" }),
+  symptoms: json("symptoms").$type<string[]>(),
+  obdCodes: json("obd_codes").$type<string[]>(),
+  severity: integer("severity"),
+  drivability: integer("drivability"),
+  recentChanges: text("recent_changes"),
   lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -225,6 +231,10 @@ export const threadReplies = pgTable("thread_replies", {
   userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   content: text("content").notNull(),
   isSolution: boolean("is_solution").default(false),
+  solutionDifficulty: integer("solution_difficulty"),
+  solutionCost: varchar("solution_cost", { length: 50 }),
+  solutionTools: json("solution_tools").$type<string[]>(),
+  solutionParts: json("solution_parts").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -299,6 +309,12 @@ export const insertThreadSchema = z.object({
   garageId: z.string().min(1, "Garage ID is required"),
   title: z.string().min(1, "Title is required").max(255),
   content: z.string().min(1, "Content is required"),
+  vehicleId: z.string().nullable().optional(),
+  symptoms: z.array(z.string()).nullable().optional(),
+  obdCodes: z.array(z.string()).nullable().optional(),
+  severity: z.number().int().min(1).max(5).nullable().optional(),
+  drivability: z.number().int().min(1).max(5).nullable().optional(),
+  recentChanges: z.string().nullable().optional(),
 });
 
 export const insertThreadReplySchema = z.object({

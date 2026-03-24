@@ -900,6 +900,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         garageId: req.params.garageId,
         title: req.body.title?.trim(),
         content: req.body.content?.trim(),
+        vehicleId: req.body.vehicleId || null,
+        symptoms: req.body.symptoms || null,
+        obdCodes: req.body.obdCodes || null,
+        severity: req.body.severity ? Number(req.body.severity) : null,
+        drivability: req.body.drivability ? Number(req.body.drivability) : null,
+        recentChanges: req.body.recentChanges?.trim() || null,
       });
 
       const thread = await storage.createThread(parsed, req.userId!);
@@ -1000,7 +1006,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Only thread owner can mark solutions" });
       }
 
-      await storage.markReplyAsSolution(req.params.replyId, req.params.threadId);
+      const solutionMeta = {
+        solutionDifficulty: req.body.solutionDifficulty ? Number(req.body.solutionDifficulty) : null,
+        solutionCost: req.body.solutionCost?.trim() || null,
+        solutionTools: req.body.solutionTools || null,
+        solutionParts: req.body.solutionParts || null,
+      };
+
+      await storage.markReplyAsSolution(req.params.replyId, req.params.threadId, solutionMeta);
       res.json({ success: true });
     } catch (error) {
       console.error("Error marking solution:", error);

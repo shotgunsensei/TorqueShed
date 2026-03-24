@@ -439,9 +439,21 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.greeting}>
-        <ThemedText type="h2">
-          Welcome back{currentUser?.username ? `, ${currentUser.username}` : ""}
-        </ThemedText>
+        <View style={styles.greetingRow}>
+          <ThemedText type="h2" style={{ flex: 1 }}>
+            Welcome back{currentUser?.username ? `, ${currentUser.username}` : ""}
+          </ThemedText>
+          <Pressable
+            onPress={() => navigation.navigate("AskForHelp")}
+            style={[styles.helpButton, { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}
+            testID="button-ask-help"
+          >
+            <Feather name="help-circle" size={16} color={theme.primary} />
+            <ThemedText type="caption" style={{ color: theme.primary, fontFamily: "Inter_500Medium", marginLeft: 4 }}>
+              Ask for Help
+            </ThemedText>
+          </Pressable>
+        </View>
       </View>
 
       {sectionOrder.map((key) => sections[key])}
@@ -457,6 +469,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+  },
+  greetingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  helpButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
   section: {
     marginTop: Spacing.lg,

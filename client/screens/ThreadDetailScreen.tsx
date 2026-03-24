@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Text,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -21,6 +22,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { Input } from "@/components/Input";
+import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +48,13 @@ interface Thread {
   hasSolution: boolean;
   isPinned: boolean;
   replyCount: number;
+  vehicleId: string | null;
+  symptoms: string[] | null;
+  obdCodes: string[] | null;
+  severity: number | null;
+  drivability: number | null;
+  recentChanges: string | null;
+  vehicleName: string | null;
   createdAt: string;
   userName: string;
   yearsWrenching: number | null;
@@ -57,9 +67,17 @@ interface ThreadReply {
   userId: string | null;
   content: string;
   isSolution: boolean;
+  solutionDifficulty: number | null;
+  solutionCost: string | null;
+  solutionTools: string[] | null;
+  solutionParts: string[] | null;
   createdAt: string;
   userName: string;
 }
+
+const SEVERITY_LABELS = ["Minor", "Low", "Moderate", "High", "Critical"];
+const DRIVABILITY_LABELS = ["Not Drivable", "Barely", "With Caution", "Mostly Fine", "Normal"];
+const DIFFICULTY_LABELS = ["Easy", "Simple", "Moderate", "Difficult", "Expert"];
 
 export default function ThreadDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -75,6 +93,12 @@ export default function ThreadDetailScreen() {
   const [replyText, setReplyText] = useState("");
   const [isComposing, setIsComposing] = useState(false);
   const inputRef = useRef<TextInput>(null);
+
+  const [showSolutionModal, setShowSolutionModal] = useState<string | null>(null);
+  const [solDifficulty, setSolDifficulty] = useState(3);
+  const [solCost, setSolCost] = useState("");
+  const [solTools, setSolTools] = useState("");
+  const [solParts, setSolParts] = useState("");
 
   const { data: thread, isLoading: threadLoading } = useQuery<Thread>({
     queryKey: [`/api/threads/${threadId}`],
@@ -113,14 +137,15 @@ export default function ThreadDetailScreen() {
   });
 
   const markSolutionMutation = useMutation({
-    mutationFn: async (replyId: string) => {
-      return apiRequest("POST", `/api/threads/${threadId}/replies/${replyId}/solution`, {});
+    mutationFn: async ({ replyId, meta }: { replyId: string; meta: any }) => {
+      return apiRequest("POST", `/api/threads/${threadId}/replies/${replyId}/solution`, meta);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}/replies`] });
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Solution marked", "success");
+      setShowSolutionModal(null);
     },
     onError: (error: Error) => {
       toast.show(error.message || "Failed to mark solution", "error");
@@ -148,14 +173,26 @@ export default function ThreadDetailScreen() {
   });
 
   const handleMarkSolution = (replyId: string) => {
-    Alert.alert(
-      "Mark as Solution",
-      "Mark this reply as the solution to your question?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Mark Solution", onPress: () => markSolutionMutation.mutate(replyId) },
-      ]
-    );
+    setShowSolutionModal(replyId);
+    setSolDifficulty(3);
+    setSolCost("");
+    setSolTools("");
+    setSolParts("");
+  };
+
+  const handleConfirmSolution = () => {
+    if (!showSolutionModal) return;
+    const toolsList = solTools.trim() ? solTools.split(",").map((t) => t.trim()).filter(Boolean) : null;
+    const partsList = solParts.trim() ? solParts.split(",").map((p) => p.trim()).filter(Boolean) : null;
+    markSolutionMutation.mutate({
+      replyId: showSolutionModal,
+      meta: {
+        solutionDifficulty: solDifficulty,
+        solutionCost: solCost.trim() || null,
+        solutionTools: toolsList,
+        solutionParts: partsList,
+      },
+    });
   };
 
   const handleDeleteThread = () => {
@@ -190,6 +227,48 @@ export default function ThreadDetailScreen() {
 
   const isThreadAuthor = currentUser?.id === thread?.userId;
 
+  const renderSolutionMeta = (reply: ThreadReply) => {
+    const hasMeta = reply.solutionDifficulty || reply.solutionCost || reply.solutionTools || reply.solutionParts;
+    if (!hasMeta) return null;
+
+    return (
+      <View style={[styles.solutionMeta, { borderTopColor: theme.success + "30" }]}>
+        {reply.solutionDifficulty ? (
+          <View style={styles.solutionMetaItem}>
+            <Feather name="bar-chart-2" size={12} color={theme.success} />
+            <Text style={[styles.solutionMetaText, { color: theme.text }]}>
+              {DIFFICULTY_LABELS[reply.solutionDifficulty - 1]} ({reply.solutionDifficulty}/5)
+            </Text>
+          </View>
+        ) : null}
+        {reply.solutionCost ? (
+          <View style={styles.solutionMetaItem}>
+            <Feather name="dollar-sign" size={12} color={theme.success} />
+            <Text style={[styles.solutionMetaText, { color: theme.text }]}>
+              ~${reply.solutionCost}
+            </Text>
+          </View>
+        ) : null}
+        {reply.solutionTools && reply.solutionTools.length > 0 ? (
+          <View style={styles.solutionMetaItem}>
+            <Feather name="tool" size={12} color={theme.success} />
+            <Text style={[styles.solutionMetaText, { color: theme.text }]} numberOfLines={1}>
+              {reply.solutionTools.join(", ")}
+            </Text>
+          </View>
+        ) : null}
+        {reply.solutionParts && reply.solutionParts.length > 0 ? (
+          <View style={styles.solutionMetaItem}>
+            <Feather name="package" size={12} color={theme.success} />
+            <Text style={[styles.solutionMetaText, { color: theme.text }]} numberOfLines={1}>
+              {reply.solutionParts.join(", ")}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   const renderReply = ({ item }: { item: ThreadReply }) => {
     if (item.isSolution) {
       return (
@@ -210,6 +289,7 @@ export default function ThreadDetailScreen() {
             <ThemedText type="body" style={styles.replyContent}>
               {item.content}
             </ThemedText>
+            {renderSolutionMeta(item)}
           </View>
         </View>
       );
@@ -262,10 +342,223 @@ export default function ThreadDetailScreen() {
     );
   };
 
+  const renderThreadMetadata = () => {
+    if (!thread) return null;
+    const hasMetadata = thread.vehicleName || (thread.symptoms && thread.symptoms.length > 0) ||
+      (thread.obdCodes && thread.obdCodes.length > 0) || thread.severity || thread.drivability;
+    if (!hasMetadata) return null;
+
+    return (
+      <View style={[styles.metadataCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+        {thread.vehicleName ? (
+          <View style={styles.metaRow}>
+            <Feather name="truck" size={14} color={theme.primary} />
+            <ThemedText type="body" style={{ marginLeft: Spacing.sm, fontWeight: "600" }}>
+              {thread.vehicleName}
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {thread.symptoms && thread.symptoms.length > 0 ? (
+          <View style={styles.metaRow}>
+            <Feather name="alert-circle" size={14} color="#EF4444" />
+            <View style={[styles.metaChips, { marginLeft: Spacing.sm }]}>
+              {thread.symptoms.map((s) => (
+                <View key={s} style={[styles.metaChip, { backgroundColor: "#EF444415" }]}>
+                  <Text style={[styles.metaChipText, { color: "#EF4444" }]}>{s}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {thread.obdCodes && thread.obdCodes.length > 0 ? (
+          <View style={styles.metaRow}>
+            <Feather name="cpu" size={14} color="#F59E0B" />
+            <View style={[styles.metaChips, { marginLeft: Spacing.sm }]}>
+              {thread.obdCodes.map((c) => (
+                <View key={c} style={[styles.metaChip, { backgroundColor: "#F59E0B15" }]}>
+                  <Text style={[styles.metaChipText, { color: "#F59E0B" }]}>{c}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {thread.severity ? (
+          <View style={styles.metaRow}>
+            <Feather name="thermometer" size={14} color={theme.textMuted} />
+            <ThemedText type="caption" style={{ marginLeft: Spacing.sm, color: theme.textSecondary }}>
+              Severity: {thread.severity}/5 ({SEVERITY_LABELS[thread.severity - 1]})
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {thread.drivability ? (
+          <View style={styles.metaRow}>
+            <Feather name="navigation" size={14} color={theme.textMuted} />
+            <ThemedText type="caption" style={{ marginLeft: Spacing.sm, color: theme.textSecondary }}>
+              Drivability: {thread.drivability}/5 ({DRIVABILITY_LABELS[thread.drivability - 1]})
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {thread.recentChanges ? (
+          <View style={styles.metaRow}>
+            <Feather name="edit-3" size={14} color={theme.textMuted} />
+            <ThemedText type="caption" style={{ marginLeft: Spacing.sm, color: theme.textSecondary, flex: 1 }}>
+              Recent: {thread.recentChanges}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderSolvedSummary = () => {
+    if (!thread?.hasSolution) return null;
+    const solutionReply = replies.find((r) => r.isSolution);
+    if (!solutionReply) return null;
+
+    return (
+      <View style={[styles.solvedSummary, { backgroundColor: theme.success + "08", borderColor: theme.success }]}>
+        <View style={styles.solvedSummaryHeader}>
+          <Feather name="check-circle" size={16} color={theme.success} />
+          <ThemedText type="h4" style={{ color: theme.success, marginLeft: Spacing.sm }}>
+            Solved
+          </ThemedText>
+        </View>
+
+        <View style={styles.summarySection}>
+          <ThemedText type="caption" style={{ color: theme.textMuted, marginBottom: 2 }}>Problem</ThemedText>
+          <ThemedText type="body" numberOfLines={2}>{thread.content}</ThemedText>
+        </View>
+
+        <View style={styles.summarySection}>
+          <ThemedText type="caption" style={{ color: theme.textMuted, marginBottom: 2 }}>Solution</ThemedText>
+          <ThemedText type="body" numberOfLines={3}>{solutionReply.content}</ThemedText>
+        </View>
+
+        {(solutionReply.solutionDifficulty || solutionReply.solutionCost || solutionReply.solutionParts) ? (
+          <View style={styles.summaryStats}>
+            {solutionReply.solutionDifficulty ? (
+              <View style={[styles.summaryStat, { backgroundColor: theme.backgroundDefault }]}>
+                <Feather name="bar-chart-2" size={12} color={theme.textMuted} />
+                <Text style={[styles.summaryStatText, { color: theme.text }]}>
+                  {DIFFICULTY_LABELS[solutionReply.solutionDifficulty - 1]}
+                </Text>
+              </View>
+            ) : null}
+            {solutionReply.solutionCost ? (
+              <View style={[styles.summaryStat, { backgroundColor: theme.backgroundDefault }]}>
+                <Feather name="dollar-sign" size={12} color={theme.textMuted} />
+                <Text style={[styles.summaryStatText, { color: theme.text }]}>
+                  ~${solutionReply.solutionCost}
+                </Text>
+              </View>
+            ) : null}
+            {solutionReply.solutionParts && solutionReply.solutionParts.length > 0 ? (
+              <View style={[styles.summaryStat, { backgroundColor: theme.backgroundDefault }]}>
+                <Feather name="package" size={12} color={theme.textMuted} />
+                <Text style={[styles.summaryStatText, { color: theme.text }]}>
+                  {solutionReply.solutionParts.length} part{solutionReply.solutionParts.length !== 1 ? "s" : ""}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderSolutionForm = () => {
+    if (!showSolutionModal) return null;
+
+    return (
+      <View style={[styles.solutionForm, { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border }]}>
+        <View style={styles.solutionFormHeader}>
+          <ThemedText type="h4">Solution Details</ThemedText>
+          <Pressable onPress={() => setShowSolutionModal(null)}>
+            <Feather name="x" size={20} color={theme.textSecondary} />
+          </Pressable>
+        </View>
+        <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+          Help others by adding details about this fix (optional)
+        </ThemedText>
+
+        <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+          Difficulty
+        </ThemedText>
+        <View style={styles.difficultyRow}>
+          {DIFFICULTY_LABELS.map((label, i) => {
+            const val = i + 1;
+            const isActive = solDifficulty === val;
+            return (
+              <Pressable
+                key={label}
+                onPress={() => setSolDifficulty(val)}
+                style={[
+                  styles.difficultyOption,
+                  {
+                    backgroundColor: isActive ? theme.primary + "20" : theme.backgroundDefault,
+                    borderColor: isActive ? theme.primary : theme.cardBorder,
+                  },
+                ]}
+              >
+                <Text style={[styles.difficultyText, { color: isActive ? theme.primary : theme.textSecondary }]}>
+                  {val}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Input
+          label="Estimated Cost"
+          placeholder="e.g., 150"
+          value={solCost}
+          onChangeText={setSolCost}
+          leftIcon="dollar-sign"
+          keyboardType="decimal-pad"
+        />
+        <Input
+          label="Tools Used"
+          placeholder="Comma-separated, e.g., Socket set, Torque wrench"
+          value={solTools}
+          onChangeText={setSolTools}
+          leftIcon="tool"
+        />
+        <Input
+          label="Parts Used"
+          placeholder="Comma-separated, e.g., Spark plugs, Ignition coils"
+          value={solParts}
+          onChangeText={setSolParts}
+          leftIcon="package"
+        />
+
+        <View style={styles.solutionFormButtons}>
+          <Button variant="outline" onPress={() => setShowSolutionModal(null)} style={{ flex: 1 }}>
+            Cancel
+          </Button>
+          <View style={{ width: Spacing.sm }} />
+          <Button
+            onPress={handleConfirmSolution}
+            disabled={markSolutionMutation.isPending}
+            style={{ flex: 1 }}
+          >
+            {markSolutionMutation.isPending ? "Saving..." : "Confirm Solution"}
+          </Button>
+        </View>
+      </View>
+    );
+  };
+
   const renderHeader = () => {
     if (!thread) return null;
     return (
       <View style={styles.headerSection}>
+        {renderSolvedSummary()}
+
         <Card style={styles.threadCard}>
           <View style={styles.threadHeader}>
             <ThemedText type="h3" style={styles.threadTitle}>
@@ -294,6 +587,7 @@ export default function ThreadDetailScreen() {
             </View>
           </View>
           {renderCredibility()}
+          {renderThreadMetadata()}
           <ThemedText type="body" style={styles.threadContent}>
             {thread.content}
           </ThemedText>
@@ -352,58 +646,62 @@ export default function ThreadDetailScreen() {
         }}
         showsVerticalScrollIndicator={false}
       />
-      <View
-        style={[
-          styles.inputContainer,
-          {
-            backgroundColor: theme.backgroundSecondary,
-            borderTopColor: theme.border,
-            paddingBottom: insets.bottom > 0 ? insets.bottom : Spacing.md,
-          },
-        ]}
-      >
-        <View style={styles.replyLabel}>
-          <Feather name="corner-down-right" size={16} color={theme.textSecondary} />
-          <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.xs }}>
-            Replying to thread
-          </ThemedText>
+      {showSolutionModal ? (
+        renderSolutionForm()
+      ) : (
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              backgroundColor: theme.backgroundSecondary,
+              borderTopColor: theme.border,
+              paddingBottom: insets.bottom > 0 ? insets.bottom : Spacing.md,
+            },
+          ]}
+        >
+          <View style={styles.replyLabel}>
+            <Feather name="corner-down-right" size={16} color={theme.textSecondary} />
+            <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.xs }}>
+              Replying to thread
+            </ThemedText>
+          </View>
+          <View style={styles.inputRow}>
+            <TextInput
+              ref={inputRef}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.backgroundRoot,
+                  color: theme.text,
+                  borderColor: replyText.trim() ? theme.primary : theme.border,
+                },
+              ]}
+              placeholder="Write your reply..."
+              placeholderTextColor={theme.textSecondary}
+              value={replyText}
+              onChangeText={setReplyText}
+              multiline
+              maxLength={2000}
+              onFocus={() => setIsComposing(true)}
+              onBlur={() => setIsComposing(false)}
+            />
+            <Pressable
+              style={[
+                styles.sendButton,
+                { backgroundColor: replyText.trim() ? theme.primary : theme.border },
+              ]}
+              onPress={handleSubmitReply}
+              disabled={!replyText.trim() || createReplyMutation.isPending}
+            >
+              {createReplyMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Feather name="send" size={20} color="#fff" />
+              )}
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.inputRow}>
-          <TextInput
-            ref={inputRef}
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.backgroundRoot,
-                color: theme.text,
-                borderColor: replyText.trim() ? theme.primary : theme.border,
-              },
-            ]}
-            placeholder="Write your reply..."
-            placeholderTextColor={theme.textSecondary}
-            value={replyText}
-            onChangeText={setReplyText}
-            multiline
-            maxLength={2000}
-            onFocus={() => setIsComposing(true)}
-            onBlur={() => setIsComposing(false)}
-          />
-          <Pressable
-            style={[
-              styles.sendButton,
-              { backgroundColor: replyText.trim() ? theme.primary : theme.border },
-            ]}
-            onPress={handleSubmitReply}
-            disabled={!replyText.trim() || createReplyMutation.isPending}
-          >
-            {createReplyMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Feather name="send" size={20} color="#fff" />
-            )}
-          </Pressable>
-        </View>
-      </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -451,6 +749,33 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: Spacing.md,
   },
+  metadataCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  metaChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    flex: 1,
+  },
+  metaChip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  metaChipText: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+  },
   deleteThreadButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -471,6 +796,38 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: BorderRadius.full,
   },
+  solvedSummary: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    marginBottom: Spacing.lg,
+  },
+  solvedSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  summarySection: {
+    marginBottom: Spacing.sm,
+  },
+  summaryStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  summaryStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    gap: 4,
+  },
+  summaryStatText: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+  },
   repliesHeader: {
     marginBottom: Spacing.md,
   },
@@ -488,6 +845,21 @@ const styles = StyleSheet.create({
   },
   replyBody: {
     padding: Spacing.md,
+  },
+  solutionMeta: {
+    borderTopWidth: 1,
+    paddingTop: Spacing.sm,
+    marginTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  solutionMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  solutionMetaText: {
+    ...Typography.caption,
+    flex: 1,
   },
   replyCard: {
     padding: Spacing.md,
@@ -511,6 +883,36 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     marginTop: Spacing.sm,
+  },
+  solutionForm: {
+    padding: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  solutionFormHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  difficultyRow: {
+    flexDirection: "row",
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  difficultyOption: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  difficultyText: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+  },
+  solutionFormButtons: {
+    flexDirection: "row",
+    marginTop: Spacing.md,
   },
   inputContainer: {
     paddingHorizontal: Spacing.lg,
