@@ -1,7 +1,8 @@
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -42,18 +43,19 @@ export default function MoreScreen() {
   const { currentUser } = useAuth();
   const navigation = useNavigation<MoreNavProp>();
   const tabBarHeight = useSafeTabBarHeight();
+  const headerHeight = useHeaderHeight();
 
   const userRole = getUserRoleDisplay(currentUser?.role);
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.backgroundRoot,
-          paddingBottom: tabBarHeight + Spacing.xl,
-        },
-      ]}
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      contentContainerStyle={{
+        paddingTop: headerHeight + Spacing.md,
+        paddingBottom: tabBarHeight + Spacing.xl,
+        paddingHorizontal: Spacing.lg,
+      }}
+      showsVerticalScrollIndicator={false}
     >
       <Pressable
         style={[styles.profileRow, { backgroundColor: theme.backgroundDefault }]}
@@ -98,14 +100,13 @@ export default function MoreScreen() {
           </Card>
         ))}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: Spacing.lg,
   },
   profileRow: {
     flexDirection: "row",

@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import { registerRoutes } from "./routes";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, garages } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
@@ -597,6 +597,38 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
+const DEFAULT_GARAGES = [
+  { id: "ford", name: "Ford Bay", description: "Ford trucks, Mustangs, and everything Blue Oval", brandColor: "#0055A5" },
+  { id: "chevy", name: "Chevy Bay", description: "Silverados, Camaros, and the Bowtie crew", brandColor: "#D4A017" },
+  { id: "dodge", name: "Dodge Bay", description: "Rams, Chargers, Challengers, and Mopar muscle", brandColor: "#CE1126" },
+  { id: "jeep", name: "Jeep Bay", description: "Wranglers, Cherokees, and trail-ready rigs", brandColor: "#4A7C2F" },
+  { id: "general", name: "General Bay", description: "All makes, all models, all welcome", brandColor: "#6B7280" },
+];
+
+async function seedDefaultGarages() {
+  try {
+    let seededCount = 0;
+    for (const garage of DEFAULT_GARAGES) {
+      const result = await db
+        .insert(garages)
+        .values(garage)
+        .onConflictDoNothing({ target: garages.id });
+      if (result.rowCount && result.rowCount > 0) {
+        log(`Seeded garage: ${garage.name}`);
+        seededCount++;
+      }
+    }
+
+    if (seededCount === 0) {
+      log(`All default garages already present`);
+    } else {
+      log(`Seeded ${seededCount} new garage(s)`);
+    }
+  } catch (error) {
+    console.error("Failed to seed default garages:", error);
+  }
+}
+
 async function seedAccount(
   username: string | undefined,
   password: string | undefined,
@@ -651,6 +683,9 @@ async function seedAccount(
 
   // API routes
   const server = await registerRoutes(app);
+
+  // Seed default garages (bays)
+  await seedDefaultGarages();
 
   // Seed accounts
   await seedAccount(process.env.REVIEWER_USERNAME, process.env.REVIEWER_PASSWORD, "user", "Reviewer");
