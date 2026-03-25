@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as WebBrowser from "expo-web-browser";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/Card";
@@ -31,6 +33,9 @@ import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates, microcopy } from "@/constants/brand";
 import { getApiUrl } from "@/lib/query-client";
+
+const SEARCH_HISTORY_KEY = "torqueshed_parts_search_history";
+const MAX_SEARCH_HISTORY = 8;
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -480,9 +485,18 @@ function FindPartsSection() {
   const tabBarHeight = useSafeTabBarHeight();
   const [partQuery, setPartQuery] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({ queryKey: ["/api/vehicles"] });
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SEARCH_HISTORY_KEY).then((stored) => {
+      if (stored) {
+        try { setSearchHistory(JSON.parse(stored)); } catch {}
+      }
+    });
+  }, []);
 
   const vehicleLabel = (v: Vehicle) => {
     if (v.nickname) return v.nickname;
@@ -490,7 +504,7 @@ function FindPartsSection() {
   };
 
   const buildSearchQuery = () => {
-    const parts = [];
+    const parts: string[] = [];
     if (selectedVehicle) {
       if (selectedVehicle.year) parts.push(selectedVehicle.year);
       if (selectedVehicle.make) parts.push(selectedVehicle.make);
@@ -501,6 +515,29 @@ function FindPartsSection() {
   };
 
   const searchText = buildSearchQuery();
+
+  const saveToHistory = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    const updated = [query, ...searchHistory.filter((h) => h !== query)].slice(0, MAX_SEARCH_HISTORY);
+    setSearchHistory(updated);
+    try { await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated)); } catch {}
+  }, [searchHistory]);
+
+  const clearHistory = async () => {
+    setSearchHistory([]);
+    try { await AsyncStorage.removeItem(SEARCH_HISTORY_KEY); } catch {}
+  };
+
+  const handleVendorPress = async (url: string) => {
+    if (partQuery.trim()) {
+      saveToHistory(partQuery.trim());
+    }
+    try {
+      await WebBrowser.openBrowserAsync(url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN });
+    } catch {
+      Linking.openURL(url);
+    }
+  };
 
   return (
     <ScrollView
@@ -529,11 +566,20 @@ function FindPartsSection() {
                   onPress={() => setSelectedVehicleId(active ? null : v.id)}
                   style={[s.vehicleChip, { backgroundColor: active ? theme.primary + "20" : theme.backgroundSecondary, borderColor: active ? theme.primary : theme.cardBorder }]}
                 >
+                  <Feather name="truck" size={12} color={active ? theme.primary : theme.textMuted} />
                   <Text style={[s.vehicleChipText, { color: active ? theme.primary : theme.text }]}>{vehicleLabel(v)}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
+          {selectedVehicle ? (
+            <View style={[s.vehicleContextBadge, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "30" }]}>
+              <Feather name="check-circle" size={12} color={theme.primary} />
+              <Text style={[s.vehicleContextText, { color: theme.primary }]}>
+                Searching for {vehicleLabel(selectedVehicle)}
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -550,8 +596,36 @@ function FindPartsSection() {
             returnKeyType="search"
             testID="input-part-search"
           />
+          {partQuery.length > 0 ? (
+            <Pressable onPress={() => setPartQuery("")} hitSlop={8}>
+              <Feather name="x" size={16} color={theme.textMuted} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
+
+      {searchText.length === 0 && searchHistory.length > 0 ? (
+        <View style={{ marginBottom: Spacing.lg }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.sm }}>
+            <Text style={[s.findLabel, { color: theme.textSecondary, marginBottom: 0 }]}>Recent Searches</Text>
+            <Pressable onPress={clearHistory} hitSlop={8}>
+              <Text style={[s.clearHistoryText, { color: theme.textMuted }]}>Clear</Text>
+            </Pressable>
+          </View>
+          <View style={s.historyChips}>
+            {searchHistory.map((term) => (
+              <Pressable
+                key={term}
+                onPress={() => setPartQuery(term)}
+                style={[s.historyChip, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}
+              >
+                <Feather name="clock" size={12} color={theme.textMuted} />
+                <Text style={[s.historyChipText, { color: theme.text }]}>{term}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {searchText.length > 0 ? (
         <View>
@@ -569,7 +643,7 @@ function FindPartsSection() {
                   opacity: pressed ? 0.9 : 1,
                 },
               ]}
-              onPress={() => Linking.openURL(vendor.buildUrl(searchText))}
+              onPress={() => handleVendorPress(vendor.buildUrl(searchText))}
               testID={`vendor-${vendor.id}`}
             >
               <View style={[s.vendorIcon, { backgroundColor: theme.primary + "15" }]}>
@@ -585,14 +659,14 @@ function FindPartsSection() {
             </Pressable>
           ))}
         </View>
-      ) : (
+      ) : searchHistory.length === 0 ? (
         <View style={s.findEmpty}>
           <Feather name="search" size={40} color={theme.textMuted} />
           <Text style={[s.findEmptyText, { color: theme.textMuted }]}>
             Enter a vehicle and/or part name to search
           </Text>
         </View>
-      )}
+      ) : null}
     </ScrollView>
   );
 }
@@ -759,6 +833,12 @@ const s = StyleSheet.create({
   vendorDesc: { ...Typography.caption },
   findEmpty: { alignItems: "center", paddingVertical: Spacing.xl * 2, gap: Spacing.md },
   findEmptyText: { ...Typography.body, textAlign: "center" },
+  vehicleContextBadge: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginTop: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1 },
+  vehicleContextText: { ...Typography.caption, fontFamily: "Inter_500Medium" },
+  historyChips: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
+  historyChip: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.full, borderWidth: 1 },
+  historyChipText: { ...Typography.caption },
+  clearHistoryText: { ...Typography.caption, fontFamily: "Inter_500Medium" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.6)", justifyContent: "flex-end" },
   modalContent: { borderTopLeftRadius: BorderRadius.lg, borderTopRightRadius: BorderRadius.lg, padding: Spacing.lg },

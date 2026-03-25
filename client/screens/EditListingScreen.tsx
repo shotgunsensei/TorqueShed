@@ -50,10 +50,12 @@ export default function EditListingScreen() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [conditionIndex, setConditionIndex] = useState(2);
   const [localPickup, setLocalPickup] = useState(true);
   const [willShip, setWillShip] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: listing, isLoading } = useQuery<Listing>({
     queryKey: [`/api/swap-shop/${listingId}`],
@@ -65,6 +67,7 @@ export default function EditListingScreen() {
       setDescription(listing.description || "");
       setPrice(listing.price?.replace(/^\$/, "") || "");
       setLocation(listing.location || "");
+      setImageUrl(listing.imageUrl || "");
       const condIdx = CONDITIONS.indexOf(listing.condition);
       setConditionIndex(condIdx >= 0 ? condIdx : 2);
       setLocalPickup(listing.localPickup);
@@ -72,6 +75,17 @@ export default function EditListingScreen() {
       setIsInitialized(true);
     }
   }, [listing, isInitialized]);
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Title is required";
+    if (!price.trim()) newErrors.price = "Price is required";
+    else if (isNaN(Number(price.replace(/[,$]/g, "")))) newErrors.price = "Enter a valid number";
+    if (imageUrl.trim() && !imageUrl.trim().startsWith("http")) newErrors.imageUrl = "Enter a valid URL starting with http";
+    if (!localPickup && !willShip) newErrors.shipping = "Select at least one shipping option";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const updateListingMutation = useMutation({
     mutationFn: async () => {
@@ -81,6 +95,7 @@ export default function EditListingScreen() {
         price: price.trim(),
         condition: CONDITIONS[conditionIndex],
         location: location.trim() || null,
+        imageUrl: imageUrl.trim() || null,
         localPickup,
         willShip,
       });
@@ -98,14 +113,7 @@ export default function EditListingScreen() {
   });
 
   const handleSubmit = () => {
-    if (!title.trim()) {
-      Alert.alert("Validation Error", "Title is required");
-      return;
-    }
-    if (!price.trim()) {
-      Alert.alert("Validation Error", "Price is required");
-      return;
-    }
+    if (!validate()) return;
     updateListingMutation.mutate();
   };
 
@@ -137,13 +145,17 @@ export default function EditListingScreen() {
       </ThemedText>
 
       <View style={styles.section}>
-        <Input
-          label="Title"
-          placeholder="e.g., Coyote 5.0L Engine"
-          value={title}
-          onChangeText={setTitle}
-          leftIcon="tag"
-        />
+        <View>
+          <Input
+            label="Title"
+            placeholder="e.g., Coyote 5.0L Engine"
+            value={title}
+            onChangeText={(t) => { setTitle(t); setErrors((e) => ({ ...e, title: "" })); }}
+            leftIcon="tag"
+            testID="input-edit-title"
+          />
+          {errors.title ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.title}</ThemedText> : null}
+        </View>
 
         <Input
           label="Description"
@@ -153,16 +165,21 @@ export default function EditListingScreen() {
           multiline
           numberOfLines={4}
           style={styles.descriptionInput}
+          testID="input-edit-description"
         />
 
-        <Input
-          label="Price"
-          placeholder="e.g., 4500"
-          value={price}
-          onChangeText={setPrice}
-          leftIcon="dollar-sign"
-          keyboardType="numeric"
-        />
+        <View>
+          <Input
+            label="Price"
+            placeholder="e.g., 4500"
+            value={price}
+            onChangeText={(p) => { setPrice(p); setErrors((e) => ({ ...e, price: "" })); }}
+            leftIcon="dollar-sign"
+            keyboardType="numeric"
+            testID="input-edit-price"
+          />
+          {errors.price ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.price}</ThemedText> : null}
+        </View>
 
         <Input
           label="Location"
@@ -170,7 +187,22 @@ export default function EditListingScreen() {
           value={location}
           onChangeText={setLocation}
           leftIcon="map-pin"
+          testID="input-edit-location"
         />
+
+        <View>
+          <Input
+            label="Image URL (optional)"
+            placeholder="https://example.com/photo.jpg"
+            value={imageUrl}
+            onChangeText={(u) => { setImageUrl(u); setErrors((e) => ({ ...e, imageUrl: "" })); }}
+            leftIcon="image"
+            autoCapitalize="none"
+            keyboardType="url"
+            testID="input-edit-image"
+          />
+          {errors.imageUrl ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.imageUrl}</ThemedText> : null}
+        </View>
 
         <View style={styles.conditionSection}>
           <ThemedText type="body" style={styles.conditionLabel}>
@@ -192,7 +224,7 @@ export default function EditListingScreen() {
           </View>
           <Switch
             value={localPickup}
-            onValueChange={setLocalPickup}
+            onValueChange={(v) => { setLocalPickup(v); setErrors((e) => ({ ...e, shipping: "" })); }}
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
           />
@@ -207,14 +239,15 @@ export default function EditListingScreen() {
           </View>
           <Switch
             value={willShip}
-            onValueChange={setWillShip}
+            onValueChange={(v) => { setWillShip(v); setErrors((e) => ({ ...e, shipping: "" })); }}
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
           />
         </View>
+        {errors.shipping ? <ThemedText type="caption" style={{ color: theme.error }}>{errors.shipping}</ThemedText> : null}
       </View>
 
-      <Button onPress={handleSubmit} disabled={!isValid || updateListingMutation.isPending}>
+      <Button onPress={handleSubmit} disabled={!isValid || updateListingMutation.isPending} testID="button-save-listing">
         {updateListingMutation.isPending ? "Saving..." : "Save Changes"}
       </Button>
     </KeyboardAwareScrollViewCompat>

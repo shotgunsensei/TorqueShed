@@ -52,8 +52,8 @@ RootStackNavigator
 - **TorqueAssist**: Step-by-step diagnostic wizard with interactive checklists and suggested parts. Uses predefined diagnostic patterns with affiliate links.
 - **Source Tab**: Unified parts sourcing hub with three segments:
   - **Shop**: Curated products with category filters, "Why It Matters" context boxes, sponsored/featured badges, affiliate tracking
-  - **Swap Shop**: Peer-to-peer marketplace with condition badges, shipping options, seller credibility (join date, listing count), report flow
-  - **Find Parts**: Search across major vendors (RockAuto, AutoZone, O'Reilly, Amazon) with vehicle context
+  - **Swap Shop**: Peer-to-peer marketplace with condition badges, shipping options, seller credibility (join date, listing count), report flow, share via clipboard, image URL support in listing forms
+  - **Find Parts**: Search across major vendors (RockAuto, AutoZone, O'Reilly, Amazon) with vehicle context badge, expo-web-browser in-app browsing, search history (AsyncStorage)
 - **User Profiles**: Rich profiles with hero section, 5-stat row (vehicles, threads, solutions, replies, listings), public vehicles carousel, recent activity feed, collapsible edit form. Role badges (Admin/Mod) and trust badges from API (Trusted Solver, Verified Owner, Active Contributor). Profile completeness indicator with progress bar.
 - **Saved Items**: Users can bookmark/save threads (ThreadDetailScreen) and swap listings (ListingDetailScreen). Saved items appear in a dedicated section on ProfileScreen. Save state managed via `/api/saved/thread-ids` and `/api/saved/listing-ids` queries.
 - **Content Moderation**: Report flow for threads, replies, and swap listings with predefined reasons. Admin report review tab in AdminProducts screen with dismiss/remove actions.
@@ -100,6 +100,8 @@ Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `th
 - **React Navigation**: App navigation
 - **expo-linear-gradient**: Gradient effects
 - **expo-haptics**: Haptic feedback on interactions
+- **expo-clipboard**: Clipboard access for share functionality
+- **expo-web-browser**: In-app browser for vendor links
 - **bcrypt**: Password hashing
 - **jsonwebtoken**: JWT auth tokens
 - **zod**: Schema validation

@@ -30,9 +30,22 @@ export default function AddListingScreen() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [conditionIndex, setConditionIndex] = useState(2);
   const [localPickup, setLocalPickup] = useState(true);
   const [willShip, setWillShip] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Title is required";
+    if (!price.trim()) newErrors.price = "Price is required";
+    else if (isNaN(Number(price.replace(/[,$]/g, "")))) newErrors.price = "Enter a valid number";
+    if (imageUrl.trim() && !imageUrl.trim().startsWith("http")) newErrors.imageUrl = "Enter a valid URL starting with http";
+    if (!localPickup && !willShip) newErrors.shipping = "Select at least one shipping option";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const createListingMutation = useMutation({
     mutationFn: async () => {
@@ -42,6 +55,7 @@ export default function AddListingScreen() {
         price: price.trim(),
         condition: CONDITIONS[conditionIndex],
         location: location.trim() || null,
+        imageUrl: imageUrl.trim() || null,
         localPickup,
         willShip,
       });
@@ -58,6 +72,7 @@ export default function AddListingScreen() {
   });
 
   const handleSubmit = () => {
+    if (!validate()) return;
     createListingMutation.mutate();
   };
 
@@ -81,13 +96,17 @@ export default function AddListingScreen() {
       </ThemedText>
 
       <View style={styles.section}>
-        <Input
-          label="Title"
-          placeholder="e.g., Coyote 5.0L Engine"
-          value={title}
-          onChangeText={setTitle}
-          leftIcon="tag"
-        />
+        <View>
+          <Input
+            label="Title"
+            placeholder="e.g., Coyote 5.0L Engine"
+            value={title}
+            onChangeText={(t) => { setTitle(t); setErrors((e) => ({ ...e, title: "" })); }}
+            leftIcon="tag"
+            testID="input-listing-title"
+          />
+          {errors.title ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.title}</ThemedText> : null}
+        </View>
 
         <Input
           label="Description"
@@ -97,16 +116,21 @@ export default function AddListingScreen() {
           multiline
           numberOfLines={4}
           style={styles.descriptionInput}
+          testID="input-listing-description"
         />
 
-        <Input
-          label="Price"
-          placeholder="e.g., 4500"
-          value={price}
-          onChangeText={setPrice}
-          leftIcon="dollar-sign"
-          keyboardType="numeric"
-        />
+        <View>
+          <Input
+            label="Price"
+            placeholder="e.g., 4500"
+            value={price}
+            onChangeText={(p) => { setPrice(p); setErrors((e) => ({ ...e, price: "" })); }}
+            leftIcon="dollar-sign"
+            keyboardType="numeric"
+            testID="input-listing-price"
+          />
+          {errors.price ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.price}</ThemedText> : null}
+        </View>
 
         <Input
           label="Location"
@@ -114,7 +138,22 @@ export default function AddListingScreen() {
           value={location}
           onChangeText={setLocation}
           leftIcon="map-pin"
+          testID="input-listing-location"
         />
+
+        <View>
+          <Input
+            label="Image URL (optional)"
+            placeholder="https://example.com/photo.jpg"
+            value={imageUrl}
+            onChangeText={(u) => { setImageUrl(u); setErrors((e) => ({ ...e, imageUrl: "" })); }}
+            leftIcon="image"
+            autoCapitalize="none"
+            keyboardType="url"
+            testID="input-listing-image"
+          />
+          {errors.imageUrl ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.imageUrl}</ThemedText> : null}
+        </View>
 
         <View style={styles.conditionSection}>
           <ThemedText type="body" style={styles.conditionLabel}>
@@ -136,7 +175,7 @@ export default function AddListingScreen() {
           </View>
           <Switch
             value={localPickup}
-            onValueChange={setLocalPickup}
+            onValueChange={(v) => { setLocalPickup(v); setErrors((e) => ({ ...e, shipping: "" })); }}
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
           />
@@ -151,14 +190,15 @@ export default function AddListingScreen() {
           </View>
           <Switch
             value={willShip}
-            onValueChange={setWillShip}
+            onValueChange={(v) => { setWillShip(v); setErrors((e) => ({ ...e, shipping: "" })); }}
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
           />
         </View>
+        {errors.shipping ? <ThemedText type="caption" style={{ color: theme.error }}>{errors.shipping}</ThemedText> : null}
       </View>
 
-      <Button onPress={handleSubmit} disabled={!isValid || createListingMutation.isPending}>
+      <Button onPress={handleSubmit} disabled={!isValid || createListingMutation.isPending} testID="button-submit-listing">
         {createListingMutation.isPending ? "Posting..." : "Post Item"}
       </Button>
     </KeyboardAwareScrollViewCompat>

@@ -28,7 +28,7 @@ export type RootStackParamList = {
   Signup: undefined;
   Onboarding: undefined;
   Main: undefined;
-  Profile: undefined;
+  Profile: { userId?: string } | undefined;
   AddVehicle: undefined;
   AddNote: { vehicleId: string };
   AddListing: undefined;
