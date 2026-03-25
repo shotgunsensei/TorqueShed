@@ -278,12 +278,20 @@ function ListingCard({
   onPress: () => void;
 }) {
   const { theme } = useTheme();
+  const listingTimeAgo = formatTimeAgo(listing.createdAt);
+  const listingIsNew = isNewContent(listing.createdAt);
+
   return (
     <Card
       style={[styles.horizontalCard, { minWidth: 180 }]}
       onPress={onPress}
       testID={`card-listing-${listing.id}`}
     >
+      {listingIsNew ? (
+        <View style={{ marginBottom: Spacing.xs }}>
+          <StatusBadge label="New" variant="primary" size="sm" />
+        </View>
+      ) : null}
       <ThemedText type="h4" numberOfLines={2}>
         {listing.title}
       </ThemedText>
@@ -295,6 +303,14 @@ function ListingCard({
         <ThemedText type="caption" style={{ color: theme.textMuted }}>
           {listing.userName}
         </ThemedText>
+        {listingTimeAgo ? (
+          <>
+            <View style={[styles.threadMetaDot, { backgroundColor: theme.textMuted }]} />
+            <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10 }}>
+              {listingTimeAgo}
+            </ThemedText>
+          </>
+        ) : null}
       </View>
     </Card>
   );

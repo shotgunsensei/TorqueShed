@@ -264,14 +264,17 @@ export default function GarageDetailScreen() {
       return <Skeleton.List count={3} />;
     }
     if (activeTab !== "all") {
-      const labelMap: Record<string, string> = { solved: "solved", pinned: "pinned", questions: "unsolved" };
-      const iconMap: Record<string, string> = { solved: "check-circle", pinned: "bookmark", questions: "help-circle" };
-      const label = labelMap[activeTab] || activeTab;
+      const tabConfig: Record<string, { label: string; icon: keyof typeof Feather.glyphMap }> = {
+        solved: { label: "solved", icon: "check-circle" },
+        pinned: { label: "pinned", icon: "bookmark" },
+        questions: { label: "unsolved", icon: "help-circle" },
+      };
+      const config = tabConfig[activeTab] || { label: activeTab, icon: "message-circle" as keyof typeof Feather.glyphMap };
       return (
         <EmptyState
-          icon={(iconMap[activeTab] || "message-circle") as any}
-          title={`No ${label} threads`}
-          description={`There are no ${label} threads in this bay yet`}
+          icon={config.icon}
+          title={`No ${config.label} threads`}
+          description={`There are no ${config.label} threads in this bay yet`}
         />
       );
     }
