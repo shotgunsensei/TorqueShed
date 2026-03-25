@@ -1581,6 +1581,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await db.delete(threads).where(eq(threads.id, report.contentId));
         } else if (report.contentType === "forum_reply") {
           await db.delete(threadReplies).where(eq(threadReplies.id, report.contentId));
+        } else if (report.contentType === "swap_listing") {
+          await db.delete(swapShopListings).where(eq(swapShopListings.id, report.contentId));
         }
       }
 

@@ -303,7 +303,7 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const VALID_CONTENT_TYPES = ["forum_thread", "forum_reply", "user"] as const;
+export const VALID_CONTENT_TYPES = ["forum_thread", "forum_reply", "swap_listing", "user"] as const;
 export const VALID_REPORT_REASONS = ["spam", "harassment", "scam", "illegal", "impersonation", "other"] as const;
 
 export const createReportSchema = z.object({

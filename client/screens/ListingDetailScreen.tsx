@@ -41,6 +41,8 @@ interface Listing {
   createdAt: string;
   userName: string;
   userSwapCount: number;
+  sellerJoinDate: string | null;
+  sellerListingCount: number;
 }
 
 export default function ListingDetailScreen() {
@@ -243,9 +245,16 @@ export default function ListingDetailScreen() {
           </View>
           <View style={styles.sellerDetails}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>{listing.userName || "Unknown"}</ThemedText>
-            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-              {listing.userSwapCount || 0} successful swaps
-            </ThemedText>
+            <View style={{ flexDirection: "row", gap: Spacing.md, marginTop: 2 }}>
+              {listing.sellerJoinDate ? (
+                <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                  Member since {formatDate(listing.sellerJoinDate)}
+                </ThemedText>
+              ) : null}
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                {listing.sellerListingCount || 0} {(listing.sellerListingCount || 0) === 1 ? "listing" : "listings"}
+              </ThemedText>
+            </View>
           </View>
         </View>
         <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>

@@ -723,7 +723,7 @@ export class DatabaseStorage implements IStorage {
     return listings.map(l => ({ ...l, userSwapCount: 0 })) as (SwapShopListing & { userName: string; userSwapCount: number; sellerJoinDate: string | null; sellerListingCount: number })[];
   }
 
-  async getSwapShopListing(id: string): Promise<(SwapShopListing & { userName: string; userSwapCount: number }) | undefined> {
+  async getSwapShopListing(id: string): Promise<(SwapShopListing & { userName: string; userSwapCount: number; sellerJoinDate: string | null; sellerListingCount: number }) | undefined> {
     const [listing] = await db
       .select({
         id: swapShopListings.id,
@@ -740,13 +740,15 @@ export class DatabaseStorage implements IStorage {
         createdAt: swapShopListings.createdAt,
         updatedAt: swapShopListings.updatedAt,
         userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+        sellerJoinDate: sql<string | null>`(SELECT created_at FROM users WHERE id = ${swapShopListings.userId})`,
+        sellerListingCount: sql<number>`(SELECT count(*)::int FROM swap_shop_listings WHERE user_id = ${swapShopListings.userId})`,
       })
       .from(swapShopListings)
       .leftJoin(users, eq(swapShopListings.userId, users.id))
       .where(eq(swapShopListings.id, id));
     
     if (!listing) return undefined;
-    return { ...listing, userSwapCount: 0 } as (SwapShopListing & { userName: string; userSwapCount: number });
+    return { ...listing, userSwapCount: listing.sellerListingCount || 0 } as (SwapShopListing & { userName: string; userSwapCount: number; sellerJoinDate: string | null; sellerListingCount: number });
   }
 
   async createSwapShopListing(listing: InsertSwapShopListing, userId: string): Promise<SwapShopListing> {
