@@ -59,6 +59,9 @@ export default function AddVehicleScreen() {
   const [year, setYear] = useState("");
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
+  const [trim, setTrim] = useState("");
+  const [engine, setEngine] = useState("");
+  const [drivetrain, setDrivetrain] = useState("");
   const [nickname, setNickname] = useState("");
   const [vinDecoding, setVinDecoding] = useState(false);
   const [vinDecoded, setVinDecoded] = useState(false);
@@ -104,6 +107,9 @@ export default function AddVehicleScreen() {
         year: year ? parseInt(year, 10) : null,
         make: make || null,
         model: model || null,
+        trim: trim || null,
+        engine: engine || null,
+        drivetrain: drivetrain || null,
         nickname,
       });
     },
@@ -233,6 +239,27 @@ export default function AddVehicleScreen() {
               value={model}
               onChangeText={setModel}
               leftIcon="tag"
+            />
+            <Input
+              label="Trim (optional)"
+              placeholder="e.g., XLT, Lariat, Sport"
+              value={trim}
+              onChangeText={setTrim}
+              leftIcon="layers"
+            />
+            <Input
+              label="Engine (optional)"
+              placeholder="e.g., 5.0L V8, 3.5L EcoBoost"
+              value={engine}
+              onChangeText={setEngine}
+              leftIcon="cpu"
+            />
+            <Input
+              label="Drivetrain (optional)"
+              placeholder="e.g., 4WD, RWD, AWD"
+              value={drivetrain}
+              onChangeText={setDrivetrain}
+              leftIcon="disc"
             />
           </>
         )}

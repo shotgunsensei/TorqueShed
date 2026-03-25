@@ -45,6 +45,8 @@ interface FeedThread {
   hasSolution: boolean | null;
   yearsWrenching: number | null;
   solutionCountTotal: number;
+  lastActivityAt?: string;
+  createdAt?: string;
 }
 
 interface FeedListing {
@@ -53,6 +55,7 @@ interface FeedListing {
   price: string;
   condition: string;
   userName: string;
+  createdAt?: string;
 }
 
 interface FeedData {
@@ -62,6 +65,41 @@ interface FeedData {
   recentListings: FeedListing[];
   joinedGarageIds: string[];
   onboardingGoals: string[];
+}
+
+interface ContinueActivity {
+  unresolvedThreads: { id: string; title: string; garageId: string; replyCount: number | null; lastActivityAt: string | null; createdAt: string | null }[];
+  activeListings: { id: string; title: string; price: string; condition: string; createdAt: string | null }[];
+}
+
+interface RecommendedBay {
+  id: string;
+  name: string;
+  description: string | null;
+  brandColor: string | null;
+  memberCount: number;
+}
+
+function formatTimeAgo(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w ago`;
+}
+
+function isNewContent(dateStr?: string | null): boolean {
+  if (!dateStr) return false;
+  const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  return new Date(dateStr).getTime() > dayAgo;
 }
 
 const GARAGE_LABELS: Record<string, { name: string; color: string }> = {
@@ -161,20 +199,26 @@ function ThreadCard({
   const { theme } = useTheme();
   const garageInfo = GARAGE_LABELS[thread.garageId];
 
+  const timeAgo = formatTimeAgo(thread.lastActivityAt || thread.createdAt);
+  const isNew = isNewContent(thread.createdAt);
+
   return (
     <Card
       style={[styles.horizontalCard, { minWidth: 260 }]}
       onPress={onPress}
       testID={`card-thread-${thread.id}`}
     >
-      {garageInfo ? (
-        <View style={[styles.garageTag, { backgroundColor: garageInfo.color + "20" }]}>
-          <ThemedText type="caption" style={{ color: garageInfo.color, fontWeight: "600" }}>
-            {garageInfo.name}
-          </ThemedText>
-        </View>
-      ) : null}
-      <ThemedText type="h4" numberOfLines={2} style={{ marginTop: garageInfo ? Spacing.xs : 0 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs }}>
+        {garageInfo ? (
+          <View style={[styles.garageTag, { backgroundColor: garageInfo.color + "20" }]}>
+            <ThemedText type="caption" style={{ color: garageInfo.color, fontWeight: "600" }}>
+              {garageInfo.name}
+            </ThemedText>
+          </View>
+        ) : null}
+        {isNew ? <StatusBadge label="New" variant="primary" size="sm" /> : null}
+      </View>
+      <ThemedText type="h4" numberOfLines={2} style={{ marginTop: garageInfo || isNew ? Spacing.xs : 0 }}>
         {thread.title}
       </ThemedText>
       <View style={styles.threadMeta}>
@@ -205,6 +249,14 @@ function ThreadCard({
             <Feather name="check-circle" size={12} color={theme.success} />
             <ThemedText type="caption" style={{ color: theme.success }}>
               Solved
+            </ThemedText>
+          </>
+        ) : null}
+        {timeAgo ? (
+          <>
+            <View style={[styles.threadMetaDot, { backgroundColor: theme.textMuted }]} />
+            <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10 }}>
+              {timeAgo}
             </ThemedText>
           </>
         ) : null}
@@ -259,11 +311,29 @@ export default function HomeScreen() {
     queryKey: ["/api/feed"],
   });
 
+  const { data: solvedData } = useQuery<FeedThread[]>({
+    queryKey: ["/api/feed/solved-this-week"],
+    enabled: !!data,
+  });
+
+  const { data: recommendedBays } = useQuery<RecommendedBay[]>({
+    queryKey: ["/api/feed/recommended-bays"],
+    enabled: !!data,
+  });
+
+  const { data: continueData } = useQuery<ContinueActivity>({
+    queryKey: ["/api/feed/continue-activity"],
+    enabled: !!data,
+  });
+
   const vehicles = data?.vehicles || [];
   const bayThreads = data?.bayThreads || [];
   const garageThreads = data?.garageThreads || [];
   const recentListings = data?.recentListings || [];
   const onboardingGoals = data?.onboardingGoals || [];
+  const solvedThisWeek = solvedData || [];
+  const continueActivity = continueData;
+  const recommended = recommendedBays || [];
   const sectionOrder = getSectionOrder(onboardingGoals);
 
   if (isLoading) {
@@ -451,6 +521,10 @@ export default function HomeScreen() {
     ),
   };
 
+  const hasUnresolved = (continueActivity?.unresolvedThreads?.length ?? 0) > 0;
+  const hasActiveListings = (continueActivity?.activeListings?.length ?? 0) > 0;
+  const hasContinueActivity = hasUnresolved || hasActiveListings;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
@@ -485,7 +559,124 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {hasContinueActivity ? (
+        <View style={styles.section}>
+          <SectionHeader title="Continue Your Activity" icon="clock" />
+          {hasUnresolved ? (
+            continueActivity!.unresolvedThreads.map((t) => (
+              <Card
+                key={t.id}
+                style={styles.activityCard}
+                onPress={() => navigation.navigate("ThreadDetail", { threadId: t.id })}
+                testID={`card-continue-thread-${t.id}`}
+              >
+                <View style={styles.promptContent}>
+                  <View style={[styles.promptIcon, { backgroundColor: theme.warning + "15", width: 36, height: 36, borderRadius: 18 }]}>
+                    <Feather name="message-circle" size={18} color={theme.warning} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="body" numberOfLines={1} style={{ fontFamily: "Inter_500Medium" }}>
+                      {t.title}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: theme.textMuted }}>
+                      {t.replyCount || 0} {(t.replyCount || 0) === 1 ? "reply" : "replies"} {formatTimeAgo(t.lastActivityAt || t.createdAt)}
+                    </ThemedText>
+                  </View>
+                  <StatusBadge label="Unsolved" variant="warning" size="sm" />
+                </View>
+              </Card>
+            ))
+          ) : null}
+          {hasActiveListings ? (
+            continueActivity!.activeListings.map((l) => (
+              <Card
+                key={l.id}
+                style={styles.activityCard}
+                onPress={() => navigation.navigate("ListingDetail", { listingId: l.id })}
+                testID={`card-continue-listing-${l.id}`}
+              >
+                <View style={styles.promptContent}>
+                  <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15", width: 36, height: 36, borderRadius: 18 }]}>
+                    <Feather name="tag" size={18} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="body" numberOfLines={1} style={{ fontFamily: "Inter_500Medium" }}>
+                      {l.title}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: theme.textMuted }}>
+                      ${l.price} - {l.condition}
+                    </ThemedText>
+                  </View>
+                  <StatusBadge label="Active" variant="success" size="sm" />
+                </View>
+              </Card>
+            ))
+          ) : null}
+        </View>
+      ) : null}
+
       {sectionOrder.map((key) => sections[key])}
+
+      {solvedThisWeek.length > 0 ? (
+        <View style={styles.section}>
+          <SectionHeader title="Solved This Week" icon="check-circle" />
+          <FlatList
+            horizontal
+            data={solvedThisWeek}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ThreadCard
+                thread={item}
+                onPress={() => navigation.navigate("ThreadDetail", { threadId: item.id })}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
+      ) : null}
+
+      {recommended.length > 0 ? (
+        <View style={styles.section}>
+          <SectionHeader
+            title="Recommended Bays"
+            icon="compass"
+            onSeeAll={() => navigateToTab("GaragesTab")}
+          />
+          {recommended.map((bay) => {
+            const bayInfo = GARAGE_LABELS[bay.id];
+            const color = bayInfo?.color || theme.primary;
+            return (
+              <Card
+                key={bay.id}
+                style={styles.activityCard}
+                onPress={() => navigation.navigate("GarageDetail", { garageId: bay.id })}
+                testID={`card-recommended-bay-${bay.id}`}
+              >
+                <View style={styles.promptContent}>
+                  <View style={[styles.promptIcon, { backgroundColor: color + "15", width: 40, height: 40, borderRadius: 20 }]}>
+                    <Feather name="users" size={20} color={color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="body" style={{ fontFamily: "Inter_500Medium" }}>
+                      {bay.name}
+                    </ThemedText>
+                    {bay.description ? (
+                      <ThemedText type="caption" numberOfLines={1} style={{ color: theme.textSecondary }}>
+                        {bay.description}
+                      </ThemedText>
+                    ) : null}
+                    <ThemedText type="caption" style={{ color: theme.textMuted }}>
+                      {bay.memberCount} {bay.memberCount === 1 ? "member" : "members"}
+                    </ThemedText>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={theme.textMuted} />
+                </View>
+              </Card>
+            );
+          })}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -578,6 +769,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xxs,
     borderRadius: BorderRadius.xs,
+  },
+  activityCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   promptCard: {
     marginHorizontal: Spacing.lg,

@@ -29,8 +29,8 @@ import {
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 import { db } from "./db";
-import { users, garageMembers } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings } from "@shared/schema";
+import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -639,6 +639,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/feed/solved-this-week", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+      const userVehicles = await storage.getVehiclesByUser(userId);
+      const vehicleMakes = userVehicles
+        .map((v) => v.make?.toLowerCase())
+        .filter(Boolean) as string[];
+
+      const makeToGarageId: Record<string, string> = {
+        ford: "ford", chevrolet: "chevy", chevy: "chevy",
+        dodge: "dodge", ram: "dodge", jeep: "jeep",
+      };
+
+      const memberRows = await db
+        .select({ garageId: garageMembers.garageId })
+        .from(garageMembers)
+        .where(eq(garageMembers.userId, userId));
+      const joinedIds = memberRows.map((r) => r.garageId);
+
+      const relevantIds = [...new Set([
+        ...joinedIds,
+        ...vehicleMakes.map((m) => makeToGarageId[m] || "general"),
+      ])];
+
+      if (relevantIds.length === 0) {
+        return res.json([]);
+      }
+
+      const allThreads = await Promise.all(
+        relevantIds.map((gid) => storage.getThreadsByGarage(gid))
+      );
+
+      const solvedThisWeek = allThreads
+        .flat()
+        .filter((t) => t.hasSolution && t.lastActivityAt && new Date(t.lastActivityAt) >= oneWeekAgo)
+        .sort((a, b) => new Date(b.lastActivityAt!).getTime() - new Date(a.lastActivityAt!).getTime())
+        .slice(0, 6);
+
+      res.json(solvedThisWeek);
+    } catch (error) {
+      console.error("Error fetching solved-this-week:", error);
+      res.status(500).json({ error: "Failed to fetch solved threads" });
+    }
+  });
+
+  app.get("/api/feed/recommended-bays", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const userVehicles = await storage.getVehiclesByUser(userId);
+      const vehicleMakes = userVehicles
+        .map((v) => v.make?.toLowerCase())
+        .filter(Boolean) as string[];
+
+      const memberRows = await db
+        .select({ garageId: garageMembers.garageId })
+        .from(garageMembers)
+        .where(eq(garageMembers.userId, userId));
+      const joinedIds = new Set(memberRows.map((r) => r.garageId));
+
+      const allGarages = await storage.getGarages();
+
+      const makeToGarageId: Record<string, string> = {
+        ford: "ford", chevrolet: "chevy", chevy: "chevy",
+        dodge: "dodge", ram: "dodge", jeep: "jeep",
+      };
+
+      const relevantGarageIds = new Set(
+        vehicleMakes.map((m) => makeToGarageId[m] || "general")
+      );
+
+      const relevantNotJoined = allGarages.filter((g) => !joinedIds.has(g.id) && relevantGarageIds.has(g.id));
+      const otherNotJoined = allGarages.filter((g) => !joinedIds.has(g.id) && !relevantGarageIds.has(g.id));
+      const recommended = [...relevantNotJoined, ...otherNotJoined].slice(0, 5);
+
+      res.json(recommended);
+    } catch (error) {
+      console.error("Error fetching recommended bays:", error);
+      res.status(500).json({ error: "Failed to fetch recommended bays" });
+    }
+  });
+
+  app.get("/api/feed/continue-activity", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+
+      const userThreads = await db
+        .select({
+          id: threads.id,
+          title: threads.title,
+          garageId: threads.garageId,
+          hasSolution: threads.hasSolution,
+          replyCount: threads.replyCount,
+          lastActivityAt: threads.lastActivityAt,
+          createdAt: threads.createdAt,
+        })
+        .from(threads)
+        .where(and(eq(threads.userId, userId), eq(threads.hasSolution, false)))
+        .orderBy(desc(threads.lastActivityAt))
+        .limit(5);
+
+      const userListings = await db
+        .select({
+          id: swapShopListings.id,
+          title: swapShopListings.title,
+          price: swapShopListings.price,
+          condition: swapShopListings.condition,
+          isActive: swapShopListings.isActive,
+          createdAt: swapShopListings.createdAt,
+        })
+        .from(swapShopListings)
+        .where(and(eq(swapShopListings.userId, userId), eq(swapShopListings.isActive, true)))
+        .orderBy(desc(swapShopListings.createdAt))
+        .limit(3);
+
+      res.json({
+        unresolvedThreads: userThreads,
+        activeListings: userListings,
+      });
+    } catch (error) {
+      console.error("Error fetching continue-activity:", error);
+      res.status(500).json({ error: "Failed to fetch activity" });
+    }
+  });
+
+  app.get("/api/vehicles/:id/cost-summary", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.id);
+      if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
+      if (vehicle.userId !== req.userId) return res.status(403).json({ error: "Not authorized" });
+
+      const notes = await storage.getVehicleNotes(req.params.id);
+      let totalCost = 0;
+      const costByType: Record<string, number> = {};
+
+      for (const note of notes) {
+        if (note.cost) {
+          const parsed = parseFloat(note.cost.replace(/[^0-9.]/g, ""));
+          if (!isNaN(parsed)) {
+            totalCost += parsed;
+            const type = note.type || "general";
+            costByType[type] = (costByType[type] || 0) + parsed;
+          }
+        }
+      }
+
+      res.json({
+        totalCost,
+        costByType,
+        noteCount: notes.length,
+      });
+    } catch (error) {
+      console.error("Error fetching cost summary:", error);
+      res.status(500).json({ error: "Failed to fetch cost summary" });
+    }
+  });
+
   // ========== Vehicle Routes ==========
   app.get("/api/vehicles", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -873,7 +1032,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== Thread Routes ==========
   app.get("/api/garages/:garageId/threads", async (req: Request, res: Response) => {
     try {
-      const threadsList = await storage.getThreadsByGarage(req.params.garageId);
+      const filter = req.query.filter as string | undefined;
+      const search = req.query.search as string | undefined;
+
+      let threadsList = await storage.getThreadsByGarage(req.params.garageId);
+
+      if (filter === "solved") {
+        threadsList = threadsList.filter((t) => t.hasSolution);
+      } else if (filter === "questions") {
+        threadsList = threadsList.filter((t) => !t.hasSolution);
+      } else if (filter === "pinned") {
+        threadsList = threadsList.filter((t) => t.isPinned);
+      }
+
+      if (search && search.trim()) {
+        const term = search.trim().toLowerCase();
+        threadsList = threadsList.filter((t) =>
+          t.title.toLowerCase().includes(term) ||
+          t.userName.toLowerCase().includes(term)
+        );
+      }
+
       res.json(threadsList);
     } catch (error) {
       console.error("Error fetching threads:", error);

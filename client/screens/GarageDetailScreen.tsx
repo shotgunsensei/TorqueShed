@@ -57,7 +57,7 @@ interface Contributor {
   focusAreas: string[];
 }
 
-type TabKey = "all" | "solved" | "pinned";
+type TabKey = "all" | "questions" | "solved" | "pinned";
 
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -157,7 +157,9 @@ export default function GarageDetailScreen() {
         return b.lastActivityTime - a.lastActivityTime;
       });
 
-    if (activeTab === "solved") {
+    if (activeTab === "questions") {
+      filtered = filtered.filter((t) => !t.hasSolution);
+    } else if (activeTab === "solved") {
       filtered = filtered.filter((t) => t.hasSolution);
     } else if (activeTab === "pinned") {
       filtered = filtered.filter((_, i) => {
@@ -262,10 +264,12 @@ export default function GarageDetailScreen() {
       return <Skeleton.List count={3} />;
     }
     if (activeTab !== "all") {
-      const label = activeTab === "solved" ? "solved" : "pinned";
+      const labelMap: Record<string, string> = { solved: "solved", pinned: "pinned", questions: "unsolved" };
+      const iconMap: Record<string, string> = { solved: "check-circle", pinned: "bookmark", questions: "help-circle" };
+      const label = labelMap[activeTab] || activeTab;
       return (
         <EmptyState
-          icon={activeTab === "solved" ? "check-circle" : "bookmark"}
+          icon={(iconMap[activeTab] || "message-circle") as any}
           title={`No ${label} threads`}
           description={`There are no ${label} threads in this bay yet`}
         />
@@ -292,9 +296,12 @@ export default function GarageDetailScreen() {
   const memberCount = garage?.memberCount ?? 0;
   const brandColor = garage?.brandColor || theme.primary;
 
+  const solvedCount = apiThreads.filter((t) => t.hasSolution).length;
+
   const tabs: { key: TabKey; label: string; count: number | null }[] = [
     { key: "all", label: "All", count: apiThreads.length },
-    { key: "solved", label: "Solved", count: apiThreads.filter((t) => t.hasSolution).length },
+    { key: "questions", label: "Questions", count: apiThreads.filter((t) => !t.hasSolution).length },
+    { key: "solved", label: "Solved", count: solvedCount },
     { key: "pinned", label: "Pinned", count: apiThreads.filter((t) => t.isPinned).length },
   ];
 
@@ -355,6 +362,14 @@ export default function GarageDetailScreen() {
                         {garage?.threadCount ?? 0} threads
                       </ThemedText>
                     </View>
+                    {solvedCount > 0 ? (
+                      <View style={styles.statItem}>
+                        <Feather name="check-circle" size={13} color={theme.success} />
+                        <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4 }}>
+                          {solvedCount} solved
+                        </ThemedText>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               </View>

@@ -54,11 +54,20 @@ interface ApiVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  trim: string | null;
+  engine: string | null;
+  drivetrain: string | null;
   nickname: string | null;
   imageUrl: string | null;
   isPublic: boolean;
   notesCount: number;
   totalCost: string;
+}
+
+interface CostSummary {
+  totalCost: number;
+  costByType: Record<string, number>;
+  noteCount: number;
 }
 
 function transformToNote(apiNote: ApiNote): VehicleNote {
@@ -124,6 +133,10 @@ export default function VehicleDetailScreen() {
 
   const { data: vehicle, refetch: refetchVehicle } = useQuery<ApiVehicle>({
     queryKey: [`/api/vehicles/${vehicleId}`],
+  });
+
+  const { data: costSummary } = useQuery<CostSummary>({
+    queryKey: [`/api/vehicles/${vehicleId}/cost-summary`],
   });
 
   const togglePublicMutation = useMutation({
@@ -282,6 +295,24 @@ export default function VehicleDetailScreen() {
               {vehicleInfo}
             </Text>
           ) : null}
+          {vehicle?.trim ? (
+            <View style={styles.vinRow}>
+              <Text style={[styles.vinLabel, { color: theme.textMuted }]}>Trim</Text>
+              <Text style={[styles.vinValue, { color: theme.textSecondary }]}>{vehicle.trim}</Text>
+            </View>
+          ) : null}
+          {vehicle?.engine ? (
+            <View style={styles.vinRow}>
+              <Text style={[styles.vinLabel, { color: theme.textMuted }]}>Engine</Text>
+              <Text style={[styles.vinValue, { color: theme.textSecondary }]}>{vehicle.engine}</Text>
+            </View>
+          ) : null}
+          {vehicle?.drivetrain ? (
+            <View style={styles.vinRow}>
+              <Text style={[styles.vinLabel, { color: theme.textMuted }]}>Drivetrain</Text>
+              <Text style={[styles.vinValue, { color: theme.textSecondary }]}>{vehicle.drivetrain}</Text>
+            </View>
+          ) : null}
           {vehicle?.vin ? (
             <View style={styles.vinRow}>
               <Text style={[styles.vinLabel, { color: theme.textMuted }]}>
@@ -382,6 +413,41 @@ export default function VehicleDetailScreen() {
             </Text>
           </View>
         </View>
+
+        {costSummary && Object.keys(costSummary.costByType).length > 0 ? (
+          <View
+            style={[
+              styles.infoCard,
+              {
+                backgroundColor: theme.backgroundDefault,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <ThemedText type="h4" style={{ marginBottom: Spacing.sm }}>
+              Cost Breakdown
+            </ThemedText>
+            {Object.entries(costSummary.costByType)
+              .sort(([, a], [, b]) => b - a)
+              .map(([type, amount]) => (
+                <View key={type} style={styles.costRow}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                    <Feather
+                      name={type === "maintenance" ? "settings" : type === "mod" ? "zap" : type === "issue" ? "alert-triangle" : "file-text"}
+                      size={14}
+                      color={type === "maintenance" ? "#3B82F6" : type === "mod" ? "#8B5CF6" : type === "issue" ? "#EF4444" : theme.textMuted}
+                    />
+                    <Text style={[styles.costLabel, { color: theme.textSecondary }]}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </View>
+                  <Text style={[styles.costValue, { color: theme.text }]}>
+                    {formatCost(String(amount))}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -633,6 +699,23 @@ const styles = StyleSheet.create({
   privacyDesc: {
     ...Typography.caption,
     marginTop: 2,
+  },
+  costRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  costLabel: {
+    ...Typography.body,
+    fontSize: 14,
+  },
+  costValue: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
   },
   recentSection: {
     marginBottom: Spacing.lg,
