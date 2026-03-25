@@ -20,6 +20,7 @@ import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { brand } from "@/constants/brand";
 import { Skeleton } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -133,7 +134,7 @@ export default function GaragesScreen() {
 
   const numColumns = isDesktop ? (width >= 1280 ? 3 : 2) : 1;
 
-  const { data: garages = [], isLoading, refetch, isRefetching } = useQuery<ApiGarage[]>({
+  const { data: garages = [], isLoading, isError, refetch, isRefetching } = useQuery<ApiGarage[]>({
     queryKey: ["/api/garages"],
   });
 
@@ -148,6 +149,20 @@ export default function GaragesScreen() {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <Skeleton.List count={5} style={{ paddingTop: isDesktop ? Spacing.xl : headerHeight + Spacing.lg }} />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't Load Bays"
+          description="Something went wrong. Tap below to try again."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
       </View>
     );
   }

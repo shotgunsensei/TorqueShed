@@ -145,7 +145,7 @@ export default function TrendingScreen() {
 
   const numColumns = isDesktop ? (width >= 1280 ? 4 : 3) : 2;
 
-  const { data: products, isLoading, refetch, isRefetching } = useQuery<Product[]>({
+  const { data: products, isLoading, isError, refetch, isRefetching } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
@@ -155,6 +155,20 @@ export default function TrendingScreen() {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <Skeleton.Grid count={6} columns={numColumns} />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't Load Products"
+          description="Something went wrong loading the tool and gear picks. Tap below to try again."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
       </View>
     );
   }

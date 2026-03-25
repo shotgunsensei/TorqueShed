@@ -1,7 +1,7 @@
 # TorqueShed - Automotive Community Platform
 
 ## Overview
-TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers. It aims to be "The Garage for Real People," fostering a strong community around automotive interests. Key features include brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a step-by-step diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), and a curated marketplace for tools and gear ("Shop").
+TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers. It aims to be "The Garage for Real People," fostering a strong community around automotive interests. Key features include brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a step-by-step diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), a curated marketplace for tools and gear ("Shop"), and rich user profiles with credibility signals.
 
 ## User Preferences
 - Bold, industrial design aesthetic
@@ -9,33 +9,101 @@ TorqueShed is a mobile-first automotive community platform designed to connect m
 - No emojis in the app
 - Mobile-first with iOS 26 liquid glass inspiration
 - Dark theme by default (neutral-950 background)
+- App must only display real data — no test data, fake counts, or placeholders
 
 ## System Architecture
 
-### UI/UX Design
-The platform features a custom component system with an automotive theme. The brand identity is "TorqueShed" with "The Garage for Real People" as its tagline. The primary color is Racing Orange (#FF6B35), with Industrial Black (#0D0F12) as a secondary and Caution Yellow (#F59E0B) as an accent. Typography uses Montserrat for headings and Inter for body text. UI components include cards, animated press feedback, Floating Action Buttons (FABs), and segmented controls. The design supports responsive layouts for mobile and desktop, utilizing a sidebar navigation on larger screens.
+### Frontend (Expo + React Native)
+- **Framework**: React Native + Expo (SDK 54) with TypeScript
+- **Navigation**: React Navigation 7+ with `RootStackNavigator` > `ResponsiveNavigator` (bottom tabs on mobile, sidebar on desktop) > per-tab stack navigators
+- **State/Data**: @tanstack/react-query with default fetcher; `getApiUrl()` from `@/lib/query-client` for API base URL
+- **Styling**: StyleSheet.create with theme-aware hooks (`useTheme`); no CSS files
+- **Typography**: Montserrat (headings via @expo-google-fonts/montserrat), Inter (body via @expo-google-fonts/inter)
+- **Brand Colors**: Racing Orange #FF6B35 (primary), Industrial Black #0D0F12 (secondary), Caution Yellow #F59E0B (accent)
 
-### Technical Implementation
-The platform uses a mobile-first approach with a React Native + Expo frontend written in TypeScript. The backend is an Express.js server, also in TypeScript, and data is stored in a PostgreSQL database.
+### Backend (Express + PostgreSQL)
+- **Server**: Express.js with TypeScript on port 5000
+- **Database**: PostgreSQL with Drizzle ORM
+- **Auth**: JWT-based with bcrypt password hashing; `requireAuth` and `requireAdmin` middleware
+- **API**: RESTful under `/api/*`
+- **CORS**: Dynamic origins from env vars + hardcoded production domains (torqueshed.pro)
+- **Security**: Helmet headers, trust proxy, 1mb request body limit
 
-**Key Features:**
-- **Bays**: Brand-specific community forums with discussion threads and user credibility signals.
-- **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general), tracking cost, mileage, and parts.
-- **TorqueAssist**: A step-by-step diagnostic wizard providing interactive checklists and suggested parts, running locally with predefined patterns.
-- **Source Tab**: A unified parts sourcing hub featuring a curated "Shop", a peer-to-peer "Swap Shop", and a "Find Parts" search across major vendors.
-- **User Profiles**: Rich profiles with hero section, 5-stat row (vehicles, threads, solutions, replies, listings), public vehicles carousel, recent activity feed, and collapsible edit form. Role badges (Admin/Mod) and "Trusted Solver" indicator (3+ accepted solutions) displayed on profile and thread reply cards.
-- **Content Moderation**: A reporting system for inappropriate content.
+### Navigation Structure
+```
+RootStackNavigator
+  ├── Login / Signup (auth flow)
+  ├── Onboarding
+  ├── Main → ResponsiveNavigator
+  │     ├── HomeTab → HomeStackNavigator (Home feed)
+  │     ├── GaragesTab → GaragesStackNavigator (Bay list)
+  │     ├── SourceTab → SourceStackNavigator (Shop/Swap/Find Parts)
+  │     ├── NotesTab → NotesStackNavigator (Vehicles + VehicleDetail)
+  │     └── MoreTab → MoreStackNavigator (TorqueAssist, Tool & Gear)
+  ├── Profile, AddVehicle, AddNote, AddListing, ListingDetail
+  ├── EditListing, AddThread, ThreadDetail, AskForHelp
+  ├── SubmitProduct, AdminProducts, GarageDetail
+```
 
-### System Design Choices
-- **Responsive Layout**: Adapts for mobile and desktop viewports, switching between bottom tabs and sidebar navigation.
-- **Navigation**: Uses React Navigation with a `RootStackNavigator` and `ResponsiveNavigator`.
-- **Data Management**: React Query for client-side data fetching and caching.
-- **Database Schema**: PostgreSQL with Drizzle ORM managing users, garages, vehicles, notes, threads, and marketplace items.
-- **API**: A RESTful API under `/api/*` for managing all platform data.
-- **Monetization Ethics**: TorqueAssist transparently uses affiliate links, prioritizing relevance and user action. The "Shop" features curated products with context boxes and sponsored product badges.
+### Key Features
+- **Home Feed**: Personalized feed with sections ordered by onboarding goals (vehicles, bay threads, garage threads, swap listings). Pull-to-refresh, error state with retry.
+- **Bays (Garages)**: Brand-specific community forums (Ford, Chevy, Dodge, Jeep, General). Join/leave, discussion threads with solution marking. Credibility signals on thread cards (Trusted Solver badge, years wrenching).
+- **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general). Tracks cost, mileage, parts. VIN decoding via NHTSA API.
+- **TorqueAssist**: Step-by-step diagnostic wizard with interactive checklists and suggested parts. Uses predefined diagnostic patterns with affiliate links.
+- **Source Tab**: Unified parts sourcing hub with three segments:
+  - **Shop**: Curated products with category filters, "Why It Matters" context boxes, sponsored/featured badges, affiliate tracking
+  - **Swap Shop**: Peer-to-peer marketplace with condition badges, shipping options, seller credibility (join date, listing count), report flow
+  - **Find Parts**: Search across major vendors (RockAuto, AutoZone, O'Reilly, Amazon) with vehicle context
+- **User Profiles**: Rich profiles with hero section, 5-stat row (vehicles, threads, solutions, replies, listings), public vehicles carousel, recent activity feed, collapsible edit form. Role badges (Admin/Mod) and "Trusted Solver" indicator (3+ accepted solutions).
+- **Content Moderation**: Report flow for threads, replies, and swap listings with predefined reasons. Admin review via AdminProducts screen.
+- **Admin**: Product management (approve/reject/delete), curated product curation
+
+### Database Schema (Drizzle ORM)
+Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`
+
+### UI Component Library
+- `Card` — themed card with elevation levels, press feedback
+- `Button` — primary action button
+- `FAB` — floating action button with safe area insets
+- `EmptyState` — icon + title + description + optional CTA for empty/error states
+- `Skeleton` — loading placeholders (List, Grid, Box variants)
+- `UserAvatar` — avatar with role badge support
+- `ThemedText` / `ThemedView` — theme-aware primitives
+- `ErrorBoundary` — crash recovery with restart
+
+### Error Handling Patterns
+- **Loading**: Skeleton loaders on all data-fetching screens
+- **Error**: EmptyState with alert-circle icon and retry button on all query-driven screens
+- **Empty**: Branded EmptyState with relevant icon, message, and CTA
+- **Form errors**: Toast notifications for mutation failures, inline validation for forms
+- **Auth errors**: Inline alert in login/signup forms
+
+### Stub Endpoints (TODO)
+- `POST /api/auth/forgot-password` — awaiting email service integration
+- `POST /api/auth/reset-password` — awaiting email service integration
+- `POST /api/auth/verify-email` — awaiting email service integration
+
+### Monetization
+- TorqueAssist transparently uses affiliate links, prioritizing relevance
+- Shop features curated products with "Why It Matters" context boxes and sponsored product badges
+- Click tracking on affiliate links for analytics
 
 ## External Dependencies
-- **React Native + Expo**: For mobile application development.
-- **Express.js**: For the backend server.
-- **PostgreSQL**: As the primary database.
-- **Drizzle ORM**: For interacting with the PostgreSQL database.
+- **React Native + Expo**: Mobile application framework
+- **Express.js**: Backend server
+- **PostgreSQL**: Primary database
+- **Drizzle ORM**: Database ORM
+- **@tanstack/react-query**: Client-side data fetching and caching
+- **React Navigation**: App navigation
+- **expo-linear-gradient**: Gradient effects
+- **expo-haptics**: Haptic feedback on interactions
+- **bcrypt**: Password hashing
+- **jsonwebtoken**: JWT auth tokens
+- **zod**: Schema validation
+
+## Development
+- Frontend runs on port 8081 (Expo dev server with HMR)
+- Backend runs on port 5000 (Express API + static landing page)
+- `npm run server:dev` starts backend, `npm run expo:dev` starts frontend
+- TypeScript strict mode enabled
+- Admin account: configured via ADMIN_USERNAME/ADMIN_PASSWORD env vars

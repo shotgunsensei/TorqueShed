@@ -273,7 +273,7 @@ function ShopSection() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const numColumns = isDesktop ? (width >= 1280 ? 4 : 3) : 2;
 
-  const { data: products = [], isLoading, refetch, isRefetching } = useQuery<Product[]>({
+  const { data: products = [], isLoading, isError, refetch, isRefetching } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
@@ -282,6 +282,18 @@ function ShopSection() {
     : products.filter((p) => p.category === selectedCategory);
 
   if (isLoading) return <Skeleton.Grid count={6} columns={numColumns} />;
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="alert-circle"
+        title="Couldn't Load Shop"
+        description="Something went wrong loading the shop. Tap below to try again."
+        actionLabel="Retry"
+        onAction={() => refetch()}
+      />
+    );
+  }
 
   return (
     <FlatList
@@ -327,7 +339,7 @@ function SwapSection() {
   const [selectedItem, setSelectedItem] = useState<SwapListing | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
 
-  const { data: listings = [], isLoading, refetch, isRefetching } = useQuery<SwapListing[]>({
+  const { data: listings = [], isLoading, isError: isSwapError, refetch, isRefetching } = useQuery<SwapListing[]>({
     queryKey: ["/api/swap-shop"],
   });
 
@@ -355,6 +367,18 @@ function SwapSection() {
   };
 
   if (isLoading) return <Skeleton.List count={4} />;
+
+  if (isSwapError) {
+    return (
+      <EmptyState
+        icon="alert-circle"
+        title="Couldn't Load Swap Shop"
+        description="Something went wrong loading listings. Tap below to try again."
+        actionLabel="Retry"
+        onAction={() => refetch()}
+      />
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>

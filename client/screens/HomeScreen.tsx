@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
@@ -254,7 +255,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
 
-  const { data, isLoading, isRefetching, refetch } = useQuery<FeedData>({
+  const { data, isLoading, isError, isRefetching, refetch } = useQuery<FeedData>({
     queryKey: ["/api/feed"],
   });
 
@@ -267,6 +268,18 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return <Skeleton.List count={5} />;
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="alert-circle"
+        title="Couldn't Load Feed"
+        description="Something went wrong loading your feed. Pull down to try again."
+        actionLabel="Retry"
+        onAction={() => refetch()}
+      />
+    );
   }
 
   const navigateToTab = (tabName: string, params?: object) => {

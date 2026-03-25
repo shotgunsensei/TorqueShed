@@ -98,7 +98,7 @@ export default function NotesScreen() {
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
 
-  const { data: vehicles = [], isLoading, refetch, isRefetching } = useQuery<VehicleItem[]>({
+  const { data: vehicles = [], isLoading, isError, refetch, isRefetching } = useQuery<VehicleItem[]>({
     queryKey: ["/api/vehicles"],
   });
 
@@ -118,6 +118,20 @@ export default function NotesScreen() {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <Skeleton.List count={3} style={{ paddingTop: Spacing.xl }} />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't Load Vehicles"
+          description="Something went wrong loading your garage. Tap below to try again."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
       </View>
     );
   }
