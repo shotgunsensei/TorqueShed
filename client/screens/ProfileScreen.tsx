@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Image, Pressable, ActivityIndicator, Alert, Text, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -20,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getUserRoleDisplay } from "@/components/UserAvatar";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const FOCUS_AREAS = [
   "Engine",
@@ -104,6 +107,8 @@ function StatItem({ value, label, icon, color }: { value: number; label: string;
   );
 }
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -111,6 +116,7 @@ export default function ProfileScreen() {
   const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const navigation = useNavigation<NavigationProp>();
 
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
@@ -131,10 +137,27 @@ export default function ProfileScreen() {
     enabled: !!currentUser?.id,
   });
 
+  const { data: trustData } = useQuery<{
+    badges: { key: string; label: string; icon: string }[];
+    stats: { solvedCount: number; replyCount: number; vehicleCount: number };
+  }>({
+    queryKey: [`/api/users/${currentUser?.id}/trust-badges`],
+    enabled: !!currentUser?.id,
+  });
+
+  const { data: savedItems } = useQuery<{
+    threads: { threadId: string; title: string; hasSolution: boolean; savedAt: string }[];
+    listings: { listingId: string; title: string; price: string; savedAt: string }[];
+  }>({
+    queryKey: ["/api/saved"],
+    enabled: !!currentUser,
+  });
+
   const stats = fullProfile?.stats;
   const recentActivity = fullProfile?.recentActivity || [];
   const publicVehicles = fullProfile?.publicVehicles || [];
   const userRole = getUserRoleDisplay(fullProfile?.role || currentUser?.role);
+  const trustBadges = trustData?.badges || [];
 
   useEffect(() => {
     if (profile) {
@@ -259,7 +282,14 @@ export default function ProfileScreen() {
     ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : null;
 
-  const isTrustedSolver = (stats?.solutionCount || 0) >= 3;
+  const profileCompleteness = (() => {
+    if (!profile) return 0;
+    let filled = 0;
+    const fields = [profile.bio, profile.location, profile.avatarUrl, profile.yearsWrenching, profile.shopAffiliation, profile.vehiclesWorkedOn];
+    fields.forEach((f) => { if (f) filled++; });
+    if (profile.focusAreas && profile.focusAreas.length > 0) filled++;
+    return Math.round((filled / 7) * 100);
+  })();
 
   if (isLoading) {
     return (
@@ -324,9 +354,15 @@ export default function ProfileScreen() {
           {userRole ? (
             <StatusBadge label={userRole} icon="shield" variant="primary" size="md" />
           ) : null}
-          {isTrustedSolver ? (
-            <StatusBadge label="Trusted Solver" icon="check-circle" variant="success" size="md" />
-          ) : null}
+          {trustBadges.map((badge) => (
+            <StatusBadge
+              key={badge.key}
+              label={badge.label}
+              icon={badge.icon as keyof typeof Feather.glyphMap}
+              variant={badge.key === "trusted-solver" ? "success" : badge.key === "verified-owner" ? "primary" : "muted"}
+              size="md"
+            />
+          ))}
         </View>
 
         <View style={styles.heroDetails}>
@@ -384,6 +420,71 @@ export default function ProfileScreen() {
           <StatItem value={stats.replyCount} label="Replies" icon="message-square" color={theme.primary} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <StatItem value={stats.listingCount} label="Listings" icon="tag" color={theme.primary} />
+        </View>
+      ) : null}
+
+      {profileCompleteness < 100 ? (
+        <Pressable
+          style={[styles.completenessCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}
+          onPress={() => setShowEditForm(true)}
+        >
+          <View style={styles.completenessHeader}>
+            <Feather name="user-check" size={16} color={theme.primary} />
+            <Text style={[styles.completenessTitle, { color: theme.text }]}>Profile Completeness</Text>
+            <Text style={[styles.completenessPercent, { color: theme.primary }]}>{profileCompleteness}%</Text>
+          </View>
+          <View style={[styles.completenessBarBg, { backgroundColor: theme.border }]}>
+            <View style={[styles.completenessBarFill, { backgroundColor: theme.primary, flex: profileCompleteness / 100 }]} />
+          </View>
+          <Text style={[styles.completenessHint, { color: theme.textMuted }]}>
+            Complete your profile to build trust in the community
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {(savedItems?.threads?.length ?? 0) > 0 || (savedItems?.listings?.length ?? 0) > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Feather name="bookmark" size={16} color={theme.primary} />
+            <ThemedText type="h4" style={styles.sectionTitle}>Saved Items</ThemedText>
+          </View>
+          {savedItems?.threads?.map((t) => (
+            <Pressable
+              key={t.threadId}
+              style={[styles.savedItem, { borderBottomColor: theme.border }]}
+              onPress={() => navigation.navigate("ThreadDetail", { threadId: t.threadId })}
+            >
+              <View style={[styles.savedIcon, { backgroundColor: theme.primary + "15" }]}>
+                <Feather name="message-circle" size={14} color={theme.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.savedTitle, { color: theme.text }]} numberOfLines={1}>{t.title}</Text>
+                {t.hasSolution ? (
+                  <View style={styles.savedSolvedRow}>
+                    <Feather name="check-circle" size={10} color={theme.success} />
+                    <Text style={[{ color: theme.success, fontSize: 10, marginLeft: 3 }]}>Solved</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Feather name="chevron-right" size={16} color={theme.textMuted} />
+            </Pressable>
+          ))}
+          {savedItems?.listings?.map((l) => (
+            <Pressable
+              key={l.listingId}
+              style={[styles.savedItem, { borderBottomColor: theme.border }]}
+              onPress={() => navigation.navigate("ListingDetail", { listingId: l.listingId })}
+            >
+              <View style={[styles.savedIcon, { backgroundColor: theme.accent + "15" }]}>
+                <Feather name="tag" size={14} color={theme.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.savedTitle, { color: theme.text }]} numberOfLines={1}>{l.title}</Text>
+                <Text style={[{ color: theme.textMuted, fontSize: 10 }]}>{l.price}</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={theme.textMuted} />
+            </Pressable>
+          ))}
         </View>
       ) : null}
 
@@ -869,6 +970,65 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+  },
+  completenessCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  completenessHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  completenessTitle: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+    flex: 1,
+  },
+  completenessPercent: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+  },
+  completenessBarBg: {
+    height: 6,
+    borderRadius: 3,
+    flexDirection: "row",
+    overflow: "hidden",
+    marginBottom: Spacing.xs,
+  },
+  completenessBarFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  completenessHint: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  savedItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    gap: Spacing.sm,
+  },
+  savedIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  savedTitle: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
+  },
+  savedSolvedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
   },
   menuSection: {},
   menuTitle: {

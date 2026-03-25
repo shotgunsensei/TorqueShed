@@ -54,12 +54,13 @@ RootStackNavigator
   - **Shop**: Curated products with category filters, "Why It Matters" context boxes, sponsored/featured badges, affiliate tracking
   - **Swap Shop**: Peer-to-peer marketplace with condition badges, shipping options, seller credibility (join date, listing count), report flow
   - **Find Parts**: Search across major vendors (RockAuto, AutoZone, O'Reilly, Amazon) with vehicle context
-- **User Profiles**: Rich profiles with hero section, 5-stat row (vehicles, threads, solutions, replies, listings), public vehicles carousel, recent activity feed, collapsible edit form. Role badges (Admin/Mod) and "Trusted Solver" indicator (3+ accepted solutions).
-- **Content Moderation**: Report flow for threads, replies, and swap listings with predefined reasons. Admin review via AdminProducts screen.
-- **Admin**: Product management (approve/reject/delete), curated product curation
+- **User Profiles**: Rich profiles with hero section, 5-stat row (vehicles, threads, solutions, replies, listings), public vehicles carousel, recent activity feed, collapsible edit form. Role badges (Admin/Mod) and trust badges from API (Trusted Solver, Verified Owner, Active Contributor). Profile completeness indicator with progress bar.
+- **Saved Items**: Users can bookmark/save threads (ThreadDetailScreen) and swap listings (ListingDetailScreen). Saved items appear in a dedicated section on ProfileScreen. Save state managed via `/api/saved/thread-ids` and `/api/saved/listing-ids` queries.
+- **Content Moderation**: Report flow for threads, replies, and swap listings with predefined reasons. Admin report review tab in AdminProducts screen with dismiss/remove actions.
+- **Admin**: Product management (approve/reject/delete), curated product curation. Reports tab with pending report queue, dismiss/remove content actions.
 
 ### Database Schema (Drizzle ORM)
-Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`
+Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`, `savedThreads`, `savedListings`
 
 ### UI Component Library
 - `Card` — themed card with 1px border (cardBorder), elevation levels, press feedback

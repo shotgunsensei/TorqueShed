@@ -59,6 +59,31 @@ export default function ListingDetailScreen() {
     queryKey: [`/api/swap-shop/${listingId}`],
   });
 
+  const { data: savedListingIds = [] } = useQuery<string[]>({
+    queryKey: ["/api/saved/listing-ids"],
+    enabled: !!currentUser,
+  });
+
+  const isListingSaved = savedListingIds.includes(listingId);
+
+  const toggleSaveListingMutation = useMutation({
+    mutationFn: async () => {
+      if (isListingSaved) {
+        return apiRequest("DELETE", `/api/saved/listings/${listingId}`);
+      }
+      return apiRequest("POST", `/api/saved/listings/${listingId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved/listing-ids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show(isListingSaved ? "Removed from saved" : "Listing saved", "success");
+    },
+    onError: () => {
+      toast.show("Failed to update saved listings", "error");
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("DELETE", `/api/swap-shop/${listingId}`);
@@ -174,6 +199,20 @@ export default function ListingDetailScreen() {
         ) : null}
       </View>
 
+      {currentUser ? (
+        <Pressable
+          onPress={() => toggleSaveListingMutation.mutate()}
+          disabled={toggleSaveListingMutation.isPending}
+          style={[styles.saveButton, { borderColor: isListingSaved ? theme.primary : theme.border }]}
+          testID="button-bookmark-listing"
+        >
+          <Feather name="bookmark" size={16} color={isListingSaved ? theme.primary : theme.textSecondary} />
+          <ThemedText type="body" style={{ color: isListingSaved ? theme.primary : theme.textSecondary, marginLeft: Spacing.sm }}>
+            {isListingSaved ? "Saved" : "Save Listing"}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
       {listing.description ? (
         <Card style={styles.section}>
           <ThemedText type="h4" style={styles.sectionTitle}>Description</ThemedText>
@@ -269,6 +308,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
   },
   section: {
     padding: Spacing.lg,

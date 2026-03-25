@@ -111,6 +111,31 @@ export default function ThreadDetailScreen() {
     queryKey: [`/api/threads/${threadId}/replies`],
   });
 
+  const { data: savedThreadIds = [] } = useQuery<string[]>({
+    queryKey: ["/api/saved/thread-ids"],
+    enabled: !!currentUser,
+  });
+
+  const isSaved = savedThreadIds.includes(threadId);
+
+  const toggleSaveMutation = useMutation({
+    mutationFn: async () => {
+      if (isSaved) {
+        return apiRequest("DELETE", `/api/saved/threads/${threadId}`);
+      }
+      return apiRequest("POST", `/api/saved/threads/${threadId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved/thread-ids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show(isSaved ? "Removed from saved" : "Thread saved", "success");
+    },
+    onError: () => {
+      toast.show("Failed to update saved threads", "error");
+    },
+  });
+
   const sortedReplies = useMemo(() => {
     const solutionReply = replies.find((r) => r.isSolution);
     const otherReplies = replies.filter((r) => !r.isSolution);
@@ -624,18 +649,33 @@ export default function ThreadDetailScreen() {
           <ThemedText type="body" style={styles.threadContent}>
             {thread.content}
           </ThemedText>
-          {isThreadAuthor ? (
-            <Pressable
-              onPress={handleDeleteThread}
-              disabled={deleteThreadMutation.isPending}
-              style={[styles.deleteThreadButton, { borderColor: theme.error }]}
-            >
-              <Feather name="trash-2" size={14} color={theme.error} />
-              <ThemedText type="caption" style={{ color: theme.error, marginLeft: 4 }}>
-                {deleteThreadMutation.isPending ? "Deleting..." : "Delete Thread"}
-              </ThemedText>
-            </Pressable>
-          ) : null}
+          <View style={styles.threadActions}>
+            {currentUser ? (
+              <Pressable
+                onPress={() => toggleSaveMutation.mutate()}
+                disabled={toggleSaveMutation.isPending}
+                style={[styles.bookmarkButton, { borderColor: isSaved ? theme.primary : theme.border }]}
+                testID="button-bookmark-thread"
+              >
+                <Feather name={isSaved ? "bookmark" : "bookmark"} size={14} color={isSaved ? theme.primary : theme.textSecondary} />
+                <ThemedText type="caption" style={{ color: isSaved ? theme.primary : theme.textSecondary, marginLeft: 4 }}>
+                  {isSaved ? "Saved" : "Save"}
+                </ThemedText>
+              </Pressable>
+            ) : null}
+            {isThreadAuthor ? (
+              <Pressable
+                onPress={handleDeleteThread}
+                disabled={deleteThreadMutation.isPending}
+                style={[styles.deleteThreadButton, { borderColor: theme.error }]}
+              >
+                <Feather name="trash-2" size={14} color={theme.error} />
+                <ThemedText type="caption" style={{ color: theme.error, marginLeft: 4 }}>
+                  {deleteThreadMutation.isPending ? "Deleting..." : "Delete Thread"}
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
         </Card>
         <ThemedText type="h4" style={styles.repliesHeader}>
           Replies ({replies.length})
@@ -809,15 +849,26 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 11,
   },
-  deleteThreadButton: {
+  threadActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  bookmarkButton: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    marginTop: Spacing.md,
+  },
+  deleteThreadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
   },
   threadContent: {
     lineHeight: 22,

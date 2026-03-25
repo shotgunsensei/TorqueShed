@@ -272,6 +272,22 @@ export const swapShopListingsRelations = relations(swapShopListings, ({ one }) =
   user: one(users, { fields: [swapShopListings.userId], references: [users.id] }),
 }));
 
+export const savedThreads = pgTable("saved_threads", {
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  threadId: varchar("thread_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.threadId] }),
+]);
+
+export const savedListings = pgTable("saved_listings", {
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  listingId: varchar("listing_id", { length: 36 }).notNull().references(() => swapShopListings.id, { onDelete: "cascade" }),
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.listingId] }),
+]);
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   passwordHash: true,

@@ -29,7 +29,7 @@ import {
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 import { db } from "./db";
-import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings } from "@shared/schema";
+import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 
 const BCRYPT_ROUNDS = 12;
@@ -1359,6 +1359,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in verify-email:", error);
       res.status(500).json({ error: "Failed to process request" });
+    }
+  });
+
+  // ========== Saved Items Routes ==========
+  app.post("/api/saved/threads/:threadId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.threadId);
+      if (!thread) return res.status(404).json({ error: "Thread not found" });
+
+      await db.insert(savedThreads).values({
+        userId: req.userId!,
+        threadId: req.params.threadId,
+      }).onConflictDoNothing();
+
+      res.json({ saved: true });
+    } catch (error) {
+      console.error("Error saving thread:", error);
+      res.status(500).json({ error: "Failed to save thread" });
+    }
+  });
+
+  app.delete("/api/saved/threads/:threadId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      await db.delete(savedThreads).where(
+        and(eq(savedThreads.userId, req.userId!), eq(savedThreads.threadId, req.params.threadId))
+      );
+      res.json({ saved: false });
+    } catch (error) {
+      console.error("Error unsaving thread:", error);
+      res.status(500).json({ error: "Failed to unsave thread" });
+    }
+  });
+
+  app.post("/api/saved/listings/:listingId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const listing = await storage.getSwapShopListing(req.params.listingId);
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+      await db.insert(savedListings).values({
+        userId: req.userId!,
+        listingId: req.params.listingId,
+      }).onConflictDoNothing();
+
+      res.json({ saved: true });
+    } catch (error) {
+      console.error("Error saving listing:", error);
+      res.status(500).json({ error: "Failed to save listing" });
+    }
+  });
+
+  app.delete("/api/saved/listings/:listingId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      await db.delete(savedListings).where(
+        and(eq(savedListings.userId, req.userId!), eq(savedListings.listingId, req.params.listingId))
+      );
+      res.json({ saved: false });
+    } catch (error) {
+      console.error("Error unsaving listing:", error);
+      res.status(500).json({ error: "Failed to unsave listing" });
+    }
+  });
+
+  app.get("/api/saved", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+
+      const savedThreadRows = await db
+        .select({
+          threadId: savedThreads.threadId,
+          savedAt: savedThreads.savedAt,
+          title: threads.title,
+          garageId: threads.garageId,
+          hasSolution: threads.hasSolution,
+          replyCount: threads.replyCount,
+          createdAt: threads.createdAt,
+        })
+        .from(savedThreads)
+        .innerJoin(threads, eq(savedThreads.threadId, threads.id))
+        .where(eq(savedThreads.userId, userId))
+        .orderBy(desc(savedThreads.savedAt));
+
+      const savedListingRows = await db
+        .select({
+          listingId: savedListings.listingId,
+          savedAt: savedListings.savedAt,
+          title: swapShopListings.title,
+          price: swapShopListings.price,
+          condition: swapShopListings.condition,
+          isActive: swapShopListings.isActive,
+          createdAt: swapShopListings.createdAt,
+        })
+        .from(savedListings)
+        .innerJoin(swapShopListings, eq(savedListings.listingId, swapShopListings.id))
+        .where(eq(savedListings.userId, userId))
+        .orderBy(desc(savedListings.savedAt));
+
+      res.json({ threads: savedThreadRows, listings: savedListingRows });
+    } catch (error) {
+      console.error("Error fetching saved items:", error);
+      res.status(500).json({ error: "Failed to fetch saved items" });
+    }
+  });
+
+  app.get("/api/saved/thread-ids", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const rows = await db
+        .select({ threadId: savedThreads.threadId })
+        .from(savedThreads)
+        .where(eq(savedThreads.userId, req.userId!));
+      res.json(rows.map((r) => r.threadId));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved thread IDs" });
+    }
+  });
+
+  app.get("/api/saved/listing-ids", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const rows = await db
+        .select({ listingId: savedListings.listingId })
+        .from(savedListings)
+        .where(eq(savedListings.userId, req.userId!));
+      res.json(rows.map((r) => r.listingId));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved listing IDs" });
+    }
+  });
+
+  // ========== Trust Badges Route ==========
+  app.get("/api/users/:id/trust-badges", async (req: Request, res: Response) => {
+    try {
+      const userId = req.params.id;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const badges: { key: string; label: string; icon: string }[] = [];
+
+      const solutionCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(threadReplies)
+        .where(and(eq(threadReplies.userId, userId), eq(threadReplies.isSolution, true)));
+      const solvedCount = solutionCount[0]?.count || 0;
+
+      if (solvedCount >= 3) {
+        badges.push({ key: "trusted-solver", label: "Trusted Solver", icon: "award" });
+      }
+
+      const userVehicles = await storage.getVehiclesByUser(userId);
+      const hasVinVehicle = userVehicles.some((v) => v.vin && v.vin.length >= 11);
+      if (hasVinVehicle) {
+        badges.push({ key: "verified-owner", label: "Verified Owner", icon: "shield" });
+      }
+
+      const replyCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(threadReplies)
+        .where(eq(threadReplies.userId, userId));
+      const totalReplies = replyCount[0]?.count || 0;
+
+      if (totalReplies >= 10) {
+        badges.push({ key: "active-contributor", label: "Active Contributor", icon: "message-circle" });
+      }
+
+      res.json({
+        badges,
+        stats: { solvedCount, replyCount: totalReplies, vehicleCount: userVehicles.length },
+      });
+    } catch (error) {
+      console.error("Error fetching trust badges:", error);
+      res.status(500).json({ error: "Failed to fetch trust badges" });
+    }
+  });
+
+  // ========== Admin Report Routes ==========
+  app.get("/api/admin/reports", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const statusFilter = (req.query.status as string) || "pending";
+      const allReports = await db
+        .select({
+          id: reports.id,
+          reporterId: reports.reporterId,
+          reportedUserId: reports.reportedUserId,
+          contentType: reports.contentType,
+          contentId: reports.contentId,
+          reason: reports.reason,
+          details: reports.details,
+          status: reports.status,
+          reviewedBy: reports.reviewedBy,
+          reviewedAt: reports.reviewedAt,
+          createdAt: reports.createdAt,
+          reporterName: sql<string>`(SELECT username FROM users WHERE id = ${reports.reporterId})`,
+          reportedUserName: sql<string>`(SELECT username FROM users WHERE id = ${reports.reportedUserId})`,
+        })
+        .from(reports)
+        .where(eq(reports.status, statusFilter))
+        .orderBy(desc(reports.createdAt));
+
+      res.json(allReports);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  app.patch("/api/admin/reports/:id", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { action } = req.body;
+      if (!action || !["dismiss", "remove_content"].includes(action)) {
+        return res.status(400).json({ error: "Invalid action. Must be 'dismiss' or 'remove_content'" });
+      }
+
+      const [report] = await db
+        .select()
+        .from(reports)
+        .where(eq(reports.id, req.params.id));
+
+      if (!report) return res.status(404).json({ error: "Report not found" });
+
+      if (action === "remove_content" && report.contentId) {
+        if (report.contentType === "forum_thread") {
+          await db.delete(threads).where(eq(threads.id, report.contentId));
+        } else if (report.contentType === "forum_reply") {
+          await db.delete(threadReplies).where(eq(threadReplies.id, report.contentId));
+        }
+      }
+
+      const newStatus = action === "dismiss" ? "dismissed" : "resolved";
+      const [updated] = await db
+        .update(reports)
+        .set({ status: newStatus, reviewedBy: req.userId!, reviewedAt: new Date() })
+        .where(eq(reports.id, req.params.id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating report:", error);
+      res.status(500).json({ error: "Failed to update report" });
     }
   });
 

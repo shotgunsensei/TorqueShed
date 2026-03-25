@@ -49,6 +49,24 @@ function getAuthHeaders(token: string | null): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
 }
 
+interface Report {
+  id: string;
+  reporterId: string;
+  reportedUserId: string | null;
+  contentType: string;
+  contentId: string | null;
+  reason: string;
+  details: string | null;
+  status: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  reporterName: string;
+  reportedUserName: string | null;
+}
+
+type AdminTab = "products" | "reports";
+
 interface Product {
   id: string;
   title: string;
@@ -90,6 +108,7 @@ export default function AdminProductsScreen() {
   const toast = useToast();
 
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("products");
   const [isModalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
@@ -214,6 +233,70 @@ export default function AdminProductsScreen() {
       toast.show(error.message || "Failed to delete product", "error");
     },
   });
+
+  const { data: reports = [], isLoading: reportsLoading, isError: reportsError, refetch: refetchReports } = useQuery<Report[]>({
+    queryKey: ["/api/admin/reports", authToken, "pending"],
+    queryFn: async () => {
+      const url = new URL("/api/admin/reports?status=pending", getApiUrl());
+      const response = await fetch(url.toString(), {
+        headers: getAuthHeaders(authToken),
+      });
+      if (!response.ok) throw new Error("Failed to fetch reports");
+      return response.json();
+    },
+    enabled: !!authToken,
+  });
+
+  const resolveReportMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: "dismiss" | "remove_content" }) => {
+      const url = new URL(`/api/admin/reports/${id}`, getApiUrl());
+      const response = await fetch(url.toString(), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(authToken),
+        },
+        body: JSON.stringify({ action }),
+      });
+      if (!response.ok) throw new Error("Failed to update report");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reports"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Report updated", "success");
+    },
+    onError: (error: Error) => {
+      toast.show(error.message || "Failed to update report", "error");
+    },
+  });
+
+  const handleReportAction = (report: Report, action: "dismiss" | "remove_content") => {
+    const actionLabel = action === "dismiss" ? "dismiss this report" : "remove the reported content";
+    Alert.alert(
+      "Confirm Action",
+      `Are you sure you want to ${actionLabel}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: action === "dismiss" ? "Dismiss" : "Remove",
+          style: action === "remove_content" ? "destructive" : "default",
+          onPress: () => resolveReportMutation.mutate({ id: report.id, action }),
+        },
+      ]
+    );
+  };
+
+  const formatReportDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays > 0) return `${diffDays}d ago`;
+    const diffHours = Math.floor(diffMs / 3600000);
+    if (diffHours > 0) return `${diffHours}h ago`;
+    return "Just now";
+  };
 
   const resetForm = () => {
     setFormData({
@@ -457,49 +540,164 @@ export default function AdminProductsScreen() {
     </View>
   );
 
+  const renderReport = ({ item }: { item: Report }) => (
+    <View style={[styles.productCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+      <View style={styles.productHeader}>
+        <View style={styles.productInfo}>
+          <Text style={[styles.productTitle, { color: theme.text }]} numberOfLines={1}>
+            {item.reason}
+          </Text>
+          <View style={styles.badges}>
+            <View style={[styles.badge, { backgroundColor: theme.error + "20" }]}>
+              <Text style={[styles.badgeText, { color: theme.error }]}>{item.contentType.replace("_", " ")}</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: theme.backgroundTertiary }]}>
+              <Text style={[styles.badgeText, { color: theme.textSecondary }]}>{formatReportDate(item.createdAt)}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+      <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm }}>
+        <View style={styles.reportRow}>
+          <Feather name="user" size={12} color={theme.textMuted} />
+          <Text style={[styles.reportText, { color: theme.textSecondary }]}>
+            Reported by: {item.reporterName}
+          </Text>
+        </View>
+        {item.reportedUserName ? (
+          <View style={styles.reportRow}>
+            <Feather name="alert-circle" size={12} color={theme.textMuted} />
+            <Text style={[styles.reportText, { color: theme.textSecondary }]}>
+              Against: {item.reportedUserName}
+            </Text>
+          </View>
+        ) : null}
+        {item.details ? (
+          <Text style={[styles.reportDetails, { color: theme.text }]} numberOfLines={3}>
+            {item.details}
+          </Text>
+        ) : null}
+      </View>
+      <View style={[styles.reportActions, { borderTopColor: theme.border }]}>
+        <Pressable
+          onPress={() => handleReportAction(item, "dismiss")}
+          style={[styles.reportActionBtn, { backgroundColor: theme.backgroundTertiary }]}
+          disabled={resolveReportMutation.isPending}
+        >
+          <Feather name="x" size={14} color={theme.textSecondary} />
+          <Text style={[styles.reportActionText, { color: theme.textSecondary }]}>Dismiss</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => handleReportAction(item, "remove_content")}
+          style={[styles.reportActionBtn, { backgroundColor: theme.error + "20" }]}
+          disabled={resolveReportMutation.isPending}
+        >
+          <Feather name="trash-2" size={14} color={theme.error} />
+          <Text style={[styles.reportActionText, { color: theme.error }]}>Remove Content</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      {isLoading ? (
-        <Skeleton.List count={4} style={{ paddingTop: headerHeight + Spacing.lg }} />
-      ) : isError ? (
-        <EmptyState
-          icon="alert-circle"
-          title="Failed to Load Products"
-          description={queryError?.message || "Could not load products. Pull down to retry."}
-          actionLabel="Retry"
-          onAction={refetch}
-          style={{ paddingTop: headerHeight + Spacing.lg }}
-        />
-      ) : (
-        <FlatList
-          data={products ?? []}
-          keyExtractor={(item) => item.id}
-          renderItem={renderProduct}
-          contentContainerStyle={[
-            styles.list,
-            { paddingTop: headerHeight + Spacing.lg, paddingBottom: insets.bottom + 80 },
-          ]}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor={theme.primary}
-              colors={[theme.primary]}
-            />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon="package"
-              title="No Products Yet"
-              description="Add your first product to the Tool and Gear section."
-              actionLabel="Add Product"
-              onAction={openCreateModal}
-            />
-          }
-        />
-      )}
+      <View style={[styles.tabRow, { paddingTop: headerHeight + Spacing.md }]}>
+        <Pressable
+          onPress={() => setActiveTab("products")}
+          style={[styles.tabButton, activeTab === "products" ? { borderBottomColor: theme.primary, borderBottomWidth: 2 } : null]}
+        >
+          <Feather name="package" size={16} color={activeTab === "products" ? theme.primary : theme.textMuted} />
+          <Text style={[styles.tabButtonText, { color: activeTab === "products" ? theme.primary : theme.textMuted }]}>Products</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setActiveTab("reports")}
+          style={[styles.tabButton, activeTab === "reports" ? { borderBottomColor: theme.primary, borderBottomWidth: 2 } : null]}
+        >
+          <Feather name="flag" size={16} color={activeTab === "reports" ? theme.primary : theme.textMuted} />
+          <Text style={[styles.tabButtonText, { color: activeTab === "reports" ? theme.primary : theme.textMuted }]}>
+            Reports{reports.length > 0 ? ` (${reports.length})` : ""}
+          </Text>
+        </Pressable>
+      </View>
 
-      <FAB icon="plus" onPress={openCreateModal} bottom={insets.bottom + 16} />
+      {activeTab === "products" ? (
+        <>
+          {isLoading ? (
+            <Skeleton.List count={4} style={{ paddingTop: Spacing.lg }} />
+          ) : isError ? (
+            <EmptyState
+              icon="alert-circle"
+              title="Failed to Load Products"
+              description={queryError?.message || "Could not load products. Pull down to retry."}
+              actionLabel="Retry"
+              onAction={refetch}
+              style={{ paddingTop: Spacing.lg }}
+            />
+          ) : (
+            <FlatList
+              data={products ?? []}
+              keyExtractor={(item) => item.id}
+              renderItem={renderProduct}
+              contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefetching}
+                  onRefresh={refetch}
+                  tintColor={theme.primary}
+                  colors={[theme.primary]}
+                />
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  icon="package"
+                  title="No Products Yet"
+                  description="Add your first product to the Tool and Gear section."
+                  actionLabel="Add Product"
+                  onAction={openCreateModal}
+                />
+              }
+            />
+          )}
+          <FAB icon="plus" onPress={openCreateModal} bottom={insets.bottom + 16} />
+        </>
+      ) : (
+        <>
+          {reportsLoading ? (
+            <Skeleton.List count={4} style={{ paddingTop: Spacing.lg }} />
+          ) : reportsError ? (
+            <EmptyState
+              icon="alert-circle"
+              title="Failed to Load Reports"
+              description="Could not load reports. Pull down to retry."
+              actionLabel="Retry"
+              onAction={refetchReports}
+              style={{ paddingTop: Spacing.lg }}
+            />
+          ) : (
+            <FlatList
+              data={reports}
+              keyExtractor={(item) => item.id}
+              renderItem={renderReport}
+              contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={false}
+                  onRefresh={refetchReports}
+                  tintColor={theme.primary}
+                  colors={[theme.primary]}
+                />
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  icon="check-circle"
+                  title="No Pending Reports"
+                  description="All reports have been reviewed."
+                />
+              }
+            />
+          )}
+        </>
+      )}
 
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
@@ -683,6 +881,57 @@ export default function AdminProductsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  tabRow: {
+    flexDirection: "row",
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  tabButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    marginRight: Spacing.md,
+  },
+  tabButtonText: {
+    ...Typography.body,
+    fontFamily: "Inter_500Medium",
+  },
+  reportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: 4,
+  },
+  reportText: {
+    ...Typography.caption,
+  },
+  reportDetails: {
+    ...Typography.body,
+    fontSize: 13,
+    marginTop: Spacing.xs,
+  },
+  reportActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  reportActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  reportActionText: {
+    ...Typography.caption,
+    fontFamily: "Inter_500Medium",
   },
   list: {
     padding: Spacing.lg,
