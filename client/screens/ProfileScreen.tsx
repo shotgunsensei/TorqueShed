@@ -14,6 +14,7 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { Skeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserRoleDisplay } from "@/components/UserAvatar";
@@ -321,16 +322,10 @@ export default function ProfileScreen() {
 
         <View style={styles.heroMeta}>
           {userRole ? (
-            <View style={[styles.roleBadge, { backgroundColor: theme.primary + "20" }]}>
-              <Feather name="shield" size={12} color={theme.primary} />
-              <Text style={[styles.roleBadgeText, { color: theme.primary }]}>{userRole}</Text>
-            </View>
+            <StatusBadge label={userRole} icon="shield" variant="primary" size="md" />
           ) : null}
           {isTrustedSolver ? (
-            <View style={[styles.roleBadge, { backgroundColor: theme.success + "20" }]}>
-              <Feather name="check-circle" size={12} color={theme.success} />
-              <Text style={[styles.roleBadgeText, { color: theme.success }]}>Trusted Solver</Text>
-            </View>
+            <StatusBadge label="Trusted Solver" icon="check-circle" variant="success" size="md" />
           ) : null}
         </View>
 

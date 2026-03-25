@@ -22,6 +22,7 @@ import { Feather } from "@expo/vector-icons";
 import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import * as Haptics from "expo-haptics";
 
@@ -152,11 +153,7 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
             {item.price}
           </Text>
           <View style={styles.cardMeta}>
-            <View style={[styles.conditionBadge, { backgroundColor: getConditionColor() + "20" }]}>
-              <Text style={[styles.conditionText, { color: getConditionColor() }]}>
-                {item.condition}
-              </Text>
-            </View>
+            <StatusBadge label={item.condition} color={getConditionColor()} backgroundColor={getConditionColor() + "20"} size="sm" />
             {item.localPickup ? (
               <View style={styles.pickupBadge}>
                 <Feather name="map-pin" size={10} color={theme.textSecondary} />

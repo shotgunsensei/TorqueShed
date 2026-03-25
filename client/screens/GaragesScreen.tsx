@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
+import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
@@ -86,9 +87,7 @@ function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void })
             <View style={styles.titleWithBadge}>
               <Text style={[styles.cardTitle, { color: theme.text }]}>{item.name}</Text>
               {item.isJoined ? (
-                <View style={[styles.joinedBadge, { backgroundColor: theme.success + "20" }]}>
-                  <Feather name="check" size={10} color={theme.success} />
-                </View>
+                <StatusBadge label="Joined" icon="check" variant="success" size="sm" />
               ) : null}
             </View>
             {item.description ? (

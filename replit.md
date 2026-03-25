@@ -62,12 +62,14 @@ RootStackNavigator
 Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`
 
 ### UI Component Library
-- `Card` — themed card with elevation levels, press feedback
-- `Button` — primary action button
+- `Card` — themed card with 1px border (cardBorder), elevation levels, press feedback
+- `Button` — primary action button with pill shape
 - `FAB` — floating action button with safe area insets
 - `EmptyState` — icon + title + description + optional CTA for empty/error states
-- `Skeleton` — loading placeholders (List, Grid, Box variants)
+- `Skeleton` — loading placeholders (List, Grid, Box variants) with cardBorder
+- `StatusBadge` — shared badge/chip with variants (default, success, warning, error, primary, muted), icon support, sm/md sizes. Used for condition badges, role badges, trust signals, and featured/sponsored indicators.
 - `UserAvatar` — avatar with role badge support
+- `Input` — themed text input with md border radius, 1px border
 - `ThemedText` / `ThemedView` — theme-aware primitives
 - `ErrorBoundary` — crash recovery with restart
 

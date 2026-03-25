@@ -18,6 +18,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
@@ -238,11 +239,7 @@ function ListingCard({
         {formatPrice(listing.price)}
       </ThemedText>
       <View style={styles.threadMeta}>
-        <View style={[styles.conditionBadge, { backgroundColor: theme.backgroundTertiary }]}>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            {listing.condition}
-          </ThemedText>
-        </View>
+        <StatusBadge label={listing.condition} variant="muted" size="sm" />
         <ThemedText type="caption" style={{ color: theme.textMuted }}>
           {listing.userName}
         </ThemedText>

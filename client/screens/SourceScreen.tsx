@@ -23,6 +23,7 @@ import * as Haptics from "expo-haptics";
 import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -132,8 +133,8 @@ function SwapCard({ item, onPress, onReport }: { item: SwapListing; onPress: () 
         ) : (
           <Feather name="camera-off" size={28} color={theme.textMuted} />
         )}
-        <View style={[s.conditionBadge, { backgroundColor: condColor + "20" }]}>
-          <Text style={[s.conditionText, { color: condColor }]}>{item.condition}</Text>
+        <View style={s.conditionBadge}>
+          <StatusBadge label={item.condition} color={condColor} backgroundColor={condColor + "20"} size="sm" />
         </View>
       </View>
       <View style={s.swapBody}>
@@ -220,13 +221,12 @@ function ProductCard({ item }: { item: Product }) {
       <View style={[s.productImageArea, { backgroundColor: theme.backgroundTertiary }]}>
         <Feather name="package" size={28} color={theme.textMuted} />
         {isFeatured ? (
-          <View style={[s.featuredBadge, { backgroundColor: theme.accent }]}>
-            <Feather name="star" size={10} color="#FFFFFF" />
-            <Text style={s.badgeText}>Featured</Text>
+          <View style={s.featuredBadge}>
+            <StatusBadge label="Featured" icon="star" color="#FFFFFF" backgroundColor={theme.accent} size="sm" />
           </View>
         ) : item.isSponsored ? (
-          <View style={[s.sponsoredBadge, { backgroundColor: theme.accent }]}>
-            <Text style={[s.badgeText, { color: "#000000" }]}>Sponsored</Text>
+          <View style={s.sponsoredBadge}>
+            <StatusBadge label="Sponsored" color="#000000" backgroundColor={theme.accent} size="sm" />
           </View>
         ) : null}
       </View>
