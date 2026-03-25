@@ -205,6 +205,15 @@ export default function GaragesScreen() {
             </Text>
           </View>
         }
+        ListEmptyComponent={
+          <EmptyState
+            icon="users"
+            title="No Bays Available"
+            description="Bays haven't been set up yet. Pull down to refresh."
+            actionLabel="Retry"
+            onAction={() => refetch()}
+          />
+        }
       />
     </View>
   );
