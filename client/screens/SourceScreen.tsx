@@ -620,11 +620,14 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
             <Pressable
               key={seg.key}
               onPress={() => setActiveSegment(seg.key)}
-              style={[s.segmentBtn, active ? { borderBottomColor: theme.primary, borderBottomWidth: 2 } : null]}
+              style={[
+                s.segmentBtn,
+                active ? { borderBottomColor: theme.primary, borderBottomWidth: 3 } : { borderBottomWidth: 3, borderBottomColor: "transparent" },
+              ]}
               testID={`segment-${seg.key}`}
             >
               <Feather name={seg.icon} size={16} color={active ? theme.primary : theme.textMuted} />
-              <Text style={[s.segmentText, { color: active ? theme.primary : theme.textMuted }]}>{seg.label}</Text>
+              <Text style={[s.segmentText, { color: active ? theme.primary : theme.textMuted, fontWeight: active ? "600" : "500" }]}>{seg.label}</Text>
             </Pressable>
           );
         })}

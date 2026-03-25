@@ -113,8 +113,8 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
-    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
     minHeight: Spacing.inputHeight,
     paddingHorizontal: Spacing.md,
   },

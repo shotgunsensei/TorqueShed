@@ -83,6 +83,7 @@ export function Card({
         styles.card,
         {
           backgroundColor: cardBackgroundColor,
+          borderColor: theme.cardBorder,
         },
         animatedStyle,
         style,
@@ -106,7 +107,9 @@ export function Card({
 const styles = StyleSheet.create({
   card: {
     padding: Spacing.xl,
-    borderRadius: BorderRadius["2xl"],
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   cardTitle: {
     marginBottom: Spacing.sm,

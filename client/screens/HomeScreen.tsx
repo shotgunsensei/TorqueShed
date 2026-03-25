@@ -12,6 +12,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
+import { useHeaderHeight } from "@react-navigation/elements";
+
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
@@ -180,25 +182,25 @@ function ThreadCard({
         </ThemedText>
         {(thread.solutionCountTotal || 0) >= 3 ? (
           <>
-            <View style={styles.threadMetaDot} />
+            <View style={[styles.threadMetaDot, { backgroundColor: theme.textMuted }]} />
             <Feather name="award" size={10} color={theme.success} />
           </>
         ) : thread.yearsWrenching ? (
           <>
-            <View style={styles.threadMetaDot} />
+            <View style={[styles.threadMetaDot, { backgroundColor: theme.textMuted }]} />
             <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10 }}>
               {thread.yearsWrenching}yr
             </ThemedText>
           </>
         ) : null}
-        <View style={styles.threadMetaDot} />
+        <View style={[styles.threadMetaDot, { backgroundColor: theme.textMuted }]} />
         <Feather name="message-circle" size={12} color={theme.textMuted} />
         <ThemedText type="caption" style={{ color: theme.textMuted }}>
           {thread.replyCount || 0}
         </ThemedText>
         {thread.hasSolution ? (
           <>
-            <View style={styles.threadMetaDot} />
+            <View style={[styles.threadMetaDot, { backgroundColor: theme.textMuted }]} />
             <Feather name="check-circle" size={12} color={theme.success} />
             <ThemedText type="caption" style={{ color: theme.success }}>
               Solved
@@ -254,6 +256,7 @@ export default function HomeScreen() {
   const { currentUser } = useAuth();
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
+  const headerHeight = useHeaderHeight();
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery<FeedData>({
     queryKey: ["/api/feed"],
@@ -455,6 +458,7 @@ export default function HomeScreen() {
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={{
+        paddingTop: headerHeight + Spacing.xl,
         paddingBottom: tabBarHeight + Spacing.xl,
       }}
       refreshControl={
@@ -572,7 +576,6 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: "#666",
   },
   conditionBadge: {
     paddingHorizontal: Spacing.sm,
