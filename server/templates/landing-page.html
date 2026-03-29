@@ -518,30 +518,82 @@
         content: '';
         position: absolute;
         inset: 0;
-        background: linear-gradient(180deg, transparent 0%, rgba(255, 107, 53, 0.03) 50%, transparent 100%);
+        background: linear-gradient(180deg, transparent 0%, rgba(255, 107, 53, 0.04) 50%, transparent 100%);
         pointer-events: none;
       }
       .install-card {
-        max-width: 480px;
+        max-width: 520px;
         margin: 0 auto;
-        padding: 40px;
+        padding: 48px 40px;
         background: var(--card);
         border: 1px solid var(--card-border);
-        border-radius: 20px;
+        border-radius: 24px;
         position: relative;
+        overflow: hidden;
       }
+      .install-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--orange), #FF9F6B, var(--orange));
+      }
+      .install-card-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        margin: 0 auto 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .install-card-icon.state-available {
+        background: var(--orange-glow);
+        color: var(--orange);
+      }
+      .install-card-icon.state-howto {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--gray-400);
+      }
+      .install-card-icon.state-installed {
+        background: rgba(34, 197, 94, 0.12);
+        color: #22C55E;
+      }
+      .install-card-icon svg { width: 28px; height: 28px; }
       .install-card h3 {
         font-family: 'Montserrat', sans-serif;
         font-weight: 800;
         font-size: 24px;
         color: var(--white);
-        margin-bottom: 10px;
+        margin-bottom: 8px;
       }
-      .install-card > p {
+      .install-card-desc {
         font-size: 15px;
         color: var(--gray-400);
         margin-bottom: 28px;
         line-height: 1.6;
+      }
+      .install-benefits {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+      }
+      .install-benefit {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--gray-300);
+      }
+      .install-benefit svg {
+        width: 16px;
+        height: 16px;
+        color: var(--orange);
+        flex-shrink: 0;
       }
       .install-actions {
         display: flex;
@@ -549,89 +601,249 @@
         gap: 12px;
         align-items: center;
       }
-      #install-btn { width: 100%; max-width: 320px; }
+      .install-actions .btn { width: 100%; max-width: 320px; }
+      .btn-install {
+        background: var(--orange);
+        color: var(--white);
+        box-shadow: 0 4px 24px rgba(255, 107, 53, 0.35);
+        font-size: 17px;
+        padding: 16px 32px;
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+      }
+      .btn-install:hover { background: var(--orange-hover); }
+      .btn-install::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+        animation: installSheen 3s ease-in-out infinite;
+      }
+      @keyframes installSheen {
+        0%, 100% { left: -100%; }
+        50% { left: 100%; }
+      }
+      .btn-howto-section {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--white);
+        border: 1px solid var(--card-border);
+        padding: 14px 28px;
+        border-radius: 12px;
+      }
+      .btn-howto-section:hover { background: rgba(255, 255, 255, 0.07); border-color: var(--gray-600); }
+      .install-helper-text {
+        font-size: 12px;
+        color: var(--gray-500);
+        margin-top: 4px;
+      }
       #install-status {
         font-size: 14px;
         margin-top: 8px;
         min-height: 20px;
       }
-      .install-success { color: #22C55E; }
+      .install-success-msg {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .install-success-msg .checkmark-ring {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(34, 197, 94, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #22C55E;
+        margin-bottom: 4px;
+      }
+      .install-success-msg .checkmark-ring svg { width: 24px; height: 24px; }
+      .install-success-msg .installed-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: #22C55E;
+      }
+      .install-success-msg .installed-sub {
+        font-size: 13px;
+        color: var(--gray-400);
+      }
       .install-info { color: var(--gray-400); }
+
+      /* Hero install badge (shown in hero when installed) */
+      .hero-installed-badge {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 18px;
+        border-radius: 100px;
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.2);
+        font-size: 13px;
+        font-weight: 500;
+        color: #22C55E;
+      }
+      .hero-installed-badge svg { width: 16px; height: 16px; }
 
       /* Install Modal */
       .modal-overlay {
         display: none;
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(4px);
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         z-index: 200;
         justify-content: center;
         align-items: center;
         padding: 24px;
+        animation: fadeIn 0.15s ease;
       }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       .modal-overlay.active { display: flex; }
       .modal {
-        background: var(--card);
+        background: #141720;
         border: 1px solid var(--card-border);
-        border-radius: 20px;
-        padding: 32px;
-        max-width: 420px;
+        border-radius: 24px;
+        padding: 36px 32px 32px;
+        max-width: 460px;
         width: 100%;
         position: relative;
+        animation: modalSlide 0.2s ease;
       }
+      @keyframes modalSlide { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .modal-close {
         position: absolute;
         top: 16px;
         right: 16px;
-        width: 32px;
-        height: 32px;
-        border: none;
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--card-border);
         background: transparent;
         color: var(--gray-400);
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 8px;
+        border-radius: 10px;
+        transition: all 0.15s;
       }
-      .modal-close:hover { color: var(--white); background: rgba(255,255,255,0.05); }
+      .modal-close:hover { color: var(--white); background: rgba(255,255,255,0.05); border-color: var(--gray-600); }
+      .modal-close svg { width: 18px; height: 18px; }
+      .modal-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: var(--orange-glow);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--orange);
+        margin-bottom: 20px;
+      }
+      .modal-header-icon svg { width: 24px; height: 24px; }
       .modal h3 {
         font-family: 'Montserrat', sans-serif;
         font-weight: 700;
         font-size: 20px;
         color: var(--white);
-        margin-bottom: 8px;
+        margin-bottom: 6px;
       }
       .modal > p {
         font-size: 14px;
-        color: var(--gray-400);
-        margin-bottom: 24px;
-      }
-      .install-instruction {
-        padding: 16px;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--card-border);
-        border-radius: 12px;
-        margin-bottom: 12px;
-      }
-      .install-instruction h4 {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--white);
-        margin-bottom: 8px;
-      }
-      .install-instruction ol {
-        padding-left: 20px;
-        list-style: decimal;
-      }
-      .install-instruction ol li {
-        font-size: 13px;
-        color: var(--gray-400);
-        padding: 3px 0;
+        color: var(--gray-500);
+        margin-bottom: 28px;
         line-height: 1.5;
       }
+      .install-instruction {
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--card-border);
+        border-radius: 14px;
+        margin-bottom: 12px;
+        transition: border-color 0.15s;
+      }
+      .install-instruction:hover { border-color: var(--gray-600); }
+      .inst-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .inst-device-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .inst-device-icon svg { width: 20px; height: 20px; }
+      .inst-device-icon.android { background: rgba(61, 220, 132, 0.1); color: #3DDC84; }
+      .inst-device-icon.ios { background: rgba(255, 255, 255, 0.08); color: var(--white); }
+      .inst-device-icon.desktop { background: rgba(96, 165, 250, 0.1); color: #60A5FA; }
+      .inst-header h4 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--white);
+      }
+      .install-instruction ol {
+        padding-left: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+      .install-instruction ol li {
+        counter-increment: step;
+        font-size: 14px;
+        color: var(--gray-300);
+        padding: 6px 0;
+        line-height: 1.5;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .install-instruction ol li::before {
+        content: counter(step);
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--gray-400);
+        margin-top: 1px;
+      }
+      .inst-key {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--card-border);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gray-300);
+        font-family: 'Inter', sans-serif;
+      }
       .install-instruction.hidden { display: none; }
+      .modal-footer-note {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid var(--card-border);
+        font-size: 12px;
+        color: var(--gray-500);
+        line-height: 1.5;
+        text-align: center;
+      }
 
       /* Beta Section */
       .beta-section {
@@ -746,28 +958,38 @@
         left: 50%;
         transform: translateX(-50%) translateY(100px);
         background: #1A1D23;
-        border: 1px solid var(--card-border);
+        border: 1px solid rgba(34, 197, 94, 0.2);
         color: var(--white);
-        padding: 14px 24px;
-        border-radius: 12px;
-        font-size: 14px;
+        padding: 16px 28px;
+        border-radius: 14px;
+        font-size: 15px;
         font-weight: 500;
         z-index: 300;
         opacity: 0;
-        transition: transform 0.3s ease, opacity 0.3s ease;
+        transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
         display: flex;
         align-items: center;
-        gap: 10px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        gap: 12px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 197, 94, 0.08);
         pointer-events: none;
+        max-width: 400px;
       }
       .toast.visible {
         transform: translateX(-50%) translateY(0);
         opacity: 1;
         pointer-events: auto;
       }
-      .toast svg { width: 18px; height: 18px; flex-shrink: 0; }
-      .toast-success svg { color: #22C55E; }
+      .toast-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(34, 197, 94, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .toast-icon svg { width: 18px; height: 18px; color: #22C55E; }
 
       /* Responsive */
       @media (max-width: 768px) {
@@ -785,7 +1007,13 @@
         .hero-ctas { flex-direction: column; align-items: center; }
         .hero-ctas .btn { width: 100%; max-width: 320px; }
         .bay-chip { padding: 12px 18px; font-size: 14px; }
-        .install-card { padding: 28px 20px; }
+        .install-card { padding: 32px 20px; }
+        .install-benefits { gap: 12px; }
+        .install-benefit { font-size: 12px; }
+        .modal { padding: 28px 20px 24px; border-radius: 20px; }
+        .install-instruction { padding: 16px; }
+        .install-instruction ol li { font-size: 13px; }
+        .toast { max-width: calc(100vw - 32px); padding: 14px 20px; font-size: 14px; bottom: 16px; }
       }
     </style>
   </head>
@@ -829,10 +1057,14 @@
           </button>
           <button id="hero-howto-btn" class="btn btn-secondary" style="display:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            How to Install
+            Add to Home Screen
           </button>
+          <span id="hero-installed-badge" class="hero-installed-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Installed
+          </span>
         </div>
-        <p class="hero-helper">Use TorqueShed like a native app on your phone or desktop.</p>
+        <p id="hero-helper" class="hero-helper">Install for faster access and a full-screen experience.</p>
       </div>
     </section>
 
@@ -1080,18 +1312,43 @@
     <section class="section install-section" id="install">
       <div class="container">
         <div class="install-card">
-          <h3>Install TorqueShed</h3>
-          <p>Use TorqueShed like a native app. Faster access, full-screen experience, and a home screen icon.</p>
+          <div id="install-card-icon" class="install-card-icon state-howto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <h3 id="install-card-title">Install TorqueShed</h3>
+          <p id="install-card-desc" class="install-card-desc">Add TorqueShed to your home screen for instant access, a full-screen experience, and faster load times.</p>
+          <div id="install-benefits" class="install-benefits">
+            <span class="install-benefit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Instant access
+            </span>
+            <span class="install-benefit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Full-screen mode
+            </span>
+            <span class="install-benefit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Works offline
+            </span>
+          </div>
           <div class="install-actions">
-            <button id="install-btn" class="btn btn-primary" style="display:none;">
+            <button id="install-btn" class="btn btn-install" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Install App
+              Install TorqueShed
             </button>
-            <button id="howto-btn" class="btn btn-secondary" style="display:none;" onclick="openInstallModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              How to Install
+            <p id="install-btn-helper" class="install-helper-text" style="display:none;">One click. No app store required.</p>
+            <button id="howto-btn" class="btn btn-howto-section" style="display:none;" onclick="openInstallModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Add to Home Screen
             </button>
-            <p id="installed-msg" class="install-success" style="display:none;">TorqueShed is installed on your device.</p>
+            <p id="howto-helper" class="install-helper-text" style="display:none;">See instructions for your device.</p>
+            <div id="installed-msg" class="install-success-msg" style="display:none;">
+              <div class="checkmark-ring">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span class="installed-title">TorqueShed is installed</span>
+              <span class="installed-sub">Open it from your home screen or app launcher.</span>
+            </div>
             <p id="install-status"></p>
           </div>
         </div>
@@ -1104,35 +1361,55 @@
         <button class="modal-close" onclick="closeInstallModal()" aria-label="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
+        <div class="modal-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
         <h3 id="modal-title">Add TorqueShed to Your Device</h3>
-        <p>Follow the steps for your browser to install TorqueShed as an app.</p>
+        <p>It takes a few seconds. Once installed, TorqueShed opens full-screen from your home screen or app launcher.</p>
 
         <div class="install-instruction" id="inst-android">
-          <h4>Android (Chrome)</h4>
+          <div class="inst-header">
+            <div class="inst-device-icon android">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <h4>Android (Chrome)</h4>
+          </div>
           <ol>
-            <li>Tap the three-dot menu in the top-right corner</li>
-            <li>Tap "Add to Home screen" or "Install app"</li>
-            <li>Tap "Install" to confirm</li>
+            <li>Tap the <span class="inst-key">three-dot menu</span> in the top-right corner of Chrome</li>
+            <li>Tap <span class="inst-key">Add to Home screen</span> or <span class="inst-key">Install app</span></li>
+            <li>Confirm by tapping <span class="inst-key">Install</span></li>
           </ol>
         </div>
 
         <div class="install-instruction" id="inst-ios">
-          <h4>iPhone / iPad (Safari)</h4>
+          <div class="inst-header">
+            <div class="inst-device-icon ios">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <h4>iPhone / iPad (Safari)</h4>
+          </div>
           <ol>
-            <li>Tap the Share button at the bottom of the screen</li>
-            <li>Scroll down and tap "Add to Home Screen"</li>
-            <li>Tap "Add" in the top-right corner</li>
+            <li>Tap the <span class="inst-key">Share</span> button (square with arrow) at the bottom of Safari</li>
+            <li>Scroll the action sheet and tap <span class="inst-key">Add to Home Screen</span></li>
+            <li>Tap <span class="inst-key">Add</span> in the top-right corner to confirm</li>
           </ol>
         </div>
 
         <div class="install-instruction" id="inst-desktop">
-          <h4>Desktop (Chrome / Edge)</h4>
+          <div class="inst-header">
+            <div class="inst-device-icon desktop">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <h4>Desktop (Chrome / Edge)</h4>
+          </div>
           <ol>
-            <li>Look for the install icon in the address bar (right side)</li>
-            <li>Or open the browser menu and select "Install TorqueShed"</li>
-            <li>Click "Install" to confirm</li>
+            <li>Look for the <span class="inst-key">install icon</span> in the right side of the address bar</li>
+            <li>Or open the browser menu and choose <span class="inst-key">Install TorqueShed</span></li>
+            <li>Click <span class="inst-key">Install</span> in the dialog to confirm</li>
           </ol>
         </div>
+
+        <p class="modal-footer-note">TorqueShed installs as a lightweight web app. No app store download required. You can uninstall it anytime from your device settings.</p>
       </div>
     </div>
 
@@ -1179,8 +1456,10 @@
     </footer>
 
     <!-- Toast -->
-    <div class="toast toast-success" id="toast">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <div class="toast" id="toast">
+      <div class="toast-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
       <span id="toast-msg">TorqueShed has been added to your device.</span>
     </div>
 
@@ -1192,10 +1471,18 @@
 
       var heroInstallBtn = document.getElementById('hero-install-btn');
       var heroHowtoBtn = document.getElementById('hero-howto-btn');
+      var heroInstalledBadge = document.getElementById('hero-installed-badge');
+      var heroHelper = document.getElementById('hero-helper');
       var installBtn = document.getElementById('install-btn');
+      var installBtnHelper = document.getElementById('install-btn-helper');
       var howtoBtn = document.getElementById('howto-btn');
+      var howtoHelper = document.getElementById('howto-helper');
       var installedMsg = document.getElementById('installed-msg');
       var installStatus = document.getElementById('install-status');
+      var installCardIcon = document.getElementById('install-card-icon');
+      var installCardTitle = document.getElementById('install-card-title');
+      var installCardDesc = document.getElementById('install-card-desc');
+      var installBenefits = document.getElementById('install-benefits');
 
       var isStandalone = window.matchMedia('(display-mode: standalone)').matches
         || window.navigator.standalone === true;
@@ -1221,9 +1508,20 @@
       function showInstallButton() {
         heroInstallBtn.style.display = 'inline-flex';
         heroHowtoBtn.style.display = 'none';
+        heroInstalledBadge.style.display = 'none';
+        heroHelper.textContent = 'One click install. No app store needed.';
+
         installBtn.style.display = 'inline-flex';
+        installBtnHelper.style.display = 'block';
         howtoBtn.style.display = 'none';
+        howtoHelper.style.display = 'none';
         installedMsg.style.display = 'none';
+        installStatus.textContent = '';
+
+        installCardIcon.className = 'install-card-icon state-available';
+        installCardTitle.textContent = 'Install TorqueShed';
+        installCardDesc.textContent = 'Add TorqueShed to your home screen for instant access, a full-screen experience, and faster load times.';
+        installBenefits.style.display = 'flex';
 
         heroInstallBtn.onclick = triggerInstall;
         installBtn.onclick = triggerInstall;
@@ -1232,9 +1530,19 @@
       function showHowtoButton() {
         heroInstallBtn.style.display = 'none';
         heroHowtoBtn.style.display = 'inline-flex';
+        heroInstalledBadge.style.display = 'none';
+        heroHelper.textContent = 'Install for faster access and a full-screen experience.';
+
         installBtn.style.display = 'none';
+        installBtnHelper.style.display = 'none';
         howtoBtn.style.display = 'inline-flex';
+        howtoHelper.style.display = 'block';
         installedMsg.style.display = 'none';
+
+        installCardIcon.className = 'install-card-icon state-howto';
+        installCardTitle.textContent = 'Install TorqueShed';
+        installCardDesc.textContent = 'Add TorqueShed to your home screen. Follow the steps for your browser to get the app experience.';
+        installBenefits.style.display = 'flex';
 
         heroHowtoBtn.onclick = openInstallModal;
       }
@@ -1242,9 +1550,21 @@
       function showInstalledState() {
         heroInstallBtn.style.display = 'none';
         heroHowtoBtn.style.display = 'none';
+        heroInstalledBadge.style.display = 'inline-flex';
+        heroHelper.textContent = 'TorqueShed is on your device. Open it from your home screen.';
+
         installBtn.style.display = 'none';
+        installBtnHelper.style.display = 'none';
         howtoBtn.style.display = 'none';
-        installedMsg.style.display = 'block';
+        howtoHelper.style.display = 'none';
+        installedMsg.style.display = 'flex';
+        installStatus.textContent = '';
+
+        installCardIcon.className = 'install-card-icon state-installed';
+        installCardIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+        installCardTitle.textContent = 'You\'re all set';
+        installCardDesc.textContent = 'TorqueShed is installed on your device. Launch it from your home screen or app launcher for the best experience.';
+        installBenefits.style.display = 'none';
       }
 
       function triggerInstall() {
@@ -1254,7 +1574,7 @@
           if (result.outcome === 'accepted') {
             installStatus.textContent = '';
           } else {
-            installStatus.textContent = 'You can install anytime from the button above.';
+            installStatus.textContent = 'No worries. You can install anytime.';
             installStatus.className = 'install-info';
           }
           deferredPrompt = null;
@@ -1271,7 +1591,6 @@
       var ua = navigator.userAgent;
       var isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       var isAndroid = /Android/i.test(ua);
-      var isMac = /Macintosh/i.test(ua) && !isIOS;
 
       var instAndroid = document.getElementById('inst-android');
       var instIOS = document.getElementById('inst-ios');
@@ -1326,7 +1645,7 @@
         toast.classList.add('visible');
         setTimeout(function() {
           toast.classList.remove('visible');
-        }, 4000);
+        }, 5000);
       }
     })();
     </script>
