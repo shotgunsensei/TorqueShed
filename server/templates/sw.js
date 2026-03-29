@@ -1,9 +1,11 @@
-const CACHE_NAME = "torqueshed-v1";
+const CACHE_NAME = "torqueshed-v2";
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
   "/assets/images/icon.png",
+  "/assets/images/icon-192.png",
+  "/assets/images/icon-512.png",
   "/assets/images/favicon.png",
   "/assets/logo.png",
 ];

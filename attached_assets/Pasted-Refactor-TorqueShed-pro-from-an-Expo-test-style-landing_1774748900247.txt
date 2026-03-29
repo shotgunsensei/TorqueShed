@@ -1,0 +1,141 @@
+Refactor TorqueShed.pro from an Expo-test style landing page into a consumer-ready, installable product site.
+
+Primary goals:
+- remove the current prototype/testing feel created by Expo Go instructions
+- preserve the strongest value props:
+  - DIY mechanic community
+  - brand-specific bays
+  - VIN + problem description workflow
+  - torque specs and part numbers
+  - local parts marketplace with in-app messaging
+- make the homepage feel like a real launchable platform, not a development preview
+- add a clean “Install App” flow so users can add TorqueShed to their phone home screen or desktop as an app/shortcut when supported
+
+Very important product behavior:
+Do not falsely claim that the site can force-create a desktop shortcut in every environment.
+Implement the correct installable PWA behavior:
+- show an “Install App” button when browser install prompt support is available
+- trigger the browser’s native PWA install prompt using beforeinstallprompt when supported
+- if native install prompt is not available, show clear fallback instructions for:
+  - Android Chrome: “Add to Home screen”
+  - desktop Chrome/Edge: “Install app” from browser menu/address bar
+  - unsupported browsers: explain that installation depends on browser support
+
+Core implementation tasks:
+
+1. New hero section
+- headline focused on fixing vehicles with real-world help
+- subheadline explaining community + diagnostics + marketplace
+- primary CTA: Launch Web App
+- secondary CTA: Install App
+- optional tertiary CTA: Join Mobile Beta
+- include product screenshots/mockups area
+- remove prototype energy from the hero
+
+2. Replace all Expo Go-focused onboarding on the main landing page
+- remove or demote “Download Expo Go” instructions from the main flow
+- if mobile beta is still needed, move it into a smaller “Beta Access” section
+- main landing page should look consumer-ready and trustworthy
+
+3. Add sections:
+- How TorqueShed Works
+- Why it’s different from forums/social media
+- Brand Bays
+- VIN + Diagnostics workflow
+- Parts Marketplace
+- Trust / Safety / Quality of Information section
+
+4. Add a real installable app experience
+Implement PWA install support properly:
+- detect and capture the browser’s beforeinstallprompt event
+- store the deferred prompt safely in state
+- show an “Install App” button only when install prompt is actually available
+- when user clicks the button, trigger the deferred prompt
+- handle accepted vs dismissed outcomes
+- after successful installation, update UI state appropriately
+- listen for appinstalled event and show a success message/toast such as:
+  - “TorqueShed has been added to your device”
+- hide or change the install button after successful install
+
+5. Add graceful fallback install guidance
+When install prompt is not available:
+- show a small modal, drawer, or tooltip with device/browser-specific guidance
+- examples:
+  - Android Chrome: tap browser menu → Add to Home screen
+  - desktop Chrome/Edge: click install icon in address bar or browser menu → Install app
+  - iPhone/iPad Safari: Share → Add to Home Screen
+- make this fallback UI elegant and easy to understand
+
+6. Ensure PWA readiness
+Audit and improve the site so install behavior is realistically supported:
+- valid manifest.json
+- service worker registration
+- HTTPS assumption
+- icons including 192x192 and 512x512
+- proper app name and short name
+- theme_color and background_color
+- display mode standalone
+- start_url and scope configured correctly
+- optional maskable icon support
+Do not just add the button without making the app installable.
+
+7. Add UX polish around installation
+- use a status badge such as “Installable App”
+- add small helper text near the Install button
+- support a smooth mobile and desktop experience
+- show a non-intrusive toast on install success/failure
+- do not spam the user with repeated prompts
+- optionally allow dismissing install callouts and remember that preference locally
+
+8. Conversion improvements
+Create a better conversion path:
+- Launch Web App
+- Install App
+- Join Waitlist / Mobile Beta
+- email capture or waitlist option
+- app install should feel like a premium feature, not a dev workaround
+
+9. Improve credibility
+- no prototype language on the main hero
+- stronger visual hierarchy
+- polished automotive/product styling
+- feature cards and UI previews
+- make the site feel like a serious automotive platform
+
+10. Technical requirements
+- responsive on desktop, tablet, and mobile
+- modular code
+- no dead buttons
+- no fake install claims
+- all install logic should degrade gracefully
+- if install is not supported, give the user the next best action
+- ensure accessibility for install button and modal interactions
+
+11. Suggested install UI behavior
+- If install prompt available:
+  show “Install App”
+- If already installed or appinstalled fired:
+  show “Installed” or hide the button
+- If not supported:
+  show “How to Install” button that opens instructions
+- Keep all states clear and intuitive
+
+12. Suggested helper copy
+Button text options:
+- Install App
+- Add to Home Screen
+- Install TorqueShed
+
+Helper text:
+- “Use TorqueShed like an app on your phone or desktop.”
+- “Install for faster access and a cleaner full-screen experience.”
+
+13. Optional enhancement
+If appropriate, detect whether the app is running in standalone/display-mode and adjust the UI:
+- if already installed, hide install prompts
+- if running in browser, show install CTA more prominently
+
+Final requirement:
+The result should make TorqueShed.pro feel like a real installable app platform, not a beta test page.
+Do not summarize.
+Directly implement.

@@ -2,8 +2,9 @@
   "id": "com.torqueshed.app",
   "name": "TorqueShed",
   "short_name": "TorqueShed",
-  "description": "The Garage for Real People. Automotive community for mechanics, enthusiasts, and DIYers.",
-  "start_url": "/app",
+  "description": "The Garage for Real People. Automotive community for mechanics, enthusiasts, and DIYers. Diagnostics, torque specs, parts marketplace.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0D0F12",
   "theme_color": "#FF6B35",
@@ -43,14 +44,5 @@
     }
   ],
   "screenshots": [],
-  "related_applications": [
-    {
-      "platform": "play",
-      "id": "com.torqueshed.app"
-    },
-    {
-      "platform": "itunes",
-      "id": "com.torqueshed.app"
-    }
-  ]
+  "prefer_related_applications": false
 }
