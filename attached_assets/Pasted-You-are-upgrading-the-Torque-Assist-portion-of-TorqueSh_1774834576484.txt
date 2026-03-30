@@ -1,0 +1,345 @@
+You are upgrading the Torque Assist portion of TorqueShed.pro into a polished, trust-building automotive diagnostics helper for DIY mechanics, techs, and enthusiasts.
+
+The current Torque Assist experience feels cheap because it repeats the same information, gives generic “follow these steps” answers, and does not behave like a real diagnostic assistant with memory, narrowing logic, or confidence-based reasoning.
+
+Your task is to redesign and rebuild Torque Assist into a professional-grade diagnostics workflow that feels like a real shop foreman helping the user isolate faults.
+
+PRIMARY OBJECTIVE
+Build Torque Assist as an interactive diagnostic interview and reasoning engine, not a generic chatbot.
+It must:
+1. collect structured symptom data
+2. remember what has already been asked and answered
+3. avoid repeating the same guidance
+4. narrow possible causes over time
+5. produce prioritized likely causes with reasoning
+6. generate a staged test plan
+7. update recommendations based on test results
+8. feel professional, clean, and credible
+
+CORE PRODUCT RULES
+- Never repeat the same advice block unless new evidence changes priority
+- Never restate the user’s symptoms over and over in slightly different wording
+- Never dump a long wall of generic steps
+- Ask only the most useful next question when uncertainty is high
+- Prefer narrowing questions over broad open-ended questions
+- Track all previously collected answers in session memory
+- Show the user progress through diagnosis
+- Present confidence levels for likely causes
+- Always explain WHY a question is being asked or WHY a test matters
+- Keep tone professional, practical, and mechanic-friendly
+- Make the assistant feel like a diagnostic helper, not a content generator
+
+DIAGNOSTIC FLOW TO IMPLEMENT
+Create a structured flow with the following phases:
+
+PHASE 1: VEHICLE + CONTEXT INTAKE
+Collect and persist:
+- year
+- make
+- model
+- engine
+- drivetrain
+- transmission
+- mileage
+- VIN if available
+- recent repairs
+- stored DTC codes
+- symptom category
+- symptom severity
+- when issue occurs
+- whether issue is intermittent or constant
+
+PHASE 2: SYMPTOM CLASSIFICATION
+Create clean selectable categories such as:
+- no start
+- hard start
+- stall
+- rough idle
+- misfire
+- overheating
+- charging issue
+- battery drain
+- no crank
+- brake issue
+- suspension/clunk
+- steering problem
+- transmission shift issue
+- poor acceleration
+- hesitation
+- limp mode
+- vibration
+- AC/heat problem
+- electrical accessory failure
+- parasitic draw
+- fluid leak
+- noise diagnosis
+
+PHASE 3: SMART NARROWING
+Based on category, dynamically ask the next best question.
+Examples:
+- no crank: single click, rapid click, silence, dash lights dim, starter relay behavior, jump start effect
+- overheating: highway or idle only, coolant loss, fan operation, heater behavior, pressure buildup, white smoke
+- misfire: cold/hot, single cylinder or random, under load or idle, fuel smell, recent tune-up, code pattern
+- charging issue: battery voltage off/running, load behavior, belt condition, warning lights, alternator replacement history
+- suspension noise: speed dependent, brake-dependent, turning-dependent, one side or both, over bumps only, steering angle effect
+
+PHASE 4: HYPOTHESIS ENGINE
+Maintain a structured list of possible causes with:
+- cause name
+- confidence score
+- supporting evidence
+- contradictory evidence
+- recommended next confirming test
+- estimated difficulty
+- estimated cost range
+- safety level
+
+As answers come in, update and rerank likely causes rather than resetting or repeating.
+
+PHASE 5: TEST PLAN
+Output a staged test plan:
+- Step 1: easiest / safest / highest-value check
+- Step 2: next best discriminator
+- Step 3: confirmatory test
+- Step 4: repair direction if confirmed
+
+Each step should include:
+- purpose of the test
+- tools needed
+- expected good result
+- expected bad result
+- what to do next based on the result
+
+PHASE 6: RESULTS LOOP
+After each user-entered test result, update the hypotheses and next actions.
+Do not repeat previous steps that are already completed.
+Mark completed tests clearly.
+Persist findings in session state.
+
+UI / UX REQUIREMENTS
+Redesign Torque Assist UI to look polished and professional:
+- modern card-based layout
+- clean mobile-first interface
+- strong typography hierarchy
+- clear progress indicator
+- visible “Vehicle Snapshot” panel
+- visible “Known Symptoms” panel
+- visible “Likely Causes” panel
+- visible “Tests Completed” timeline
+- visible “Next Best Step” callout
+- user can edit previous answers without losing the whole session
+- user can save a diagnostic session
+- user can resume later
+- user can export a summary
+
+Add these visual sections:
+1. Vehicle Snapshot
+2. Reported Symptoms
+3. Most Likely Causes
+4. Recommended Next Test
+5. Completed Tests
+6. Notes / Observations
+7. Repair Summary
+
+ANTI-REPETITION LOGIC
+Implement strict anti-repetition safeguards:
+- hash or fingerprint prior assistant advice blocks
+- compare proposed new response against prior response blocks
+- if overlap exceeds threshold, rewrite with only novel info
+- do not restate full symptom summary every turn
+- do not restate already completed tests
+- do not suggest tests already marked complete unless user explicitly re-runs them
+- do not keep recommending “check fuses, battery, grounds” after those were already addressed unless new evidence reopens that branch
+
+STATE MANAGEMENT
+Implement proper state handling for diagnostic sessions:
+- current vehicle profile
+- current problem category
+- answered questions
+- unanswered high-value questions
+- hypotheses with confidence
+- completed tests
+- pending tests
+- user notes
+- dtc codes
+- uploaded photos if supported
+- session timestamp/history
+
+Store this in structured form, not just chat text.
+Use a diagnostics session object and persist it in app state/database.
+
+RESPONSE FORMAT
+Every assistant response should follow this format when applicable:
+
+1. Current read
+A concise one-paragraph assessment of where the diagnosis stands right now.
+
+2. Most likely causes
+A ranked list with confidence percentages.
+
+3. Best next question or best next test
+Only one primary next action unless there is a justified branch split.
+
+4. Why this matters
+Short explanation of how the answer/test narrows the fault.
+
+5. What changes based on the result
+Show the branch logic.
+
+Example:
+Current read:
+Based on your no-crank condition, full dash power, and single heavy click from the starter area, the problem is currently leaning toward a starter motor or high-resistance power/ground path rather than a dead battery.
+
+Most likely causes:
+- Failed starter motor or solenoid (62%)
+- High resistance on battery cable or engine ground (24%)
+- Starter relay / control issue (9%)
+- Mechanical engine lockup (5%)
+
+Best next test:
+Measure battery voltage at rest, then at the starter main lug while attempting crank.
+
+Why this matters:
+This separates a control issue from a power delivery issue in one step.
+
+What changes based on the result:
+- If voltage stays strong at battery but drops badly at starter, suspect cable or connection resistance.
+- If voltage reaches starter correctly and it only clicks, suspect starter failure.
+- If no trigger signal reaches solenoid, move upstream to relay/ignition/control logic.
+
+DIAGNOSTIC ENGINE DESIGN
+Build or refactor the logic into modular services/components:
+- vehicleProfileService
+- symptomClassifier
+- diagnosticDecisionTree
+- hypothesisScoringEngine
+- responseComposer
+- repetitionGuard
+- sessionStateManager
+- exportSummaryService
+
+If an LLM is used:
+- use the LLM for explanation and natural language
+- do NOT rely on the LLM alone for session memory or branching logic
+- keep branching, scoring, and deduplication in code
+- have deterministic rules for common categories
+- use structured JSON outputs between reasoning layers when appropriate
+
+CONFIDENCE SCORING
+Implement a weighted confidence system.
+Each hypothesis should gain or lose confidence based on:
+- direct symptom match
+- code match
+- environmental conditions
+- recent repair relevance
+- passed/failed tests
+- contradictory evidence
+
+Do not show false certainty.
+If evidence is weak, say so.
+
+TRUST-BUILDING FEATURES
+Add:
+- “Why I’m asking this” beneath each narrowing question
+- “What this usually points to” for each recommended test
+- safety badge: safe to DIY / use caution / professional help recommended
+- estimated tool level: no tools / basic hand tools / multimeter / scan tool / lift required
+- save/share diagnostic summary
+- technician-style concise wording
+- optional deeper explanation toggle for advanced users
+
+EXPORT SUMMARY
+Allow exporting a clean diagnostic summary with:
+- vehicle info
+- complaint
+- symptoms
+- codes
+- tests performed
+- findings
+- likely causes
+- recommended next repair/check
+This should be formatted well enough to hand to a shop or keep in vehicle notes.
+
+DATA / CONTENT MODEL
+Create example decision trees or starter logic for at least these high-value categories:
+- no crank
+- no start
+- overheating
+- misfire
+- charging system
+- brake pulsation/noise
+- front-end clunk
+- parasitic battery drain
+- AC not cold
+- transmission slipping/harsh shift
+
+SEED CONTENT QUALITY
+Do not write vague filler like:
+- “check wiring”
+- “inspect components”
+- “follow manufacturer procedure”
+unless specific context is given.
+
+Instead be specific:
+- where to probe
+- what voltage or behavior to expect
+- what result means
+- what likely branch it opens or closes
+
+EXAMPLE OF BAD CURRENT BEHAVIOR TO ELIMINATE
+- repeats same symptom summary every response
+- repeats same 5 basic checks
+- does not remember completed steps
+- gives generic advice with no narrowing
+- sounds like low-trust AI filler
+
+EXAMPLE OF TARGET EXPERIENCE
+The user selects:
+2016 Jeep Renegade 2.4L
+Symptom: hesitation under acceleration
+Codes: none
+Occurs warm, under moderate throttle, worse uphill
+
+The tool should not dump generic tune-up advice.
+It should narrow intelligently:
+- fuel trim behavior?
+- recent plugs/coils?
+- throttle body cleaned?
+- any misfire counters?
+- does it improve with premium fuel?
+- intake leak signs?
+Then produce ranked causes and the single best next test.
+
+DELIVERABLES
+1. Refactor or rebuild Torque Assist UI and logic
+2. Add structured session-based diagnostics engine
+3. Add anti-repetition and deduplication layer
+4. Add ranked likely-cause panel with confidence
+5. Add next-best-test workflow
+6. Add completed-tests memory
+7. Add exportable diagnostic summary
+8. Improve styling to feel production-grade and trustworthy
+9. Seed real starter diagnostic trees for major categories
+10. Remove low-quality repetitive chatbot behavior entirely
+
+CODE QUALITY REQUIREMENTS
+- production-grade component structure
+- reusable hooks/services
+- no messy duplicate logic
+- clean typing/interfaces if TypeScript is available
+- clear comments where diagnostic logic matters
+- mobile responsive
+- visually polished
+- no placeholder lorem ipsum or fake diagnostics copy
+- no regression to generic chatbot behavior
+
+SUCCESS CRITERIA
+Torque Assist should feel like:
+- a serious diagnostic helper
+- memory-aware
+- progressively narrowing
+- evidence-based
+- non-repetitive
+- useful enough that a user would trust it to begin diagnosis instead of abandoning it
+
+Now inspect the existing Torque Assist implementation in this project, identify the current repetitive/generic behavior, then refactor it into the new architecture above. Preserve brand consistency with TorqueShed, but elevate the quality dramatically. Build the feature completely, not as a mockup.

@@ -1,0 +1,412 @@
+Now build the internal diagnostic engine for Torque Assist as a real stateful reasoning system, not a generic chat flow.
+
+Your goal is to create the structured backend/frontend logic that powers a trustworthy automotive diagnostic assistant.
+
+The current problem:
+Torque Assist behaves like a cheap chatbot because it:
+- repeats the same recommendations
+- does not truly remember prior answers
+- does not track completed tests
+- does not score likely causes in a structured way
+- does not transition intelligently from symptoms to narrowing questions to ranked hypotheses
+- does not adapt based on user-entered test results
+
+You must fix this by implementing a deterministic diagnostic session engine.
+
+ARCHITECTURE GOAL
+Create a modular diagnostics engine with clear separation between:
+1. session state
+2. symptom intake
+3. branching question logic
+4. hypothesis scoring
+5. test recommendation selection
+6. result interpretation
+7. response composition
+8. repetition suppression
+
+If using an LLM, the LLM may help with wording or explanation only.
+The LLM must not be responsible for:
+- main state tracking
+- deciding what has already been asked
+- deciding what tests were already completed
+- scoring likely causes
+- choosing the next branch
+
+That logic must be implemented in code.
+
+BUILD THESE MODULES
+
+1. diagnosticSessionManager
+Responsible for:
+- creating a session
+- updating the session
+- storing vehicle profile
+- storing symptom category
+- storing answers
+- storing completed tests
+- storing notes
+- storing hypotheses
+- storing response history
+- restoring saved sessions
+
+2. symptomRouter
+Responsible for:
+- mapping the user complaint into a supported diagnostic category
+- choosing the correct category tree
+- falling back gracefully when confidence is low
+
+3. decisionTreeEngine
+Responsible for:
+- loading category-specific decision trees
+- identifying the next best question
+- identifying the next best test
+- marking branches as opened or closed
+- skipping already answered or irrelevant questions
+
+4. hypothesisScoringEngine
+Responsible for:
+- assigning weighted scores to possible causes
+- increasing score when evidence supports a cause
+- decreasing score when evidence contradicts a cause
+- reranking likely causes after every answer or test result
+- storing supporting and contradictory evidence for each cause
+
+5. testPlanner
+Responsible for:
+- selecting the best next test based on current uncertainty
+- preferring safest/easiest/highest-value test first
+- not repeating completed tests
+- producing branch-aware next steps
+
+6. repetitionGuard
+Responsible for:
+- detecting repeated recommendations
+- detecting repeated symptom summaries
+- preventing the same advice from being presented again unless new evidence changes priority
+- rewriting or suppressing duplicate blocks
+
+7. responseComposer
+Responsible for producing consistent structured responses using current engine state.
+
+DATA MODEL
+Create TypeScript interfaces or equivalent models for:
+
+VehicleProfile
+- year
+- make
+- model
+- engine
+- drivetrain
+- transmission
+- mileage
+- vin
+- recentRepairs
+
+DiagnosticAnswer
+- id
+- questionId
+- answer
+- timestamp
+
+DiagnosticQuestion
+- id
+- category
+- prompt
+- explanation
+- answerType
+- options
+- conditions
+- evidenceEffects
+- excludesQuestions
+- unlocksQuestions
+- relatedTests
+
+DiagnosticTest
+- id
+- name
+- category
+- description
+- toolLevel
+- safetyLevel
+- estimatedDifficulty
+- estimatedTime
+- purpose
+- expectedGoodResult
+- expectedBadResult
+- result
+- resultNotes
+- completedAt
+- effectsOnHypotheses
+
+Hypothesis
+- id
+- name
+- category
+- score
+- confidencePercent
+- supportingEvidence
+- contradictoryEvidence
+- recommendedConfirmingTest
+- estimatedCostRange
+- difficultyLevel
+- safetyLevel
+
+DiagnosticSession
+- id
+- createdAt
+- updatedAt
+- vehicleProfile
+- complaint
+- symptomCategory
+- symptomDetails
+- answers
+- completedTests
+- pendingTests
+- openQuestions
+- closedQuestions
+- hypotheses
+- notes
+- codes
+- responseHistory
+- branchHistory
+- status
+
+DECISION TREE FORMAT
+Implement decision trees as structured JSON or TS objects rather than hardcoded if/else sprawl.
+
+Each diagnostic category should define:
+- intake questions
+- narrowing questions
+- terminal indicators
+- possible hypotheses
+- recommended tests
+- scoring rules
+- branch transitions
+
+Seed category trees for:
+- no crank
+- no start
+- overheating
+- misfire
+- charging system
+- front-end clunk
+
+For each tree:
+- include at least 10-20 meaningful questions
+- include at least 5-8 realistic hypotheses
+- include at least 5-10 tests
+- include branching logic based on answers
+
+QUESTION SELECTION LOGIC
+Implement “next best question” selection using these rules:
+1. ask the question that most reduces uncertainty
+2. do not ask questions already answered
+3. do not ask questions invalidated by previous answers
+4. prefer binary or high-signal questions over vague open-ended ones
+5. stop asking questions when a better next test exists
+6. prefer tests when uncertainty can be reduced faster than questioning
+
+Examples:
+- no crank with full dash power and single click should quickly elevate starter/cable testing
+- overheating at idle but not highway should elevate fan/airflow questions
+- misfire under load but not idle should elevate coil/fuel delivery/load questions
+
+HYPOTHESIS SCORING RULES
+Implement a weighted evidence model.
+
+Each hypothesis begins with a baseline score.
+Each answer/test can:
+- add positive weight
+- subtract weight
+- invalidate a hypothesis entirely
+- unlock a confirming test
+
+Example scoring model:
+- symptom match: +10 to +25
+- code alignment: +20
+- contradictory answer: -15
+- passed confirming test: -30 or invalidate
+- failed confirming test: +30
+- recent repair directly related: +10
+- impossible condition: set score to zero
+
+Normalize scores into confidence percentages.
+Do not fake precision.
+If evidence is weak, confidence should remain modest.
+
+ANTI-LOOP / ANTI-REPETITION SYSTEM
+This is critical.
+
+Implement protection against repeated cheap chatbot behavior:
+- maintain a response fingerprint/history
+- compare each new recommendation against previous responses
+- if the next output overlaps too much with previous output, compress or suppress repeated sections
+- do not repeat completed tests
+- do not re-ask answered questions
+- do not restate full vehicle info and symptom summary every turn
+- only show delta changes unless the summary materially changed
+- if the likely causes list remains mostly unchanged, only indicate what strengthened or weakened
+
+Examples of desired behavior:
+BAD:
+“Check battery, starter, and wiring.”
+Next turn:
+“Check battery, starter, and wiring.”
+Next turn:
+“Check battery, starter, and wiring.”
+
+GOOD:
+Turn 1: Check voltage at battery and starter during crank.
+Turn 2: Based on voltage holding steady, battery supply drops in priority and starter motor rises.
+Turn 3: Confirm starter trigger signal before replacement.
+
+TEST SELECTION LOGIC
+Each recommended test should be evaluated by:
+- expected information gain
+- ease
+- safety
+- tool requirement
+- time required
+- whether it discriminates between top 2-3 hypotheses
+
+The engine should choose one primary next test unless there is a true justified branch split.
+
+RESULT INTERPRETATION
+When a user enters a test result:
+- update the relevant test object
+- apply score changes
+- rerank hypotheses
+- close invalid branches
+- open next branch
+- generate updated “current read”
+- suggest next best step
+
+RESPONSE COMPOSER FORMAT
+Every response from the engine should contain:
+- currentRead
+- topHypotheses[]
+- primaryNextAction
+- whyThisActionMatters
+- whatChangesBasedOnOutcome
+
+Avoid long filler.
+Keep wording concise, technician-style, and useful.
+
+Example response structure:
+{
+  "currentRead": "...",
+  "topHypotheses": [
+    {
+      "name": "Starter motor failure",
+      "confidencePercent": 62,
+      "supportingEvidence": ["single heavy click", "full dash power", "jump pack did not help"]
+    }
+  ],
+  "primaryNextAction": {
+    "type": "test",
+    "name": "Voltage check at starter main lug during crank"
+  },
+  "whyThisActionMatters": "...",
+  "whatChangesBasedOnOutcome": [
+    "...",
+    "..."
+  ]
+}
+
+UI BINDING REQUIREMENTS
+Expose the engine state cleanly to the UI so the interface can show:
+- vehicle snapshot
+- known symptoms
+- unanswered high-value question
+- top likely causes
+- recommended next test
+- completed tests timeline
+- evidence chips
+- contradictions
+- repair summary
+
+The UI must update incrementally, not redraw the entire conversation as repeated chat sludge.
+
+SEED REALISTIC DIAGNOSTIC CONTENT
+Seed initial diagnostic content with real-world practical logic.
+
+NO CRANK example hypotheses:
+- failed starter motor
+- bad starter solenoid
+- high resistance battery cable
+- poor engine ground
+- starter relay failure
+- ignition switch/control issue
+- park/neutral switch issue
+- partially seized engine
+- weak battery under load
+
+OVERHEATING example hypotheses:
+- low coolant
+- thermostat stuck closed
+- radiator fan not engaging
+- water pump flow issue
+- restricted radiator
+- head gasket pressurizing system
+- air pocket after cooling system service
+- collapsed hose
+
+MISFIRE example hypotheses:
+- spark plug failure
+- coil failure
+- injector issue
+- vacuum leak
+- fuel pressure issue
+- compression problem
+- oil intrusion
+- carbon buildup
+
+Do not use vague filler content.
+Questions and tests must feel realistic and diagnostic.
+
+EXAMPLE TEST DEFINITION
+A test should look roughly like this:
+- Test Name: Voltage drop test across starter positive cable during crank
+- Tools: Multimeter
+- Purpose: Checks whether cable resistance is preventing proper current delivery
+- Good Result: Minimal voltage drop
+- Bad Result: High voltage drop under crank
+- Meaning of Bad Result: Cable/connection issue rises sharply; starter itself becomes less primary until feed path is repaired
+
+SAVE / EXPORT REQUIREMENTS
+The engine must support export of a diagnostic summary containing:
+- vehicle
+- complaint
+- codes
+- symptoms
+- questions answered
+- tests completed
+- top likely causes
+- recommended next repair/test
+
+QUALITY REQUIREMENTS
+- clean, readable code
+- minimal duplication
+- modular architecture
+- no monolithic diagnostic blob
+- no fake placeholder scoring
+- no generic repeated chatbot output
+- no broken loops
+- no asking the same thing twice
+
+TEST HARNESS
+Build a test harness or dev mode viewer that can simulate sessions for at least:
+- no crank with single click
+- overheating only at idle
+- misfire under load with no codes
+- charging issue with battery light on
+- front-end clunk over bumps
+
+The harness should let a developer confirm:
+- questions do not repeat
+- completed tests are not re-suggested
+- hypotheses rerank correctly
+- next best action changes logically
+
+FINAL TASK
+Inspect the existing Torque Assist implementation and replace or refactor its current low-trust repetitive behavior with this structured diagnostics engine. Integrate it cleanly into the TorqueShed architecture and ensure the final experience feels credible, useful, and production-grade.

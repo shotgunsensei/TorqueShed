@@ -9,6 +9,7 @@ import {
   threads,
   threadReplies,
   swapShopListings,
+  diagnosticSessions,
   type User, 
   type InsertUser,
   type Garage,
@@ -27,6 +28,7 @@ import {
   type InsertThreadReply,
   type SwapShopListing,
   type InsertSwapShopListing,
+  type DiagnosticSession,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, or, isNull, gt, inArray } from "drizzle-orm";
@@ -114,6 +116,12 @@ export interface IStorage {
   deleteProduct(id: string): Promise<void>;
   incrementProductViews(id: string): Promise<void>;
   incrementProductClicks(id: string): Promise<void>;
+
+  getDiagnosticSessions(userId: string): Promise<DiagnosticSession[]>;
+  getDiagnosticSession(id: string): Promise<DiagnosticSession | undefined>;
+  createDiagnosticSession(userId: string, data: Partial<DiagnosticSession>): Promise<DiagnosticSession>;
+  updateDiagnosticSession(id: string, data: Partial<DiagnosticSession>): Promise<DiagnosticSession | undefined>;
+  deleteDiagnosticSession(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -778,6 +786,75 @@ export class DatabaseStorage implements IStorage {
       .from(swapShopListings)
       .where(eq(swapShopListings.userId, userId))
       .orderBy(desc(swapShopListings.createdAt));
+  }
+
+  async getDiagnosticSessions(userId: string): Promise<DiagnosticSession[]> {
+    return db
+      .select()
+      .from(diagnosticSessions)
+      .where(eq(diagnosticSessions.userId, userId))
+      .orderBy(desc(diagnosticSessions.updatedAt));
+  }
+
+  async getDiagnosticSession(id: string): Promise<DiagnosticSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(diagnosticSessions)
+      .where(eq(diagnosticSessions.id, id));
+    return session || undefined;
+  }
+
+  async createDiagnosticSession(userId: string, data: Partial<DiagnosticSession>): Promise<DiagnosticSession> {
+    const [session] = await db
+      .insert(diagnosticSessions)
+      .values({
+        userId,
+        vehicleYear: data.vehicleYear,
+        vehicleMake: data.vehicleMake,
+        vehicleModel: data.vehicleModel,
+        vehicleEngine: data.vehicleEngine,
+        vehicleMileage: data.vehicleMileage,
+        vehicleVin: data.vehicleVin,
+        categoryId: data.categoryId,
+        phase: data.phase || "intake",
+        answers: data.answers || {},
+        completedTests: data.completedTests || {},
+        dtcCodes: data.dtcCodes || [],
+        recentRepairs: data.recentRepairs || "",
+        notes: data.notes || "",
+        status: "active",
+      })
+      .returning();
+    return session;
+  }
+
+  async updateDiagnosticSession(id: string, data: Partial<DiagnosticSession>): Promise<DiagnosticSession | undefined> {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.vehicleYear !== undefined) updates.vehicleYear = data.vehicleYear;
+    if (data.vehicleMake !== undefined) updates.vehicleMake = data.vehicleMake;
+    if (data.vehicleModel !== undefined) updates.vehicleModel = data.vehicleModel;
+    if (data.vehicleEngine !== undefined) updates.vehicleEngine = data.vehicleEngine;
+    if (data.vehicleMileage !== undefined) updates.vehicleMileage = data.vehicleMileage;
+    if (data.vehicleVin !== undefined) updates.vehicleVin = data.vehicleVin;
+    if (data.categoryId !== undefined) updates.categoryId = data.categoryId;
+    if (data.phase !== undefined) updates.phase = data.phase;
+    if (data.answers !== undefined) updates.answers = data.answers;
+    if (data.completedTests !== undefined) updates.completedTests = data.completedTests;
+    if (data.dtcCodes !== undefined) updates.dtcCodes = data.dtcCodes;
+    if (data.recentRepairs !== undefined) updates.recentRepairs = data.recentRepairs;
+    if (data.notes !== undefined) updates.notes = data.notes;
+    if (data.status !== undefined) updates.status = data.status;
+
+    const [updated] = await db
+      .update(diagnosticSessions)
+      .set(updates)
+      .where(eq(diagnosticSessions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteDiagnosticSession(id: string): Promise<void> {
+    await db.delete(diagnosticSessions).where(eq(diagnosticSessions.id, id));
   }
 }
 

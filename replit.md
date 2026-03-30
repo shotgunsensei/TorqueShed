@@ -49,7 +49,7 @@ RootStackNavigator
 - **Home Feed**: Personalized feed with sections ordered by onboarding goals (vehicles, bay threads, garage threads, swap listings). Pull-to-refresh, error state with retry.
 - **Bays (Garages)**: Brand-specific community forums (Ford, Chevy, Dodge, Jeep, General). Join/leave, discussion threads with solution marking. Credibility signals on thread cards (Trusted Solver badge, years wrenching).
 - **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general). Tracks cost, mileage, parts. VIN decoding via NHTSA API.
-- **TorqueAssist**: Step-by-step diagnostic wizard with interactive checklists and suggested parts. Uses predefined diagnostic patterns with affiliate links.
+- **TorqueAssist**: Professional diagnostic engine with 10 category decision trees (no-crank, no-start, overheating, misfire, charging-system, brake-noise, front-end-clunk, parasitic-drain, ac-not-cold, transmission-issue). Four-phase flow: intake (vehicle info + DTC codes), category selection, narrowing questions (one-at-a-time with "why asking" context), and diagnostic dashboard (ranked hypotheses with confidence bars, safety/difficulty/cost metadata, expandable test procedures with pass/fail/inconclusive recording). Session persistence via API. Export summary to clipboard. Hypothesis scoring engine in `shared/diagnostic-engine.ts`.
 - **Source Tab**: Unified parts sourcing hub with three segments:
   - **Shop**: Curated products with category filters, "Why It Matters" context boxes, sponsored/featured badges, affiliate tracking
   - **Swap Shop**: Peer-to-peer marketplace with condition badges, shipping options, seller credibility (join date, listing count), report flow, share via clipboard, image URL support in listing forms
@@ -60,7 +60,7 @@ RootStackNavigator
 - **Admin**: Product management (approve/reject/delete), curated product curation. Reports tab with pending report queue, dismiss/remove content actions.
 
 ### Database Schema (Drizzle ORM)
-Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`, `savedThreads`, `savedListings`
+Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`, `savedThreads`, `savedListings`, `diagnosticSessions`
 
 ### UI Component Library
 - `Card` — themed card with 1px border (cardBorder), elevation levels, press feedback

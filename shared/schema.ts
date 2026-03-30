@@ -280,6 +280,33 @@ export const savedThreads = pgTable("saved_threads", {
   primaryKey({ columns: [t.userId, t.threadId] }),
 ]);
 
+export const diagnosticSessions = pgTable("diagnostic_sessions", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  vehicleYear: integer("vehicle_year"),
+  vehicleMake: varchar("vehicle_make", { length: 50 }),
+  vehicleModel: varchar("vehicle_model", { length: 100 }),
+  vehicleEngine: varchar("vehicle_engine", { length: 100 }),
+  vehicleMileage: integer("vehicle_mileage"),
+  vehicleVin: varchar("vehicle_vin", { length: 17 }),
+  categoryId: varchar("category_id", { length: 50 }),
+  phase: varchar("phase", { length: 20 }).default("intake"),
+  answers: json("answers").$type<Record<string, string>>().default({}),
+  completedTests: json("completed_tests").$type<Record<string, { result: string; notes: string; completedAt: string }>>().default({}),
+  dtcCodes: json("dtc_codes").$type<string[]>().default([]),
+  recentRepairs: text("recent_repairs"),
+  notes: text("notes"),
+  status: varchar("status", { length: 20 }).default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const diagnosticSessionsRelations = relations(diagnosticSessions, ({ one }) => ({
+  user: one(users, { fields: [diagnosticSessions.userId], references: [users.id] }),
+}));
+
 export const savedListings = pgTable("saved_listings", {
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   listingId: varchar("listing_id", { length: 36 }).notNull().references(() => swapShopListings.id, { onDelete: "cascade" }),
@@ -463,3 +490,4 @@ export type SwapShopListing = typeof swapShopListings.$inferSelect;
 export type InsertSwapShopListing = z.infer<typeof insertSwapShopListingSchema>;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type InsertVehicleNote = z.infer<typeof insertVehicleNoteSchema>;
+export type DiagnosticSession = typeof diagnosticSessions.$inferSelect;
