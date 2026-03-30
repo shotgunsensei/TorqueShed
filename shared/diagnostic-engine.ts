@@ -69,6 +69,13 @@ export interface DiagnosticTest {
   failEffects: { hypothesisId: string; delta: number }[];
 }
 
+export interface DtcEffect {
+  pattern: string;
+  hypothesisId: string;
+  delta: number;
+  label: string;
+}
+
 export interface CategoryDefinition {
   id: string;
   name: string;
@@ -77,6 +84,7 @@ export interface CategoryDefinition {
   hypotheses: HypothesisTemplate[];
   questions: NarrowingQuestion[];
   tests: DiagnosticTest[];
+  dtcEffects?: DtcEffect[];
 }
 
 export interface ScoredHypothesis {
@@ -122,6 +130,12 @@ const noCrank: CategoryDefinition = {
   name: "No Crank",
   icon: "battery",
   description: "Key turns but engine does not crank at all",
+  dtcEffects: [
+    { pattern: "P0615", hypothesisId: "nc-relay", delta: 20, label: "Starter relay circuit" },
+    { pattern: "P0616", hypothesisId: "nc-relay", delta: 15, label: "Starter relay low" },
+    { pattern: "P0617", hypothesisId: "nc-relay", delta: 15, label: "Starter relay high" },
+    { pattern: "U0100", hypothesisId: "nc-battery", delta: 15, label: "Lost ECM communication (power issue)" },
+  ],
   hypotheses: [
     { id: "nc-battery", name: "Dead or weak battery", baseConfidence: 35, description: "Battery has insufficient charge or capacity to engage the starter. Batteries typically last 3-5 years and fail faster in extreme temps.", difficulty: "easy", costRange: "$100-200", safetyLevel: "diy-safe", toolLevel: "Multimeter" },
     { id: "nc-terminals", name: "Corroded or loose battery terminals", baseConfidence: 20, description: "Corrosion or loose connections at the battery posts prevent current flow to the starter circuit.", difficulty: "easy", costRange: "$5-15", safetyLevel: "diy-safe", toolLevel: "Wire brush, wrench" },
@@ -195,6 +209,16 @@ const noStart: CategoryDefinition = {
   name: "Cranks, Won't Start",
   icon: "power",
   description: "Engine cranks normally but fails to fire and run",
+  dtcEffects: [
+    { pattern: "P0230", hypothesisId: "ns-fuel", delta: 25, label: "Fuel pump primary circuit" },
+    { pattern: "P0232", hypothesisId: "ns-fuel", delta: 20, label: "Fuel pump secondary circuit high" },
+    { pattern: "P0335", hypothesisId: "ns-spark", delta: 25, label: "Crankshaft position sensor" },
+    { pattern: "P0340", hypothesisId: "ns-spark", delta: 20, label: "Camshaft position sensor" },
+    { pattern: "P1260", hypothesisId: "ns-security", delta: 30, label: "Theft detected" },
+    { pattern: "B2960", hypothesisId: "ns-security", delta: 25, label: "Key not recognized" },
+    { pattern: "P0016", hypothesisId: "ns-timing", delta: 25, label: "Crank/cam correlation" },
+    { pattern: "P020[1-8]", hypothesisId: "ns-injector", delta: 20, label: "Injector circuit" },
+  ],
   hypotheses: [
     { id: "ns-fuel", name: "No fuel delivery (pump, relay, or filter)", baseConfidence: 30, description: "The fuel pump is not priming, the pump relay has failed, or a clogged filter is restricting flow.", difficulty: "moderate", costRange: "$150-600", safetyLevel: "use-caution", toolLevel: "Fuel pressure gauge" },
     { id: "ns-spark", name: "No spark (coil, module, or crank sensor)", baseConfidence: 25, description: "Ignition system not producing spark. Often caused by a failed crankshaft position sensor, ignition module, or coil.", difficulty: "moderate", costRange: "$30-200", safetyLevel: "diy-safe", toolLevel: "Spark tester, multimeter" },
@@ -238,7 +262,7 @@ const noStart: CategoryDefinition = {
       { label: "Backfires through intake", value: "backfire", effects: [{ hypothesisId: "ns-timing", delta: 20 }] },
       { label: "Nothing at all - just cranks", value: "nothing", effects: [{ hypothesisId: "ns-fuel", delta: 5 }, { hypothesisId: "ns-spark", delta: 5 }] },
     ] },
-    { id: "ns-q8", text: "Have you tried using starting fluid (ether) sprayed into the intake?", whyAsking: "If the engine fires on starting fluid, the ignition system works and the problem is fuel delivery. If it still won't fire, ignition or timing is the issue.", options: [
+    { id: "ns-q8", text: "Have you tried using starting fluid (ether) sprayed into the intake?", whyAsking: "If the engine fires on starting fluid, the ignition system works and the problem is fuel delivery. If it still won't fire, ignition or timing is the issue.", prerequisites: [{ questionId: "ns-q2", values: ["no"] }], options: [
       { label: "Yes, fires on starting fluid", value: "fires", effects: [{ hypothesisId: "ns-fuel", delta: 25 }, { hypothesisId: "ns-spark", delta: -20 }, { hypothesisId: "ns-timing", delta: -10 }] },
       { label: "No response to starting fluid", value: "no-fire", effects: [{ hypothesisId: "ns-spark", delta: 15 }, { hypothesisId: "ns-timing", delta: 15 }, { hypothesisId: "ns-fuel", delta: -15 }] },
       { label: "Haven't tried", value: "not-tried", effects: [] },
@@ -268,6 +292,14 @@ const overheating: CategoryDefinition = {
   name: "Overheating",
   icon: "thermometer",
   description: "Engine temperature climbing above normal operating range",
+  dtcEffects: [
+    { pattern: "P0128", hypothesisId: "oh-thermostat", delta: 25, label: "Coolant temp below thermostat regulating range" },
+    { pattern: "P0217", hypothesisId: "oh-thermostat", delta: 15, label: "Engine overheat condition" },
+    { pattern: "P0480", hypothesisId: "oh-fan", delta: 25, label: "Cooling fan relay circuit" },
+    { pattern: "P0481", hypothesisId: "oh-fan", delta: 20, label: "Cooling fan 2 relay circuit" },
+    { pattern: "P0116", hypothesisId: "oh-headgasket", delta: 10, label: "Coolant temp sensor range/performance" },
+    { pattern: "P0599", hypothesisId: "oh-thermostat", delta: 20, label: "Thermostat heater control circuit" },
+  ],
   hypotheses: [
     { id: "oh-coolant", name: "Low coolant from external leak", baseConfidence: 30, description: "Coolant is escaping through a hose, radiator, water pump weep hole, or gasket. The system cannot maintain pressure and temperature.", difficulty: "easy", costRange: "$0-200", safetyLevel: "use-caution", toolLevel: "Pressure tester" },
     { id: "oh-thermostat", name: "Stuck-closed thermostat", baseConfidence: 25, description: "The thermostat is not opening at its rated temperature, blocking coolant flow to the radiator.", difficulty: "easy", costRange: "$15-40", safetyLevel: "diy-safe", toolLevel: "Basic hand tools" },
@@ -313,7 +345,7 @@ const overheating: CategoryDefinition = {
       { label: "Yes, milky or mayo present", value: "yes", effects: [{ hypothesisId: "oh-headgasket", delta: 25 }] },
       { label: "Oil and coolant look normal", value: "no", effects: [{ hypothesisId: "oh-headgasket", delta: -5 }] },
     ] },
-    { id: "oh-q9", text: "Does the upper radiator hose feel very hard (pressurized) when the engine is hot?", whyAsking: "Excessive pressure in the cooling system when hot indicates combustion gases entering the system (head gasket) or a stuck radiator cap.", options: [
+    { id: "oh-q9", text: "Does the upper radiator hose feel very hard (pressurized) when the engine is hot?", whyAsking: "Excessive pressure in the cooling system when hot indicates combustion gases entering the system (head gasket) or a stuck radiator cap.", prerequisites: [{ questionId: "oh-q2", values: ["internal-loss"] }], options: [
       { label: "Yes, extremely hard and pressurized", value: "yes", effects: [{ hypothesisId: "oh-headgasket", delta: 15 }] },
       { label: "Firm but normal", value: "normal", effects: [] },
       { label: "Soft, no pressure", value: "soft", effects: [{ hypothesisId: "oh-coolant", delta: 10 }] },
@@ -337,6 +369,16 @@ const misfire: CategoryDefinition = {
   name: "Misfire / Rough Idle",
   icon: "activity",
   description: "Engine running rough, shaking, or misfiring under load",
+  dtcEffects: [
+    { pattern: "P030[1-8]", hypothesisId: "mf-coil", delta: 15, label: "Specific cylinder misfire" },
+    { pattern: "P030[1-8]", hypothesisId: "mf-plugs", delta: 15, label: "Specific cylinder misfire" },
+    { pattern: "P0300", hypothesisId: "mf-vacuum", delta: 20, label: "Random/multiple cylinder misfire" },
+    { pattern: "P0300", hypothesisId: "mf-plugs", delta: 10, label: "Random/multiple cylinder misfire" },
+    { pattern: "P017[12]", hypothesisId: "mf-vacuum", delta: 20, label: "System too lean" },
+    { pattern: "P017[245]", hypothesisId: "mf-injector", delta: 15, label: "System too rich" },
+    { pattern: "P020[1-8]", hypothesisId: "mf-injector", delta: 20, label: "Injector circuit malfunction" },
+    { pattern: "P0101", hypothesisId: "mf-vacuum", delta: 15, label: "MAF sensor range/performance" },
+  ],
   hypotheses: [
     { id: "mf-plugs", name: "Worn or fouled spark plugs", baseConfidence: 30, description: "Spark plugs have exceeded service life, are oil-fouled, or have incorrect gap.", difficulty: "easy", costRange: "$20-60", safetyLevel: "diy-safe", toolLevel: "Spark plug socket, gap tool" },
     { id: "mf-coil", name: "Failed ignition coil", baseConfidence: 25, description: "One or more ignition coils have internal failure, producing weak or no spark on that cylinder.", difficulty: "easy", costRange: "$30-80 per coil", safetyLevel: "diy-safe", toolLevel: "Basic hand tools" },
@@ -369,7 +411,7 @@ const misfire: CategoryDefinition = {
       { label: "Yes, direct injection", value: "yes", effects: [{ hypothesisId: "mf-carbon", delta: 20 }] },
       { label: "No, port injection or unsure", value: "no", effects: [{ hypothesisId: "mf-carbon", delta: -10 }] },
     ] },
-    { id: "mf-q6", text: "Have you swapped the coil from the misfiring cylinder to another and did the miss follow?", whyAsking: "If the misfire moves with the coil, that specific coil is bad. If it stays, the problem is something else on that cylinder (plug, injector, mechanical).", options: [
+    { id: "mf-q6", text: "Have you swapped the coil from the misfiring cylinder to another and did the miss follow?", whyAsking: "If the misfire moves with the coil, that specific coil is bad. If it stays, the problem is something else on that cylinder (plug, injector, mechanical).", prerequisites: [{ questionId: "mf-q1", values: ["single"] }], options: [
       { label: "Misfire followed the coil", value: "followed", effects: [{ hypothesisId: "mf-coil", delta: 30 }, { hypothesisId: "mf-plugs", delta: -10 }] },
       { label: "Misfire stayed on original cylinder", value: "stayed", effects: [{ hypothesisId: "mf-coil", delta: -20 }, { hypothesisId: "mf-injector", delta: 10 }, { hypothesisId: "mf-compression", delta: 10 }] },
       { label: "Haven't tried this", value: "not-tried", effects: [] },
@@ -408,6 +450,15 @@ const chargingSystem: CategoryDefinition = {
   name: "Charging System",
   icon: "battery-charging",
   description: "Battery light on, battery keeps dying, dimming lights",
+  dtcEffects: [
+    { pattern: "P0562", hypothesisId: "cs-alternator", delta: 20, label: "System voltage low" },
+    { pattern: "P0563", hypothesisId: "cs-alternator", delta: 15, label: "System voltage high" },
+    { pattern: "P0620", hypothesisId: "cs-alternator", delta: 20, label: "Generator control circuit" },
+    { pattern: "P0621", hypothesisId: "cs-alternator", delta: 15, label: "Generator lamp circuit" },
+    { pattern: "P0622", hypothesisId: "cs-alternator", delta: 20, label: "Generator field circuit" },
+    { pattern: "P2504", hypothesisId: "cs-alternator", delta: 15, label: "Charging system voltage" },
+    { pattern: "P0A7F", hypothesisId: "cs-battery", delta: 20, label: "Battery deterioration" },
+  ],
   hypotheses: [
     { id: "cs-alternator", name: "Failed alternator", baseConfidence: 35, description: "The alternator is no longer producing sufficient voltage or current to charge the battery and run accessories.", difficulty: "moderate", costRange: "$200-500", safetyLevel: "diy-safe", toolLevel: "Multimeter, socket set" },
     { id: "cs-belt", name: "Serpentine belt slipping or broken", baseConfidence: 20, description: "The belt that drives the alternator is loose, glazed, or broken, so the alternator cannot spin at the correct speed.", difficulty: "easy", costRange: "$25-60", safetyLevel: "diy-safe", toolLevel: "Belt pry bar, wrench" },
@@ -477,6 +528,11 @@ const brakeNoise: CategoryDefinition = {
   name: "Brake Noise / Pulsation",
   icon: "disc",
   description: "Squealing, grinding, vibration, or pulsation when braking",
+  dtcEffects: [
+    { pattern: "C0035", hypothesisId: "bn-rotors", delta: 10, label: "Left front wheel speed sensor" },
+    { pattern: "C0040", hypothesisId: "bn-rotors", delta: 10, label: "Right front wheel speed sensor" },
+    { pattern: "C0265", hypothesisId: "bn-caliper", delta: 15, label: "EBCM relay circuit" },
+  ],
   hypotheses: [
     { id: "bn-pads", name: "Worn brake pads", baseConfidence: 35, description: "Pads have worn past the minimum thickness. Wear indicators are contacting the rotor or metal backing plate is exposed.", difficulty: "easy", costRange: "$30-80 per axle", safetyLevel: "diy-safe", toolLevel: "Jack, lug wrench, C-clamp" },
     { id: "bn-rotors", name: "Warped or scored rotors", baseConfidence: 25, description: "Rotors have developed lateral runout (warping) or deep grooves, causing pulsation and/or noise.", difficulty: "easy", costRange: "$40-100 each", safetyLevel: "diy-safe", toolLevel: "Micrometer, dial indicator" },
@@ -545,6 +601,10 @@ const frontEndClunk: CategoryDefinition = {
   name: "Front-End Clunk / Noise",
   icon: "truck",
   description: "Clunking, popping, or knocking from front suspension",
+  dtcEffects: [
+    { pattern: "C0710", hypothesisId: "fe-strut", delta: 10, label: "Steering position signal" },
+    { pattern: "B1342", hypothesisId: "fe-strut", delta: 5, label: "ECU internal fault (ride control)" },
+  ],
   hypotheses: [
     { id: "fe-endlinks", name: "Worn sway bar end links", baseConfidence: 30, description: "End link ball joints wear out, allowing the sway bar to knock against the control arms over bumps. Most common front-end clunk.", difficulty: "easy", costRange: "$30-70 per pair", safetyLevel: "diy-safe", toolLevel: "Wrench set" },
     { id: "fe-balljoint", name: "Worn ball joints", baseConfidence: 22, description: "Ball joints connect the control arm to the steering knuckle. Excessive play causes clunking and can affect alignment.", difficulty: "moderate", costRange: "$80-200 per side", safetyLevel: "use-caution", toolLevel: "Jack, pry bar" },
@@ -613,6 +673,11 @@ const parasiticDrain: CategoryDefinition = {
   name: "Parasitic Battery Drain",
   icon: "zap-off",
   description: "Battery dies overnight or after sitting a few days",
+  dtcEffects: [
+    { pattern: "B1[0-9]{3}", hypothesisId: "pd-module", delta: 10, label: "Body control module code (module not sleeping)" },
+    { pattern: "U1[0-9]{3}", hypothesisId: "pd-module", delta: 15, label: "Network communication fault (module wake)" },
+    { pattern: "P0562", hypothesisId: "pd-alternator", delta: 15, label: "System voltage low (alternator diode leak)" },
+  ],
   hypotheses: [
     { id: "pd-aftermarket", name: "Aftermarket accessory drawing power", baseConfidence: 28, description: "Aftermarket stereos, amplifiers, dash cams, remote starters, or alarm systems often have always-on circuits that drain the battery.", difficulty: "easy", costRange: "$0-100", safetyLevel: "diy-safe", toolLevel: "Multimeter" },
     { id: "pd-module", name: "Control module not entering sleep mode", baseConfidence: 25, description: "A body control module, infotainment, or other computer is staying awake instead of entering its low-power sleep mode after the vehicle is shut off.", difficulty: "moderate", costRange: "$0-300", safetyLevel: "diy-safe", toolLevel: "Multimeter, scan tool" },
@@ -679,6 +744,15 @@ const acNotCold: CategoryDefinition = {
   name: "AC Not Cold",
   icon: "wind",
   description: "Air conditioning blowing warm or not cooling sufficiently",
+  dtcEffects: [
+    { pattern: "B1421", hypothesisId: "ac-blend", delta: 25, label: "Blend door actuator circuit" },
+    { pattern: "B1453", hypothesisId: "ac-blend", delta: 20, label: "Blend door position error" },
+    { pattern: "P0530", hypothesisId: "ac-refrigerant", delta: 20, label: "AC pressure sensor circuit" },
+    { pattern: "P0532", hypothesisId: "ac-refrigerant", delta: 20, label: "AC pressure sensor low" },
+    { pattern: "P0533", hypothesisId: "ac-refrigerant", delta: 15, label: "AC pressure sensor high" },
+    { pattern: "P0645", hypothesisId: "ac-compressor", delta: 20, label: "AC clutch relay circuit" },
+    { pattern: "B0408", hypothesisId: "ac-compressor", delta: 15, label: "AC compressor control circuit" },
+  ],
   hypotheses: [
     { id: "ac-refrigerant", name: "Low refrigerant from leak", baseConfidence: 35, description: "R-134a or R-1234yf has leaked from a hose, o-ring, condenser, or evaporator, reducing system cooling capacity.", difficulty: "moderate", costRange: "$100-400", safetyLevel: "use-caution", toolLevel: "AC gauge set, UV light" },
     { id: "ac-compressor", name: "Compressor failure or clutch not engaging", baseConfidence: 22, description: "The AC compressor has internal failure, or its electromagnetic clutch is not engaging due to low charge, blown fuse, or clutch failure.", difficulty: "hard", costRange: "$300-800", safetyLevel: "professional", toolLevel: "AC gauge set" },
@@ -746,6 +820,17 @@ const transmissionIssue: CategoryDefinition = {
   name: "Transmission Slip / Harsh Shift",
   icon: "repeat",
   description: "Slipping, harsh shifts, delayed engagement, or shudder",
+  dtcEffects: [
+    { pattern: "P070[0-6]", hypothesisId: "tr-solenoid", delta: 20, label: "Transmission control system" },
+    { pattern: "P075[0-6]", hypothesisId: "tr-solenoid", delta: 20, label: "Shift solenoid circuit" },
+    { pattern: "P0730", hypothesisId: "tr-clutches", delta: 15, label: "Incorrect gear ratio" },
+    { pattern: "P0731", hypothesisId: "tr-clutches", delta: 20, label: "Gear 1 incorrect ratio" },
+    { pattern: "P073[2-6]", hypothesisId: "tr-clutches", delta: 20, label: "Gear ratio fault" },
+    { pattern: "P0741", hypothesisId: "tr-converter", delta: 25, label: "TCC stuck off" },
+    { pattern: "P0740", hypothesisId: "tr-converter", delta: 20, label: "TCC circuit malfunction" },
+    { pattern: "P0218", hypothesisId: "tr-fluid", delta: 15, label: "Transmission over-temperature" },
+    { pattern: "P0868", hypothesisId: "tr-fluid", delta: 20, label: "Transmission fluid pressure low" },
+  ],
   hypotheses: [
     { id: "tr-fluid", name: "Low or degraded transmission fluid", baseConfidence: 30, description: "Fluid is low from a leak, or has degraded from heat and age, losing its friction properties.", difficulty: "easy", costRange: "$20-150", safetyLevel: "diy-safe", toolLevel: "Drain pan, funnel" },
     { id: "tr-solenoid", name: "Shift solenoid failure", baseConfidence: 22, description: "An electronically-controlled shift solenoid is stuck open or closed, preventing proper gear engagement.", difficulty: "moderate", costRange: "$100-400", safetyLevel: "use-caution", toolLevel: "Scan tool, socket set" },
@@ -829,6 +914,7 @@ export function computeHypotheses(
   category: CategoryDefinition,
   answers: Record<string, string>,
   completedTests: Record<string, TestResult>,
+  dtcCodes?: string[],
 ): ScoredHypothesis[] {
   const scores: Record<string, number> = {};
   const supporting: Record<string, string[]> = {};
@@ -838,6 +924,24 @@ export function computeHypotheses(
     scores[h.id] = h.baseConfidence;
     supporting[h.id] = [];
     contradicting[h.id] = [];
+  }
+
+  if (dtcCodes && dtcCodes.length > 0 && category.dtcEffects) {
+    for (const code of dtcCodes) {
+      const upper = code.toUpperCase().trim();
+      for (const effect of category.dtcEffects) {
+        if (scores[effect.hypothesisId] === undefined) continue;
+        const regex = new RegExp(`^${effect.pattern}$`, "i");
+        if (regex.test(upper)) {
+          scores[effect.hypothesisId] += effect.delta;
+          if (effect.delta > 0) {
+            supporting[effect.hypothesisId].push(`DTC ${upper}: ${effect.label}`);
+          } else if (effect.delta < 0) {
+            contradicting[effect.hypothesisId].push(`DTC ${upper}: ${effect.label}`);
+          }
+        }
+      }
+    }
   }
 
   for (const q of category.questions) {
@@ -958,8 +1062,9 @@ export function generateAssessment(
   category: CategoryDefinition,
   answers: Record<string, string>,
   completedTests: Record<string, TestResult>,
+  dtcCodes?: string[],
 ): DiagnosticAssessment {
-  const hypotheses = computeHypotheses(category, answers, completedTests);
+  const hypotheses = computeHypotheses(category, answers, completedTests, dtcCodes);
   const nextQuestion = getNextQuestion(category, answers);
   const nextTest = getNextTest(category, hypotheses, completedTests);
 
@@ -1033,7 +1138,7 @@ export function generateExportSummary(
     : [];
 
   const hypotheses = category
-    ? computeHypotheses(category, session.answers, session.completedTests)
+    ? computeHypotheses(category, session.answers, session.completedTests, session.dtcCodes)
     : [];
 
   const likelyCauses = hypotheses.filter(h => h.confidence >= 5).slice(0, 5).map(h => ({

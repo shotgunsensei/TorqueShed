@@ -140,8 +140,8 @@ export default function PartsScreen() {
 
   const assessment = useMemo<DiagnosticAssessment | null>(() => {
     if (!category) return null;
-    return generateAssessment(category, session.answers, session.completedTests);
-  }, [category, session.answers, session.completedTests]);
+    return generateAssessment(category, session.answers, session.completedTests, session.dtcCodes);
+  }, [category, session.answers, session.completedTests, session.dtcCodes]);
 
   const updateSession = useCallback((updates: Partial<DiagnosticSessionData>) => {
     setSession(prev => ({ ...prev, ...updates }));
