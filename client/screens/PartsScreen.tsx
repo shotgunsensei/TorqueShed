@@ -26,6 +26,7 @@ import {
   computeHypotheses,
   generateAssessment,
   generateExportSummary,
+  getDtcMatchingCategories,
   createEmptySession,
   type DiagnosticSessionData,
   type DiagnosticPhase,
@@ -143,6 +144,10 @@ export default function PartsScreen() {
     return generateAssessment(category, session.answers, session.completedTests, session.dtcCodes);
   }, [category, session.answers, session.completedTests, session.dtcCodes]);
 
+  const dtcMatches = useMemo(() => {
+    return getDtcMatchingCategories(session.dtcCodes);
+  }, [session.dtcCodes]);
+
   const updateSession = useCallback((updates: Partial<DiagnosticSessionData>) => {
     setSession(prev => ({ ...prev, ...updates }));
   }, []);
@@ -236,7 +241,15 @@ export default function PartsScreen() {
     }
     if (summary.likelyCauses.length > 0) {
       lines.push("", "LIKELY CAUSES");
-      summary.likelyCauses.forEach(c => lines.push(`${c.confidence}% ${c.name}`));
+      summary.likelyCauses.forEach((c, i) => {
+        lines.push(`#${i + 1} ${c.confidence}% ${c.name}`);
+        if (c.supportingEvidence.length > 0) {
+          lines.push(`   Supporting: ${c.supportingEvidence.join(", ")}`);
+        }
+        if (c.contradictingEvidence.length > 0) {
+          lines.push(`   Against: ${c.contradictingEvidence.join(", ")}`);
+        }
+      });
     }
     lines.push("", `NEXT STEP: ${summary.recommendedNextStep}`);
     if (summary.notes) lines.push("", `NOTES: ${summary.notes}`);
@@ -438,27 +451,39 @@ export default function PartsScreen() {
       </View>
 
       <View style={styles.categoryGrid}>
-        {DIAGNOSTIC_CATEGORIES.map(cat => (
-          <Pressable
-            key={cat.id}
-            style={({ pressed }) => [
-              styles.categoryCard,
-              {
-                backgroundColor: theme.backgroundSecondary,
-                borderColor: theme.cardBorder,
-                opacity: pressed ? 0.9 : 1,
-              },
-            ]}
-            onPress={() => handleSelectCategory(cat)}
-            testID={`category-${cat.id}`}
-          >
-            <View style={[styles.catIconBg, { backgroundColor: theme.primary + "15" }]}>
-              <Feather name={CATEGORY_ICONS[cat.id] || "help-circle"} size={22} color={theme.primary} />
-            </View>
-            <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
-            <Text style={[styles.catDesc, { color: theme.textMuted }]} numberOfLines={2}>{cat.description}</Text>
-          </Pressable>
-        ))}
+        {DIAGNOSTIC_CATEGORIES.map(cat => {
+          const match = dtcMatches.find(m => m.categoryId === cat.id);
+          return (
+            <Pressable
+              key={cat.id}
+              style={({ pressed }) => [
+                styles.categoryCard,
+                {
+                  backgroundColor: theme.backgroundSecondary,
+                  borderColor: match ? theme.primary : theme.cardBorder,
+                  borderWidth: match ? 2 : 1,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+              onPress={() => handleSelectCategory(cat)}
+              testID={`category-${cat.id}`}
+            >
+              <View style={[styles.catIconBg, { backgroundColor: theme.primary + "15" }]}>
+                <Feather name={CATEGORY_ICONS[cat.id] || "help-circle"} size={22} color={theme.primary} />
+              </View>
+              <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
+              <Text style={[styles.catDesc, { color: theme.textMuted }]} numberOfLines={2}>{cat.description}</Text>
+              {match ? (
+                <View style={[styles.dtcMatchBadge, { backgroundColor: theme.primary + "15" }]}>
+                  <Feather name="cpu" size={10} color={theme.primary} />
+                  <Text style={[styles.dtcMatchText, { color: theme.primary }]}>
+                    {match.matchCount} matching DTC{match.matchCount > 1 ? "s" : ""}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -483,6 +508,17 @@ export default function PartsScreen() {
             <Text style={[styles.categoryBadgeText, { color: theme.primary }]}>{category.name}</Text>
           </View>
         </View>
+
+        {session.dtcCodes.length > 0 ? (
+          <View style={styles.dtcChipRow}>
+            <Feather name="cpu" size={12} color={theme.accent} />
+            {session.dtcCodes.map((code, i) => (
+              <View key={i} style={[styles.dtcChip, { backgroundColor: theme.accent + "15", borderColor: theme.accent + "30" }]}>
+                <Text style={[styles.dtcChipText, { color: theme.accent }]}>{code}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <View style={[styles.progressWrap, { backgroundColor: theme.backgroundTertiary }]}>
           <View style={[styles.progressFill, { backgroundColor: theme.primary, width: `${assessment.progress * 100}%` }]} />
@@ -628,6 +664,16 @@ export default function PartsScreen() {
           </View>
         </View>
 
+        {session.dtcCodes.length > 0 ? (
+          <View style={styles.dtcChipRow}>
+            <Feather name="cpu" size={12} color={theme.accent} />
+            {session.dtcCodes.map((code, i) => (
+              <View key={i} style={[styles.dtcChip, { backgroundColor: theme.accent + "15", borderColor: theme.accent + "30" }]}>
+                <Text style={[styles.dtcChipText, { color: theme.accent }]}>{code}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {assessment.summary ? (
           <View style={[styles.summaryBanner, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "30" }]}>
@@ -682,6 +728,32 @@ export default function PartsScreen() {
                   <Text style={[styles.hypToolText, { color: theme.textMuted }]}>{h.toolLevel}</Text>
                 </View>
               ) : null}
+              {h.supportingEvidence.length > 0 ? (
+                <View style={styles.evidenceSection}>
+                  <Text style={[styles.evidenceLabel, { color: theme.success }]}>Supporting</Text>
+                  <View style={styles.evidenceChips}>
+                    {h.supportingEvidence.map((e, ei) => (
+                      <View key={ei} style={[styles.evidenceChip, { backgroundColor: theme.success + "10", borderColor: theme.success + "30" }]}>
+                        <Feather name="plus" size={10} color={theme.success} />
+                        <Text style={[styles.evidenceChipText, { color: theme.text }]} numberOfLines={1}>{e}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {h.contradictingEvidence.length > 0 ? (
+                <View style={styles.evidenceSection}>
+                  <Text style={[styles.evidenceLabel, { color: theme.error }]}>Against</Text>
+                  <View style={styles.evidenceChips}>
+                    {h.contradictingEvidence.map((e, ei) => (
+                      <View key={ei} style={[styles.evidenceChip, { backgroundColor: theme.error + "10", borderColor: theme.error + "30" }]}>
+                        <Feather name="minus" size={10} color={theme.error} />
+                        <Text style={[styles.evidenceChipText, { color: theme.text }]} numberOfLines={1}>{e}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
             </View>
           ))}
         </View>
@@ -700,42 +772,56 @@ export default function PartsScreen() {
           <View style={styles.dashCardHeader}>
             <Feather name="list" size={16} color={theme.primary} />
             <Text style={[styles.dashCardTitle, { color: theme.text }]}>All Tests</Text>
+            <Text style={[styles.dashCardSubtitle, { color: theme.textMuted }]}>
+              {Object.keys(session.completedTests).length} of {category.tests.length} completed
+            </Text>
           </View>
-          {category.tests.map(test => {
-            const completed = session.completedTests[test.id];
-            if (completed) {
-              return (
-                <View key={test.id} style={[styles.completedTest, { borderColor: theme.cardBorder }]}>
-                  <View style={styles.completedTestHeader}>
-                    <Feather
-                      name={completed.result === "pass" ? "check-circle" : completed.result === "fail" ? "x-circle" : "minus-circle"}
-                      size={18}
-                      color={completed.result === "pass" ? theme.success : completed.result === "fail" ? theme.error : theme.accent}
-                    />
-                    <Text style={[styles.completedTestName, { color: theme.text }]}>{test.name}</Text>
-                    <View style={[
-                      styles.resultBadge,
-                      { backgroundColor: (completed.result === "pass" ? theme.success : completed.result === "fail" ? theme.error : theme.accent) + "15" },
-                    ]}>
-                      <Text style={[
-                        styles.resultBadgeText,
-                        { color: completed.result === "pass" ? theme.success : completed.result === "fail" ? theme.error : theme.accent },
-                      ]}>{completed.result.toUpperCase()}</Text>
+          {(() => {
+            const topIds = assessment.hypotheses.slice(0, 3).map(h => h.id);
+            const sortedTests = [...category.tests].sort((a, b) => {
+              const aCompleted = session.completedTests[a.id] ? 1 : 0;
+              const bCompleted = session.completedTests[b.id] ? 1 : 0;
+              if (aCompleted !== bCompleted) return aCompleted - bCompleted;
+              const aRelevance = a.discriminates.filter(id => topIds.includes(id)).length;
+              const bRelevance = b.discriminates.filter(id => topIds.includes(id)).length;
+              return bRelevance - aRelevance;
+            });
+            return sortedTests.map(test => {
+              const completed = session.completedTests[test.id];
+              if (completed) {
+                return (
+                  <View key={test.id} style={[styles.completedTest, { borderColor: theme.cardBorder }]}>
+                    <View style={styles.completedTestHeader}>
+                      <Feather
+                        name={completed.result === "pass" ? "check-circle" : completed.result === "fail" ? "x-circle" : "minus-circle"}
+                        size={18}
+                        color={completed.result === "pass" ? theme.success : completed.result === "fail" ? theme.error : theme.accent}
+                      />
+                      <Text style={[styles.completedTestName, { color: theme.text }]}>{test.name}</Text>
+                      <View style={[
+                        styles.resultBadge,
+                        { backgroundColor: (completed.result === "pass" ? theme.success : completed.result === "fail" ? theme.error : theme.accent) + "15" },
+                      ]}>
+                        <Text style={[
+                          styles.resultBadgeText,
+                          { color: completed.result === "pass" ? theme.success : completed.result === "fail" ? theme.error : theme.accent },
+                        ]}>{completed.result.toUpperCase()}</Text>
+                      </View>
                     </View>
+                    {completed.notes ? (
+                      <Text style={[styles.completedTestNotes, { color: theme.textMuted }]}>{completed.notes}</Text>
+                    ) : null}
                   </View>
-                  {completed.notes ? (
-                    <Text style={[styles.completedTestNotes, { color: theme.textMuted }]}>{completed.notes}</Text>
-                  ) : null}
+                );
+              }
+              if (assessment.nextTest && test.id === assessment.nextTest.id) return null;
+              return (
+                <View key={test.id}>
+                  {renderTestCard(test, false)}
                 </View>
               );
-            }
-            if (assessment.nextTest && test.id === assessment.nextTest.id) return null;
-            return (
-              <View key={test.id}>
-                {renderTestCard(test, false)}
-              </View>
-            );
-          })}
+            });
+          })()}
         </View>
 
         <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
@@ -805,6 +891,13 @@ export default function PartsScreen() {
   const renderTestCard = (test: DiagnosticTest, isRecommended: boolean) => {
     const isActive = activeTestId === test.id;
 
+    const discriminatesNames = category
+      ? test.discriminates.map(hId => {
+          const h = category.hypotheses.find(hyp => hyp.id === hId);
+          return h ? h.name : hId;
+        })
+      : [];
+
     return (
       <View style={[styles.testCard, isRecommended ? { borderLeftWidth: 3, borderLeftColor: theme.primary } : undefined]}>
         <Pressable
@@ -823,6 +916,14 @@ export default function PartsScreen() {
 
         {isActive ? (
           <View style={styles.testExpanded}>
+            {discriminatesNames.length > 0 ? (
+              <View style={[styles.testDiscriminates, { backgroundColor: theme.primary + "08", borderColor: theme.primary + "20" }]}>
+                <Feather name="crosshair" size={12} color={theme.primary} />
+                <Text style={[styles.testDiscriminatesText, { color: theme.textSecondary }]}>
+                  Helps confirm or rule out: {discriminatesNames.join(", ")}
+                </Text>
+              </View>
+            ) : null}
             <View style={styles.testSection}>
               <Text style={[styles.testSectionTitle, { color: theme.primary }]}>Procedure</Text>
               <Text style={[styles.testSectionBody, { color: theme.text }]}>{test.procedure}</Text>
@@ -955,7 +1056,29 @@ export default function PartsScreen() {
 
           <Text style={[styles.exportSectionTitle, { color: theme.primary, marginTop: Spacing.md }]}>Likely Causes</Text>
           {summary.likelyCauses.map((c, i) => (
-            <Text key={i} style={[styles.exportText, { color: theme.text }]}>{c.confidence}% - {c.name}</Text>
+            <View key={i} style={[styles.exportCauseCard, { borderColor: theme.cardBorder }]}>
+              <View style={styles.exportCauseHeader}>
+                <Text style={[styles.exportCauseRank, { color: theme.primary }]}>#{i + 1}</Text>
+                <Text style={[styles.exportText, { color: theme.text, flex: 1 }]}>{c.name}</Text>
+                <Text style={[styles.exportCausePct, { color: theme.primary }]}>{c.confidence}%</Text>
+              </View>
+              {c.supportingEvidence.length > 0 ? (
+                <View style={styles.exportEvidenceRow}>
+                  <Feather name="plus-circle" size={11} color={theme.success} />
+                  <Text style={[styles.exportEvidenceText, { color: theme.textMuted }]}>
+                    {c.supportingEvidence.join(" / ")}
+                  </Text>
+                </View>
+              ) : null}
+              {c.contradictingEvidence.length > 0 ? (
+                <View style={styles.exportEvidenceRow}>
+                  <Feather name="minus-circle" size={11} color={theme.error} />
+                  <Text style={[styles.exportEvidenceText, { color: theme.textMuted }]}>
+                    {c.contradictingEvidence.join(" / ")}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           ))}
 
           <Text style={[styles.exportSectionTitle, { color: theme.primary, marginTop: Spacing.md }]}>Next Step</Text>
@@ -1036,6 +1159,11 @@ const styles = StyleSheet.create({
   catIconBg: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: Spacing.sm },
   catName: { ...Typography.h4, marginBottom: 2, textAlign: "center" },
   catDesc: { ...Typography.caption, textAlign: "center" },
+  dtcMatchBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full, marginTop: Spacing.xs },
+  dtcMatchText: { ...Typography.caption, fontWeight: "600", fontSize: 10 },
+  dtcChipRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: Spacing.xs, marginBottom: Spacing.md },
+  dtcChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full, borderWidth: 1 },
+  dtcChipText: { ...Typography.caption, fontWeight: "700", fontSize: 11 },
 
   progressWrap: { height: 6, borderRadius: 3, overflow: "hidden", marginBottom: Spacing.xs },
   progressFill: { height: "100%", borderRadius: 3 },
@@ -1076,6 +1204,7 @@ const styles = StyleSheet.create({
   dashCard: { padding: Spacing.lg, borderRadius: BorderRadius.md, borderWidth: 1, marginBottom: Spacing.md },
   dashCardHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.md },
   dashCardTitle: { ...Typography.h4 },
+  dashCardSubtitle: { ...Typography.caption, marginLeft: "auto" },
 
   summaryBanner: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, marginBottom: Spacing.md },
   summaryBannerText: { ...Typography.body, flex: 1 },
@@ -1095,6 +1224,11 @@ const styles = StyleSheet.create({
   hypCost: { ...Typography.caption, marginLeft: "auto" },
   hypToolRow: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginTop: Spacing.xs },
   hypToolText: { ...Typography.caption },
+  evidenceSection: { marginTop: Spacing.sm },
+  evidenceLabel: { ...Typography.caption, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4, fontSize: 10 },
+  evidenceChips: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  evidenceChip: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: BorderRadius.full, borderWidth: 1 },
+  evidenceChipText: { ...Typography.caption, fontSize: 10 },
 
   testCard: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.sm, marginBottom: Spacing.sm },
   testHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
@@ -1103,6 +1237,8 @@ const styles = StyleSheet.create({
   diffBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
   diffBadgeText: { ...Typography.caption, fontWeight: "600", textTransform: "capitalize" },
   testExpanded: { marginTop: Spacing.md, paddingTop: Spacing.md },
+  testDiscriminates: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, padding: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1, marginBottom: Spacing.md },
+  testDiscriminatesText: { ...Typography.caption, flex: 1 },
   testSection: { marginBottom: Spacing.md },
   testSectionTitle: { ...Typography.caption, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
   testSectionBody: { ...Typography.body },
@@ -1138,4 +1274,10 @@ const styles = StyleSheet.create({
   exportText: { ...Typography.body, marginBottom: 2 },
   exportTextSub: { ...Typography.small, marginBottom: 2 },
   exportTestRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: 4 },
+  exportCauseCard: { borderBottomWidth: 1, paddingVertical: Spacing.sm, marginBottom: Spacing.xs },
+  exportCauseHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  exportCauseRank: { ...Typography.body, fontWeight: "700" },
+  exportCausePct: { ...Typography.body, fontWeight: "700" },
+  exportEvidenceRow: { flexDirection: "row", alignItems: "flex-start", gap: 4, marginTop: 4, paddingLeft: Spacing.lg },
+  exportEvidenceText: { ...Typography.caption, flex: 1 },
 });

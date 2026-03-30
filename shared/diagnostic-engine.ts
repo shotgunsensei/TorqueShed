@@ -119,7 +119,7 @@ export interface ExportSummary {
   dtcCodes: string[];
   recentRepairs: string;
   testsPerformed: { name: string; result: string; notes: string }[];
-  likelyCauses: { name: string; confidence: number; description: string }[];
+  likelyCauses: { name: string; confidence: number; description: string; supportingEvidence: string[]; contradictingEvidence: string[] }[];
   recommendedNextStep: string;
   notes: string;
   generatedAt: string;
@@ -1058,6 +1058,49 @@ export function getNextTest(
   return null;
 }
 
+function countEligibleQuestions(
+  category: CategoryDefinition,
+  answers: Record<string, string>,
+): number {
+  let count = 0;
+  for (const q of category.questions) {
+    if (answers[q.id]) { count++; continue; }
+    if (q.prerequisites) {
+      const met = q.prerequisites.every(
+        p => answers[p.questionId] && p.values.includes(answers[p.questionId])
+      );
+      if (!met) continue;
+    }
+    count++;
+  }
+  return count;
+}
+
+export function getDtcMatchingCategories(
+  dtcCodes: string[],
+): { categoryId: string; matchCount: number; matchedCodes: string[] }[] {
+  if (!dtcCodes || dtcCodes.length === 0) return [];
+  const results: { categoryId: string; matchCount: number; matchedCodes: string[] }[] = [];
+  for (const cat of DIAGNOSTIC_CATEGORIES) {
+    if (!cat.dtcEffects) continue;
+    const matchedCodes: string[] = [];
+    for (const code of dtcCodes) {
+      const upper = code.toUpperCase().trim();
+      for (const effect of cat.dtcEffects) {
+        const regex = new RegExp(`^${effect.pattern}$`, "i");
+        if (regex.test(upper) && !matchedCodes.includes(upper)) {
+          matchedCodes.push(upper);
+        }
+      }
+    }
+    if (matchedCodes.length > 0) {
+      results.push({ categoryId: cat.id, matchCount: matchedCodes.length, matchedCodes });
+    }
+  }
+  results.sort((a, b) => b.matchCount - a.matchCount);
+  return results;
+}
+
 export function generateAssessment(
   category: CategoryDefinition,
   answers: Record<string, string>,
@@ -1069,9 +1112,12 @@ export function generateAssessment(
   const nextTest = getNextTest(category, hypotheses, completedTests);
 
   const answeredCount = category.questions.filter(q => answers[q.id]).length;
-  const totalQuestions = category.questions.length;
+  const eligibleCount = countEligibleQuestions(category, answers);
+  const totalQuestions = eligibleCount;
   const completedTestCount = category.tests.filter(t => completedTests[t.id]).length;
-  const progress = (answeredCount + completedTestCount) / (totalQuestions + category.tests.length);
+  const progress = totalQuestions + category.tests.length > 0
+    ? (answeredCount + completedTestCount) / (totalQuestions + category.tests.length)
+    : 0;
 
   let phaseLabel: "narrowing" | "testing" | "conclusion" = "narrowing";
   if (!nextQuestion && !nextTest) {
@@ -1085,20 +1131,24 @@ export function generateAssessment(
   let summary = "";
 
   if (answeredCount === 0 && completedTestCount === 0) {
-    summary = `Diagnosing ${category.name}. Answer each question to narrow the field.`;
+    const dtcHint = dtcCodes && dtcCodes.length > 0
+      ? ` ${dtcCodes.length} DTC${dtcCodes.length > 1 ? "s" : ""} factored into initial scoring.`
+      : "";
+    summary = `Diagnosing ${category.name}.${dtcHint} Answer each question to narrow the field.`;
   } else if (top && runner) {
+    const evidenceCount = top.supportingEvidence.length;
     if (top.confidence >= 50) {
-      summary = `Strong indicator: ${top.name} at ${top.confidence}%. ${runner.name} still in play at ${runner.confidence}%.`;
+      summary = `${top.name} is the strong front-runner at ${top.confidence}%, backed by ${evidenceCount} data point${evidenceCount !== 1 ? "s" : ""}. ${runner.name} at ${runner.confidence}% hasn't been ruled out.`;
     } else if (top.confidence - runner.confidence > 15) {
-      summary = `Leading cause: ${top.name} (${top.confidence}%). Runner-up: ${runner.name} (${runner.confidence}%).`;
+      summary = `${top.name} leads at ${top.confidence}% with ${evidenceCount} supporting indicator${evidenceCount !== 1 ? "s" : ""}. ${runner.name} trails at ${runner.confidence}%.`;
     } else {
-      summary = `${top.name} (${top.confidence}%) and ${runner.name} (${runner.confidence}%) are close. More data needed to separate them.`;
+      summary = `${top.name} (${top.confidence}%) and ${runner.name} (${runner.confidence}%) are still close. A discriminating test will help separate them.`;
     }
 
     if (phaseLabel === "testing" && nextTest) {
-      summary += ` Next step: ${nextTest.name}.`;
+      summary += ` Recommended: run the ${nextTest.name}.`;
     } else if (phaseLabel === "conclusion") {
-      summary += " All questions and tests complete.";
+      summary += ` All available questions and tests are complete.`;
     }
   }
 
@@ -1123,7 +1173,7 @@ export function generateExportSummary(
       const val = session.answers[q.id];
       if (!val) continue;
       const opt = q.options.find(o => o.value === val);
-      if (opt) answeredSymptoms.push(`${opt.label}`);
+      if (opt) answeredSymptoms.push(`${q.text} -- ${opt.label}`);
     }
   }
 
@@ -1145,18 +1195,37 @@ export function generateExportSummary(
     name: h.name,
     confidence: h.confidence,
     description: h.description,
+    supportingEvidence: h.supportingEvidence,
+    contradictingEvidence: h.contradictingEvidence,
   }));
 
   const topCause = hypotheses[0];
-  const recommendedNextStep = topCause
-    ? topCause.nextTest
-      ? `${topCause.nextTest.name} -- ${topCause.nextTest.purpose}`
-      : `Primary suspect: ${topCause.name} (${topCause.confidence}%). Proceed with repair or professional verification.`
-    : "Gather more data.";
+  const assessmentNextTest = category
+    ? getNextTest(category, hypotheses, session.completedTests)
+    : null;
+  let recommendedNextStep: string;
+  if (!topCause) {
+    recommendedNextStep = "Gather more data.";
+  } else if (assessmentNextTest) {
+    recommendedNextStep = `Run ${assessmentNextTest.name} -- ${assessmentNextTest.purpose}`;
+  } else if (topCause.confidence >= 50) {
+    recommendedNextStep = `${topCause.name} is the primary suspect at ${topCause.confidence}%. Proceed with targeted repair or professional verification.`;
+  } else {
+    recommendedNextStep = `${topCause.name} leads at ${topCause.confidence}% but confidence is moderate. Consider additional testing before committing to repair.`;
+  }
+
+  let complaint = category ? category.name : "Unknown";
+  if (category && Object.keys(session.answers).length > 0) {
+    const firstAnswer = session.answers[category.questions[0]?.id];
+    const firstOpt = category.questions[0]?.options.find(o => o.value === firstAnswer);
+    if (firstOpt) {
+      complaint = `${category.name} (${firstOpt.label})`;
+    }
+  }
 
   return {
     vehicle: session.vehicle,
-    complaint: category ? category.name : "Unknown",
+    complaint,
     symptoms: answeredSymptoms,
     dtcCodes: session.dtcCodes,
     recentRepairs: session.recentRepairs,
