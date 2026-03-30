@@ -617,11 +617,10 @@ export function computeHypotheses(
     for (const effect of selectedOption.effects) {
       if (scores[effect.hypothesisId] === undefined) continue;
       scores[effect.hypothesisId] += effect.delta;
-      const label = `${q.text.substring(0, 60)}... -> "${selectedOption.label}"`;
       if (effect.delta > 0) {
-        supporting[effect.hypothesisId].push(label);
+        supporting[effect.hypothesisId].push(selectedOption.label);
       } else if (effect.delta < 0) {
-        contradicting[effect.hypothesisId].push(label);
+        contradicting[effect.hypothesisId].push(selectedOption.label);
       }
     }
   }
@@ -702,10 +701,18 @@ export function getNextTest(
   hypotheses: ScoredHypothesis[],
   completedTests: Record<string, TestResult>,
 ): DiagnosticTest | null {
-  const topHypothesis = hypotheses[0];
-  if (!topHypothesis) return null;
+  const top = hypotheses[0];
+  const runner = hypotheses[1];
+  if (!top) return null;
 
-  if (topHypothesis.nextTest) return topHypothesis.nextTest;
+  if (top && runner) {
+    const discriminatingTest = category.tests.find(
+      t => !completedTests[t.id] && t.discriminates.includes(top.id) && t.discriminates.includes(runner.id)
+    );
+    if (discriminatingTest) return discriminatingTest;
+  }
+
+  if (top.nextTest) return top.nextTest;
 
   for (const test of category.tests) {
     if (!completedTests[test.id]) return test;
@@ -740,20 +747,20 @@ export function generateAssessment(
   let summary = "";
 
   if (answeredCount === 0 && completedTestCount === 0) {
-    summary = `Starting diagnosis for ${category.name}. Answer the following questions to help narrow down the cause.`;
+    summary = `Diagnosing ${category.name}. Answer each question to narrow the field.`;
   } else if (top && runner) {
     if (top.confidence >= 50) {
-      summary = `Evidence strongly points toward ${top.name} (${top.confidence}%). ${runner.name} remains possible at ${runner.confidence}%.`;
+      summary = `Strong indicator: ${top.name} at ${top.confidence}%. ${runner.name} still in play at ${runner.confidence}%.`;
     } else if (top.confidence - runner.confidence > 15) {
-      summary = `${top.name} is the leading candidate at ${top.confidence}%. The next most likely is ${runner.name} at ${runner.confidence}%.`;
+      summary = `Leading cause: ${top.name} (${top.confidence}%). Runner-up: ${runner.name} (${runner.confidence}%).`;
     } else {
-      summary = `${top.name} (${top.confidence}%) and ${runner.name} (${runner.confidence}%) are close. Further testing will help separate them.`;
+      summary = `${top.name} (${top.confidence}%) and ${runner.name} (${runner.confidence}%) are close. More data needed to separate them.`;
     }
 
     if (phaseLabel === "testing" && nextTest) {
-      summary += ` The next best step is: ${nextTest.name}.`;
+      summary += ` Next step: ${nextTest.name}.`;
     } else if (phaseLabel === "conclusion") {
-      summary += " All available questions and tests have been completed.";
+      summary += " All questions and tests complete.";
     }
   }
 
@@ -778,7 +785,7 @@ export function generateExportSummary(
       const val = session.answers[q.id];
       if (!val) continue;
       const opt = q.options.find(o => o.value === val);
-      if (opt) answeredSymptoms.push(`${q.text} -> ${opt.label}`);
+      if (opt) answeredSymptoms.push(`${opt.label}`);
     }
   }
 
@@ -796,7 +803,7 @@ export function generateExportSummary(
     ? computeHypotheses(category, session.answers, session.completedTests)
     : [];
 
-  const likelyCauses = hypotheses.slice(0, 5).map(h => ({
+  const likelyCauses = hypotheses.filter(h => h.confidence >= 5).slice(0, 5).map(h => ({
     name: h.name,
     confidence: h.confidence,
     description: h.description,
@@ -805,9 +812,9 @@ export function generateExportSummary(
   const topCause = hypotheses[0];
   const recommendedNextStep = topCause
     ? topCause.nextTest
-      ? `Perform: ${topCause.nextTest.name} - ${topCause.nextTest.purpose}`
-      : `Most likely cause: ${topCause.name} (${topCause.confidence}%). Consider repair or further professional inspection.`
-    : "Continue diagnostic investigation.";
+      ? `${topCause.nextTest.name} -- ${topCause.nextTest.purpose}`
+      : `Primary suspect: ${topCause.name} (${topCause.confidence}%). Proceed with repair or professional verification.`
+    : "Gather more data.";
 
   return {
     vehicle: session.vehicle,

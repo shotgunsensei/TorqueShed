@@ -213,35 +213,35 @@ export default function PartsScreen() {
     if (!category) return;
     const summary = generateExportSummary(session, category);
     const lines: string[] = [
-      "=== DIAGNOSTIC SUMMARY ===",
+      "TORQUEASSIST DIAGNOSTIC REPORT",
       "",
-      `Vehicle: ${summary.vehicle.year || ""} ${summary.vehicle.make || ""} ${summary.vehicle.model || ""}`.trim(),
+      `Vehicle: ${[summary.vehicle.year, summary.vehicle.make, summary.vehicle.model].filter(Boolean).join(" ")}`,
     ];
     if (summary.vehicle.engine) lines.push(`Engine: ${summary.vehicle.engine}`);
     if (summary.vehicle.mileage) lines.push(`Mileage: ${summary.vehicle.mileage.toLocaleString()}`);
     if (summary.vehicle.vin) lines.push(`VIN: ${summary.vehicle.vin}`);
-    lines.push("", `Complaint: ${summary.complaint}`);
-    if (summary.dtcCodes.length > 0) lines.push(`DTC Codes: ${summary.dtcCodes.join(", ")}`);
-    if (summary.recentRepairs) lines.push(`Recent Repairs: ${summary.recentRepairs}`);
+    lines.push(`Complaint: ${summary.complaint}`);
+    if (summary.dtcCodes.length > 0) lines.push(`DTCs: ${summary.dtcCodes.join(", ")}`);
+    if (summary.recentRepairs) lines.push(`Recent work: ${summary.recentRepairs}`);
     if (summary.symptoms.length > 0) {
-      lines.push("", "--- Symptoms & Observations ---");
-      summary.symptoms.forEach(s => lines.push(`  ${s}`));
+      lines.push("", "REPORTED SYMPTOMS");
+      summary.symptoms.forEach(s => lines.push(`- ${s}`));
     }
     if (summary.testsPerformed.length > 0) {
-      lines.push("", "--- Tests Performed ---");
+      lines.push("", "TESTS PERFORMED");
       summary.testsPerformed.forEach(t => {
-        lines.push(`  ${t.name}: ${t.result.toUpperCase()}`);
-        if (t.notes) lines.push(`    Notes: ${t.notes}`);
+        lines.push(`- ${t.name}: ${t.result.toUpperCase()}`);
+        if (t.notes) lines.push(`  ${t.notes}`);
       });
     }
     if (summary.likelyCauses.length > 0) {
-      lines.push("", "--- Most Likely Causes ---");
-      summary.likelyCauses.forEach(c => lines.push(`  ${c.confidence}% - ${c.name}`));
+      lines.push("", "LIKELY CAUSES");
+      summary.likelyCauses.forEach(c => lines.push(`${c.confidence}% ${c.name}`));
     }
-    lines.push("", `Recommended: ${summary.recommendedNextStep}`);
-    if (summary.notes) lines.push("", `Notes: ${summary.notes}`);
-    lines.push("", `Generated: ${new Date(summary.generatedAt).toLocaleString()}`);
-    lines.push("", "Powered by TorqueShed TorqueAssist");
+    lines.push("", `NEXT STEP: ${summary.recommendedNextStep}`);
+    if (summary.notes) lines.push("", `NOTES: ${summary.notes}`);
+    lines.push("", new Date(summary.generatedAt).toLocaleString());
+    lines.push("TorqueShed TorqueAssist");
 
     const text = lines.join("\n");
     await Clipboard.setStringAsync(text);
@@ -263,7 +263,7 @@ export default function PartsScreen() {
         </View>
         <Text style={[styles.phaseTitle, { color: theme.text }]}>Vehicle Information</Text>
         <Text style={[styles.phaseSubtitle, { color: theme.textSecondary }]}>
-          Tell us about your vehicle so we can provide accurate diagnostics
+          Enter your vehicle details for an accurate diagnosis
         </Text>
       </View>
 
@@ -584,9 +584,9 @@ export default function PartsScreen() {
         ) : (
           <View style={[styles.allAnsweredCard, { backgroundColor: theme.success + "10", borderColor: theme.success + "40" }]}>
             <Feather name="check-circle" size={24} color={theme.success} />
-            <Text style={[styles.allAnsweredText, { color: theme.text }]}>All narrowing questions answered</Text>
+            <Text style={[styles.allAnsweredText, { color: theme.text }]}>Narrowing complete</Text>
             <Text style={[styles.allAnsweredSub, { color: theme.textSecondary }]}>
-              View your full diagnostic dashboard with ranked causes and recommended tests.
+              Ready for the diagnostic dashboard with ranked causes and test recommendations.
             </Text>
           </View>
         )}
@@ -620,33 +620,15 @@ export default function PartsScreen() {
           <Text style={[styles.backText, { color: theme.textSecondary }]}>Back to Questions</Text>
         </Pressable>
 
-        {/* Vehicle Snapshot */}
-        <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
-          <View style={styles.dashCardHeader}>
-            <Feather name="truck" size={16} color={theme.primary} />
-            <Text style={[styles.dashCardTitle, { color: theme.text }]}>Vehicle</Text>
-          </View>
-          <Text style={[styles.dashVehicleName, { color: theme.text }]}>{vehicleLabel}</Text>
-          <View style={styles.dashVehicleRow}>
-            {session.vehicle.engine ? (
-              <View style={styles.dashVehicleTag}>
-                <Text style={[styles.dashVehicleTagText, { color: theme.textMuted }]}>{session.vehicle.engine}</Text>
-              </View>
-            ) : null}
-            {session.vehicle.mileage ? (
-              <View style={styles.dashVehicleTag}>
-                <Text style={[styles.dashVehicleTagText, { color: theme.textMuted }]}>{session.vehicle.mileage.toLocaleString()} mi</Text>
-              </View>
-            ) : null}
-            {session.dtcCodes.length > 0 ? (
-              <View style={styles.dashVehicleTag}>
-                <Text style={[styles.dashVehicleTagText, { color: theme.accent }]}>DTCs: {session.dtcCodes.join(", ")}</Text>
-              </View>
-            ) : null}
+        <View style={[styles.vehicleSnap, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
+          <Feather name="truck" size={16} color={theme.primary} />
+          <Text style={[styles.vehicleSnapText, { color: theme.text }]}>{vehicleLabel}</Text>
+          <View style={[styles.categoryBadge, { backgroundColor: theme.primary + "20" }]}>
+            <Text style={[styles.categoryBadgeText, { color: theme.primary }]}>{category.name}</Text>
           </View>
         </View>
 
-        {/* Assessment Summary */}
+
         {assessment.summary ? (
           <View style={[styles.summaryBanner, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "30" }]}>
             <Feather name="zap" size={18} color={theme.primary} />
@@ -654,13 +636,12 @@ export default function PartsScreen() {
           </View>
         ) : null}
 
-        {/* Most Likely Causes */}
         <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
           <View style={styles.dashCardHeader}>
             <Feather name="target" size={16} color={theme.primary} />
-            <Text style={[styles.dashCardTitle, { color: theme.text }]}>Most Likely Causes</Text>
+            <Text style={[styles.dashCardTitle, { color: theme.text }]}>Likely Causes</Text>
           </View>
-          {assessment.hypotheses.map((h, idx) => (
+          {assessment.hypotheses.filter(h => h.confidence >= 5).map((h, idx) => (
             <View key={h.id} style={[styles.hypCard, idx > 0 ? { borderTopWidth: 1, borderTopColor: theme.cardBorder, paddingTop: Spacing.md } : undefined]}>
               <View style={styles.hypHeader}>
                 <Text style={[styles.hypRank, { color: theme.primary }]}>#{idx + 1}</Text>
@@ -705,7 +686,6 @@ export default function PartsScreen() {
           ))}
         </View>
 
-        {/* Recommended Next Test */}
         {assessment.nextTest ? (
           <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.primary + "40" }]}>
             <View style={styles.dashCardHeader}>
@@ -716,11 +696,10 @@ export default function PartsScreen() {
           </View>
         ) : null}
 
-        {/* All Available Tests */}
         <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
           <View style={styles.dashCardHeader}>
             <Feather name="list" size={16} color={theme.primary} />
-            <Text style={[styles.dashCardTitle, { color: theme.text }]}>Diagnostic Tests</Text>
+            <Text style={[styles.dashCardTitle, { color: theme.text }]}>All Tests</Text>
           </View>
           {category.tests.map(test => {
             const completed = session.completedTests[test.id];
@@ -750,6 +729,7 @@ export default function PartsScreen() {
                 </View>
               );
             }
+            if (assessment.nextTest && test.id === assessment.nextTest.id) return null;
             return (
               <View key={test.id}>
                 {renderTestCard(test, false)}
@@ -758,7 +738,6 @@ export default function PartsScreen() {
           })}
         </View>
 
-        {/* Notes */}
         <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
           <View style={styles.dashCardHeader}>
             <Feather name="edit-3" size={16} color={theme.primary} />
@@ -775,7 +754,6 @@ export default function PartsScreen() {
           />
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionRow}>
           <Pressable
             style={({ pressed }) => [styles.actionButton, { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 }]}
@@ -924,9 +902,9 @@ export default function PartsScreen() {
         </Pressable>
 
         <View style={styles.phaseHeader}>
-          <Text style={[styles.phaseTitle, { color: theme.text }]}>Diagnostic Summary</Text>
+          <Text style={[styles.phaseTitle, { color: theme.text }]}>Diagnostic Report</Text>
           <Text style={[styles.phaseSubtitle, { color: theme.textSecondary }]}>
-            Copy this to share with a shop or save for your records
+            Share with your shop or save for reference
           </Text>
         </View>
 
@@ -952,9 +930,9 @@ export default function PartsScreen() {
 
           {summary.symptoms.length > 0 ? (
             <>
-              <Text style={[styles.exportSectionTitle, { color: theme.primary, marginTop: Spacing.md }]}>Observations</Text>
+              <Text style={[styles.exportSectionTitle, { color: theme.primary, marginTop: Spacing.md }]}>Symptoms</Text>
               {summary.symptoms.map((s, i) => (
-                <Text key={i} style={[styles.exportTextSub, { color: theme.text }]}>{s}</Text>
+                <Text key={i} style={[styles.exportTextSub, { color: theme.text }]}>- {s}</Text>
               ))}
             </>
           ) : null}
@@ -980,7 +958,7 @@ export default function PartsScreen() {
             <Text key={i} style={[styles.exportText, { color: theme.text }]}>{c.confidence}% - {c.name}</Text>
           ))}
 
-          <Text style={[styles.exportSectionTitle, { color: theme.primary, marginTop: Spacing.md }]}>Recommended Next Step</Text>
+          <Text style={[styles.exportSectionTitle, { color: theme.primary, marginTop: Spacing.md }]}>Next Step</Text>
           <Text style={[styles.exportText, { color: theme.text }]}>{summary.recommendedNextStep}</Text>
         </View>
 
@@ -1098,10 +1076,6 @@ const styles = StyleSheet.create({
   dashCard: { padding: Spacing.lg, borderRadius: BorderRadius.md, borderWidth: 1, marginBottom: Spacing.md },
   dashCardHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.md },
   dashCardTitle: { ...Typography.h4 },
-  dashVehicleName: { ...Typography.h3, marginBottom: Spacing.xs },
-  dashVehicleRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs },
-  dashVehicleTag: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
-  dashVehicleTagText: { ...Typography.caption },
 
   summaryBanner: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, marginBottom: Spacing.md },
   summaryBannerText: { ...Typography.body, flex: 1 },
