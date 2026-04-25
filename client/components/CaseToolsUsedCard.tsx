@@ -42,7 +42,7 @@ export default function CaseToolsUsedCard({ caseId, isAuthor, onUpgrade }: Props
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const linksKey = [`/api/cases/${caseId}/tools-used`];
-  const { data: links } = useQuery<CaseToolLink[]>({ queryKey: linksKey });
+  const { data: links } = useQuery<CaseToolLink[]>({ queryKey: linksKey, enabled: isAuthor });
 
   const { data: inventory } = useQuery<ToolRow[]>({
     queryKey: ["/api/tools"],

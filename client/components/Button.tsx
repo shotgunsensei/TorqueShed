@@ -34,6 +34,7 @@ export function Button({
   children,
   style,
   disabled = false,
+  testID,
 }: ButtonProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -60,6 +61,7 @@ export function Button({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={disabled}
+      testID={testID}
       style={[
         styles.button,
         {
