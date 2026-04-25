@@ -127,18 +127,6 @@ export function MaintenanceDueWidget({ vehicleId, title }: WidgetProps = {}) {
           </Pressable>
         );
       })}
-
-      {!data.hasFeature && data.totalCount > data.items.length ? (
-        <View style={{ marginTop: Spacing.sm }}>
-          <LockedFeature
-            feature="maintenance_tracking"
-            title={`${data.totalCount - data.items.length} more reminders available`}
-            description="Upgrade to see every upcoming service across all your vehicles."
-            onUpgrade={navigateToSubscription}
-            compact
-          />
-        </View>
-      ) : null}
     </Card>
   );
 }
