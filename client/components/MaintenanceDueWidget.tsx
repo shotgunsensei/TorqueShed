@@ -30,12 +30,26 @@ interface MaintenanceResponse {
   totalCount: number;
 }
 
-export function MaintenanceDueWidget() {
+interface WidgetProps {
+  vehicleId?: string;
+  title?: string;
+}
+
+export function MaintenanceDueWidget({ vehicleId, title }: WidgetProps = {}) {
   const { theme } = useTheme();
   const navigation = useNavigation<any>();
-  const { data, isLoading, isError } = useQuery<MaintenanceResponse>({
+  const { data: rawData, isLoading, isError } = useQuery<MaintenanceResponse>({
     queryKey: ["/api/vehicles/me/maintenance-due"],
   });
+
+  const data: MaintenanceResponse | undefined = rawData
+    ? vehicleId
+      ? (() => {
+          const items = rawData.items.filter((i) => i.vehicleId === vehicleId);
+          return { ...rawData, items, totalCount: items.length };
+        })()
+      : rawData
+    : undefined;
 
   if (isLoading || isError || !data) return null;
   if (data.totalCount === 0 && data.hasFeature) return null;
@@ -62,7 +76,7 @@ export function MaintenanceDueWidget() {
     <Card style={styles.card} testID="maintenance-due-widget">
       <View style={styles.headerRow}>
         <Feather name="clock" size={16} color={theme.primary} />
-        <ThemedText type="h4" style={styles.headerTitle}>Maintenance Due</ThemedText>
+        <ThemedText type="h4" style={styles.headerTitle}>{title ?? "Maintenance Due"}</ThemedText>
         <View style={[styles.countPill, { backgroundColor: theme.primary + "20" }]}>
           <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
             {data.totalCount}
@@ -78,7 +92,7 @@ export function MaintenanceDueWidget() {
         if (item.milesRemaining !== null) {
           due.push(item.milesRemaining < 0 ? `${Math.abs(item.milesRemaining).toLocaleString()} mi overdue` : `${item.milesRemaining.toLocaleString()} mi`);
         }
-        const tone = item.isOverdue ? theme.error : (theme as any).warning ?? theme.primary;
+        const tone = item.isOverdue ? theme.error : theme.accent;
         return (
           <Pressable
             key={item.noteId}

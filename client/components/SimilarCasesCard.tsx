@@ -83,9 +83,21 @@ export function SimilarCasesCard({ caseId, onUpgrade }: Props) {
           testID={`similar-case-${c.id}`}
         >
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }} numberOfLines={2}>
-              {c.title}
-            </ThemedText>
+            <View style={styles.titleRow}>
+              <ThemedText type="body" style={{ fontWeight: "600", flex: 1 }} numberOfLines={2}>
+                {c.title}
+              </ThemedText>
+              <View style={[styles.scorePill, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "40" }]}>
+                <Feather name="bar-chart-2" size={10} color={theme.primary} />
+                <ThemedText
+                  type="caption"
+                  style={{ color: theme.primary, fontWeight: "700", marginLeft: 4 }}
+                  testID={`similar-case-score-${c.id}`}
+                >
+                  {Math.min(100, Math.round(c.score))}% match
+                </ThemedText>
+              </View>
+            </View>
             <View style={styles.metaRow}>
               {c.vehicleName ? (
                 <View style={styles.metaChip}>
@@ -161,6 +173,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+  },
+  scorePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
 });
 

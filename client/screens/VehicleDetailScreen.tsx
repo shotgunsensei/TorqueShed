@@ -19,6 +19,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { NoteCard } from "@/components/NoteCard";
 import { EmptyState } from "@/components/EmptyState";
+import { MaintenanceDueWidget } from "@/components/MaintenanceDueWidget";
 import { Skeleton } from "@/components/Skeleton";
 import { FAB } from "@/components/FAB";
 import { ThemedText } from "@/components/ThemedText";
@@ -485,6 +486,8 @@ export default function VehicleDetailScreen() {
             disabled={togglePublicMutation.isPending}
           />
         </View>
+
+        <MaintenanceDueWidget vehicleId={vehicleId} title="Upcoming Service" />
 
         {notes.length > 0 ? (
           <View style={styles.recentSection}>
