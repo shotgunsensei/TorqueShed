@@ -2296,7 +2296,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const all = await storage.getAllThreads();
       const baseDtcs = (thread.obdCodes ?? []).map((c) => c.toUpperCase().trim()).filter(Boolean);
-      const baseMakeFirst = (thread.vehicleName ?? "").toLowerCase().split(/\s+/).filter(Boolean)[0] ?? "";
+      const parseVehicle = (name: string | null | undefined) => {
+        const tokens = (name ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+        const yearIdx = tokens.findIndex((t) => /^(19|20)\d{2}$/.test(t));
+        const afterYear = yearIdx >= 0 ? tokens.slice(yearIdx + 1) : tokens;
+        const make = afterYear[0] ?? "";
+        const model = afterYear[1] ?? "";
+        return { make, model };
+      };
+      const baseVehicle = parseVehicle(thread.vehicleName);
       const baseSymptoms = (thread.symptoms ?? []).join(" ").toLowerCase();
 
       const scored = all
@@ -2305,9 +2313,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let score = 0;
           const reasons: string[] = [];
 
-          if (baseMakeFirst && t.vehicleName && t.vehicleName.toLowerCase().includes(baseMakeFirst)) {
+          const tVehicle = parseVehicle(t.vehicleName);
+          const sameMake = baseVehicle.make && tVehicle.make && baseVehicle.make === tVehicle.make;
+          const sameModel = baseVehicle.model && tVehicle.model && baseVehicle.model === tVehicle.model;
+          if (sameMake && sameModel) {
+            score += 25;
+            reasons.push(`Same make + model (${baseVehicle.make} ${baseVehicle.model})`);
+          } else if (sameMake) {
             score += 10;
-            reasons.push("Same make");
+            reasons.push(`Same make (${baseVehicle.make})`);
           }
           const tDtcs = (t.obdCodes ?? []).map((c) => c.toUpperCase().trim());
           const dtcOverlap = baseDtcs.filter((c) => tDtcs.includes(c));
