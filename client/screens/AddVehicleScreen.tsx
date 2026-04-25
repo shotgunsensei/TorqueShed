@@ -3,7 +3,7 @@ import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -12,8 +12,10 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
+import { LockedFeature } from "@/components/LockedFeature";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
+import { useEntitlements } from "@/lib/entitlements";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
@@ -50,9 +52,12 @@ export default function AddVehicleScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasFeature } = useEntitlements();
+  const { data: existingVehicles = [] } = useQuery<any[]>({ queryKey: ["/api/vehicles"] });
+  const atVehicleLimit = !hasFeature("multi_vehicle") && existingVehicles.length >= 1;
 
   const [inputMode, setInputMode] = useState(0);
   const [vin, setVin] = useState("");
@@ -149,6 +154,15 @@ export default function AddVehicleScreen() {
       <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
         Add your vehicle to track maintenance and modifications
       </ThemedText>
+
+      {atVehicleLimit ? (
+        <LockedFeature
+          feature="multi_vehicle"
+          title="One vehicle per Free account"
+          description="Garage Pro lets you track unlimited vehicles, with maintenance schedules, build logs, and per-vehicle cost tracking."
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+        />
+      ) : null}
 
       <View style={styles.section}>
         <SegmentedControl
@@ -273,8 +287,8 @@ export default function AddVehicleScreen() {
         />
       </View>
 
-      <Button onPress={handleSave} disabled={!isValid || createVehicleMutation.isPending}>
-        {createVehicleMutation.isPending ? "Adding..." : "Add Vehicle"}
+      <Button onPress={handleSave} disabled={atVehicleLimit || !isValid || createVehicleMutation.isPending}>
+        {createVehicleMutation.isPending ? "Adding..." : atVehicleLimit ? "Upgrade to add more" : "Add Vehicle"}
       </Button>
     </KeyboardAwareScrollViewCompat>
   );

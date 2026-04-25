@@ -34,6 +34,7 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
     items: [
       { label: "TorqueAssist", icon: "tool", action: "stack", screen: "TorqueAssist", description: "Diagnostic wizard and checklists" },
       { label: "Bays", icon: "grid", action: "tab", tab: "CasesTab", description: "Browse brand-specific community garages" },
+      { label: "Tool Inventory", icon: "briefcase", action: "stack", screen: "ToolInventory", description: "Catalog the tools you own (Garage Pro)" },
       { label: "Saved Cases", icon: "bookmark", action: "toast", toastMessage: "Saved cases live on your profile.", description: "Review the cases you've bookmarked" },
     ],
   },

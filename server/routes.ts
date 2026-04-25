@@ -31,6 +31,8 @@ import {
   insertSubscriptionSchema,
   insertSellerProfileSchema,
   escalateCaseSchema,
+  insertToolSchema,
+  updateToolSchema,
   SUBSCRIPTION_TIERS,
   EXPERT_SERVICE_LEVELS,
   type SubscriptionTier,
@@ -40,7 +42,9 @@ import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from ".
 import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
-import { getContextRecommendations } from "./case-recommendations";
+import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
+import { getUserTier, tierHasFeature, minimumTierFor, tierLabel, requireFeature } from "./entitlements";
+import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -843,7 +847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
       if (vehicle.userId !== req.userId) return res.status(403).json({ error: "Not authorized" });
 
-      const notes = await storage.getVehicleNotes(req.params.id);
+      const notes = await storage.getNotesByVehicle(req.params.id);
       let totalCost = 0;
       const costByType: Record<string, number> = {};
 
@@ -898,6 +902,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vehicles", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const tier = await getUserTier(req.userId!);
+      if (!tierHasFeature(tier, "multi_vehicle")) {
+        const existing = await storage.getVehiclesByUser(req.userId!);
+        if (existing.length >= 1) {
+          const required = minimumTierFor("multi_vehicle");
+          return res.status(402).json({
+            error: `Adding more than one vehicle requires ${tierLabel(required)} or higher.`,
+            upgradeRequired: true,
+            feature: "multi_vehicle",
+            currentTier: tier,
+            requiredTier: required,
+            requiredTierLabel: tierLabel(required),
+          });
+        }
+      }
+
       const parsed = insertVehicleSchema.parse({
         vin: req.body.vin || null,
         year: req.body.year ? parseInt(req.body.year) : null,
@@ -1014,6 +1034,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      const tier = await getUserTier(req.userId!);
+      const canTrackMaintenance = tierHasFeature(tier, "maintenance_tracking");
+
       const parsed = insertVehicleNoteSchema.parse({
         vehicleId: req.params.vehicleId,
         title: req.body.title?.trim(),
@@ -1024,6 +1047,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         partsUsed: req.body.partsUsed || null,
         beforeState: req.body.beforeState?.trim() || null,
         afterState: req.body.afterState?.trim() || null,
+        nextDueMileage: canTrackMaintenance && req.body.nextDueMileage ? Number(req.body.nextDueMileage) : null,
+        nextDueDate: canTrackMaintenance && req.body.nextDueDate ? req.body.nextDueDate : null,
         isPrivate: req.body.isPrivate !== false,
       });
 
@@ -1416,6 +1441,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/swap-shop", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const tier = await getUserTier(req.userId!);
+      const hasAdvanced = tierHasFeature(tier, "advanced_listing_options");
+
+      let attachedCaseId: string | null = req.body.attachedCaseId || null;
+      if (attachedCaseId) {
+        const attachedThread = await storage.getThread(attachedCaseId);
+        if (!attachedThread || attachedThread.userId !== req.userId) {
+          return res.status(403).json({ error: "You can only attach listings to your own cases." });
+        }
+      }
+
       const parsed = insertSwapShopListingSchema.parse({
         title: req.body.title?.trim(),
         description: req.body.description || null,
@@ -1425,8 +1461,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         localPickup: req.body.localPickup !== false,
         willShip: req.body.willShip === true,
         imageUrl: req.body.imageUrl || null,
+        extraImageUrls: hasAdvanced && Array.isArray(req.body.extraImageUrls) ? req.body.extraImageUrls.filter((u: unknown) => typeof u === "string" && u.trim().length > 0) : [],
+        contactMethod: hasAdvanced ? (req.body.contactMethod || null) : null,
+        isDraft: hasAdvanced ? req.body.isDraft === true : false,
         category: req.body.category || "parts",
-        attachedCaseId: req.body.attachedCaseId || null,
+        attachedCaseId,
       });
 
       const listing = await storage.createSwapShopListing(parsed, req.userId!);
@@ -1451,6 +1490,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      const tier = await getUserTier(req.userId!);
+      const hasAdvanced = tierHasFeature(tier, "advanced_listing_options");
+
       const parsed = updateSwapShopListingSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
       if (parsed.title !== undefined) updates.title = parsed.title;
@@ -1463,7 +1505,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
       if (parsed.isActive !== undefined) updates.isActive = parsed.isActive;
       if (parsed.category !== undefined) updates.category = parsed.category;
-      if (parsed.attachedCaseId !== undefined) updates.attachedCaseId = parsed.attachedCaseId;
+      if (parsed.attachedCaseId !== undefined) {
+        if (parsed.attachedCaseId) {
+          const attachedThread = await storage.getThread(parsed.attachedCaseId);
+          if (!attachedThread || attachedThread.userId !== req.userId) {
+            return res.status(403).json({ error: "You can only attach listings to your own cases." });
+          }
+        }
+        updates.attachedCaseId = parsed.attachedCaseId;
+      }
+      if (hasAdvanced) {
+        if (parsed.extraImageUrls !== undefined) updates.extraImageUrls = parsed.extraImageUrls.filter((u) => typeof u === "string" && u.trim().length > 0);
+        if (parsed.contactMethod !== undefined) updates.contactMethod = parsed.contactMethod;
+        if (parsed.isDraft !== undefined) updates.isDraft = parsed.isDraft;
+      }
 
       const updated = await storage.updateSwapShopListing(req.params.id, updates);
       res.json(updated);
@@ -1944,11 +1999,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const thread = await storage.getThread(req.params.caseId);
       if (!thread) return res.status(404).json({ error: "Case not found" });
 
-      const sub = await storage.getSubscription(req.userId!);
-      const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
+      const tier = await getUserTier(req.userId!);
       const wantsPdf = req.body?.exportType === "pdf";
-      if (wantsPdf && tier === "free") {
-        return res.status(402).json({ error: "PDF export requires DIY Pro or higher.", upgradeRequired: true });
+      if (wantsPdf && !tierHasFeature(tier, "pdf_repair_plan")) {
+        const required = minimumTierFor("pdf_repair_plan");
+        return res.status(402).json({
+          error: `PDF export requires ${tierLabel(required)} or higher.`,
+          upgradeRequired: true,
+          feature: "pdf_repair_plan",
+          currentTier: tier,
+          requiredTier: required,
+          requiredTierLabel: tierLabel(required),
+        });
       }
 
       const recs = getContextRecommendations({
@@ -1957,6 +2019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         symptoms: thread.symptoms,
         title: thread.title,
       });
+      const totalCostRange = summarizeCostRange(recs);
 
       const planRec = (r: typeof recs[number]) => ({ title: r.title, reason: r.description });
 
@@ -1976,7 +2039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         symptoms: thread.symptoms ?? [],
         obdCodes: thread.obdCodes ?? [],
-        probableCauses: recs.filter((r) => r.type === "part" && r.isRequired === false).slice(0, 5).map((r) => r.title),
+        probableCauses: recs.filter((r) => r.category === "likely_part").slice(0, 5).map((r) => r.title),
         diagnosticSteps: [
           "Verify the symptom is reproducible.",
           "Pull and document any current and pending DTCs.",
@@ -1984,14 +2047,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "Run the targeted tests for each top hypothesis before swapping parts.",
         ],
         toolsNeeded: recs.filter((r) => r.type === "tool").map(planRec),
-        partsList: recs.filter((r) => r.type === "part").map(planRec),
+        partsList: recs.filter((r) => r.type === "part" || r.type === "consumable").map(planRec),
         safetyWarnings: [
           "Always use jack stands when working under a vehicle.",
           "Disconnect the battery before any work on airbag, fuel, or high-voltage systems.",
           "Verify fitment of every part by VIN before installing.",
         ],
         difficulty: thread.urgency === "stranded" ? "advanced" : "moderate",
-        estimatedCostRange: tier === "free" ? "Hidden in preview — upgrade for full estimate" : "$50-$600 depending on root cause",
+        estimatedCostRange: totalCostRange.label,
         finalNotes: "Document each test result on the case so the community can verify your final fix.",
         tier,
         exportType: wantsPdf ? "pdf" : "preview",
@@ -1999,10 +2062,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const exportType = wantsPdf ? "pdf" : "preview";
       await storage.createRepairPlanExport(req.params.caseId, req.userId!, exportType, plan);
-      res.json(plan);
+
+      if (!wantsPdf) {
+        return res.json(plan);
+      }
+
+      const doc = new PDFDocument({ margin: 50, size: "LETTER" });
+      const safeTitle = (thread.title || "case").replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="repair-plan-${safeTitle}.pdf"`);
+      doc.pipe(res);
+
+      doc.fontSize(20).text("TorqueShed Repair Plan", { align: "left" });
+      doc.moveDown(0.3).fontSize(14).text(thread.title);
+      if (thread.vehicleName) doc.fontSize(10).fillColor("#666").text(`Vehicle: ${thread.vehicleName}`);
+      doc.fontSize(9).fillColor("#888").text(`Generated: ${new Date(plan.generatedAt).toLocaleString()}`);
+      doc.fontSize(9).text(`Difficulty: ${plan.difficulty}    Estimated total: ${plan.estimatedCostRange}`);
+      doc.moveDown();
+
+      const writeSection = (label: string, items: string[]) => {
+        if (items.length === 0) return;
+        doc.fillColor("#000").fontSize(13).text(label, { underline: true });
+        doc.moveDown(0.2);
+        items.forEach((line) => {
+          doc.fontSize(10).fillColor("#222").text(`• ${line}`, { indent: 12, paragraphGap: 2 });
+        });
+        doc.moveDown(0.4);
+      };
+
+      if (plan.symptoms.length > 0) writeSection("Symptoms", plan.symptoms);
+      if (plan.obdCodes.length > 0) writeSection("DTC Codes", plan.obdCodes);
+      if (plan.probableCauses.length > 0) writeSection("Probable Causes", plan.probableCauses);
+      writeSection("Diagnostic Steps", plan.diagnosticSteps);
+      writeSection("Tools Needed", plan.toolsNeeded.map((t) => `${t.title} — ${t.reason}`));
+      writeSection("Parts & Consumables", plan.partsList.map((p) => `${p.title} — ${p.reason}`));
+      writeSection("Safety Warnings", plan.safetyWarnings);
+
+      doc.moveDown(0.5).fontSize(8).fillColor("#666").text(plan.finalNotes, { align: "left" });
+      doc.fontSize(7).fillColor("#999").text(`TorqueShed · Generated ${new Date(plan.generatedAt).toLocaleDateString()} · Tier: ${tier}`, { align: "right" });
+      doc.end();
     } catch (error) {
       console.error("Error generating repair plan:", error);
-      res.status(500).json({ error: "Failed to generate repair plan" });
+      if (!res.headersSent) res.status(500).json({ error: "Failed to generate repair plan" });
     }
   });
 
@@ -2027,17 +2128,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedPrice: r.estimatedPrice,
         fitmentNote: r.fitmentNote,
         type: r.type,
+        category: r.category,
       });
       res.json({
-        requiredTools: seeded.filter((r) => r.type === "tool" && r.isRequired).map(toClient),
-        optionalTools: seeded.filter((r) => r.type === "tool" && !r.isRequired).map(toClient),
-        likelyParts: seeded.filter((r) => r.type === "part").map(toClient),
-        marketplaceListings: userListings,
+        requiredTools: seeded.filter((r) => r.category === "required_tool").map(toClient),
+        optionalTools: seeded.filter((r) => r.category === "optional_tool").map(toClient),
+        likelyParts: seeded.filter((r) => r.category === "likely_part").map(toClient),
+        consumables: seeded.filter((r) => r.category === "consumable").map(toClient),
+        safetyEquipment: seeded.filter((r) => r.category === "safety_equipment").map(toClient),
+        marketplaceListings: userListings.map((l) => ({
+          id: l.id,
+          title: l.title,
+          price: l.price,
+          category: l.category ?? "parts",
+        })),
+        totalCostRange: summarizeCostRange(seeded),
         affiliateNote: "Affiliate links shown when available. Always verify fitment by VIN before purchase.",
       });
     } catch (error) {
       console.error("Error fetching recommendations:", error);
       res.status(500).json({ error: "Failed to load recommendations" });
+    }
+  });
+
+  // ========== Similar Solved Cases ==========
+  app.get("/api/cases/:caseId/similar", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.caseId);
+      if (!thread) return res.status(404).json({ error: "Case not found" });
+
+      const tier = await getUserTier(req.userId!);
+      const hasFull = tierHasFeature(tier, "similar_solved_matching");
+
+      const all = await storage.getAllThreads();
+      const baseDtcs = (thread.obdCodes ?? []).map((c) => c.toUpperCase().trim()).filter(Boolean);
+      const baseMakeFirst = (thread.vehicleName ?? "").toLowerCase().split(/\s+/).filter(Boolean)[0] ?? "";
+      const baseSymptoms = (thread.symptoms ?? []).join(" ").toLowerCase();
+
+      const scored = all
+        .filter((t) => t.id !== thread.id && (t.hasSolution || t.status === "solved"))
+        .map((t) => {
+          let score = 0;
+          const reasons: string[] = [];
+
+          if (baseMakeFirst && t.vehicleName && t.vehicleName.toLowerCase().includes(baseMakeFirst)) {
+            score += 10;
+            reasons.push("Same make");
+          }
+          const tDtcs = (t.obdCodes ?? []).map((c) => c.toUpperCase().trim());
+          const dtcOverlap = baseDtcs.filter((c) => tDtcs.includes(c));
+          if (dtcOverlap.length > 0) {
+            score += 25 * dtcOverlap.length;
+            reasons.push(`DTC match: ${dtcOverlap.join(", ")}`);
+          }
+          if (thread.systemCategory && t.systemCategory === thread.systemCategory) {
+            score += 5;
+            reasons.push("Same system");
+          }
+          const tSymptoms = (t.symptoms ?? []).join(" ").toLowerCase();
+          if (baseSymptoms && tSymptoms) {
+            const baseWords = Array.from(new Set(baseSymptoms.split(/\W+/).filter((w) => w.length > 4)));
+            const overlap = baseWords.filter((w) => tSymptoms.includes(w));
+            if (overlap.length > 0) {
+              score += overlap.length * 2;
+              reasons.push(`Symptom overlap (${overlap.length})`);
+            }
+          }
+
+          return { thread: t, score, reasons };
+        })
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      const top = scored.slice(0, 5);
+      const visible = hasFull ? top : top.slice(0, 1);
+      const hidden = top.length - visible.length;
+
+      res.json({
+        cases: visible.map((s) => ({
+          id: s.thread.id,
+          title: s.thread.title,
+          vehicleName: s.thread.vehicleName,
+          systemCategory: s.thread.systemCategory,
+          obdCodes: s.thread.obdCodes ?? [],
+          score: s.score,
+          matchReasons: s.reasons,
+        })),
+        hiddenCount: hidden,
+        totalAvailable: top.length,
+        hasFeature: hasFull,
+      });
+    } catch (error) {
+      console.error("Error fetching similar cases:", error);
+      res.status(500).json({ error: "Failed to load similar cases" });
+    }
+  });
+
+  // ========== Maintenance Due ==========
+  app.get("/api/vehicles/me/maintenance-due", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const tier = await getUserTier(req.userId!);
+      const hasFeature = tierHasFeature(tier, "maintenance_tracking");
+      const items = await storage.getMaintenanceDueForUser(req.userId!);
+      if (!hasFeature) {
+        return res.json({ items: items.slice(0, 1), hasFeature: false, totalCount: items.length });
+      }
+      res.json({ items, hasFeature: true, totalCount: items.length });
+    } catch (error) {
+      console.error("Error loading maintenance due:", error);
+      res.status(500).json({ error: "Failed to load maintenance" });
+    }
+  });
+
+  // ========== Tool Inventory ==========
+  app.get("/api/tools", requireAuth, requireFeature("tool_inventory"), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const list = await storage.getToolsByUser(req.userId!);
+      res.json(list);
+    } catch (error) {
+      console.error("Error loading tools:", error);
+      res.status(500).json({ error: "Failed to load tools" });
+    }
+  });
+
+  app.post("/api/tools", requireAuth, requireFeature("tool_inventory"), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = insertToolSchema.parse(req.body);
+      const created = await storage.createTool(parsed, req.userId!);
+      res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error creating tool:", error);
+      res.status(500).json({ error: "Failed to create tool" });
+    }
+  });
+
+  app.patch("/api/tools/:id", requireAuth, requireFeature("tool_inventory"), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ error: "Tool not found" });
+      if (tool.userId !== req.userId) return res.status(403).json({ error: "Forbidden" });
+      const parsed = updateToolSchema.parse(req.body);
+      const updated = await storage.updateTool(req.params.id, parsed);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error updating tool:", error);
+      res.status(500).json({ error: "Failed to update tool" });
+    }
+  });
+
+  app.delete("/api/tools/:id", requireAuth, requireFeature("tool_inventory"), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ error: "Tool not found" });
+      if (tool.userId !== req.userId) return res.status(403).json({ error: "Forbidden" });
+      await storage.deleteTool(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting tool:", error);
+      res.status(500).json({ error: "Failed to delete tool" });
     }
   });
 

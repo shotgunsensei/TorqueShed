@@ -108,6 +108,8 @@ export const vehicleNotes = pgTable("vehicle_notes", {
   partsUsed: json("parts_used").$type<string[]>(),
   beforeState: text("before_state"),
   afterState: text("after_state"),
+  nextDueMileage: integer("next_due_mileage"),
+  nextDueDate: timestamp("next_due_date"),
   isPrivate: boolean("is_private").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -319,6 +321,8 @@ export const swapShopListings = pgTable("swap_shop_listings", {
   localPickup: boolean("local_pickup").default(true),
   willShip: boolean("will_ship").default(false),
   imageUrl: text("image_url"),
+  extraImageUrls: json("extra_image_urls").$type<string[]>().default([]),
+  contactMethod: varchar("contact_method", { length: 30 }),
   attachedCaseId: varchar("attached_case_id", { length: 36 }),
   isRecommendedForCase: boolean("is_recommended_for_case").default(false),
   isActive: boolean("is_active").default(true),
@@ -444,6 +448,50 @@ export const repairPlanExports = pgTable("repair_plan_exports", {
   payload: json("payload"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const TOOL_CATEGORIES = [
+  "hand_tool",
+  "power_tool",
+  "diagnostic",
+  "lifting",
+  "specialty",
+  "consumable",
+  "safety",
+  "other",
+] as const;
+export type ToolCategory = typeof TOOL_CATEGORIES[number];
+
+export const tools = pgTable("tools", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 200 }).notNull(),
+  brand: varchar("brand", { length: 100 }),
+  category: varchar("category", { length: 30 }).notNull().default("hand_tool"),
+  notes: text("notes"),
+  purchasePrice: varchar("purchase_price", { length: 50 }),
+  purchasedAt: timestamp("purchased_at"),
+  storageLocation: varchar("storage_location", { length: 200 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const toolsRelations = relations(tools, ({ one, many }) => ({
+  user: one(users, { fields: [tools.userId], references: [users.id] }),
+  caseUses: many(caseToolsUsed),
+}));
+
+export const caseToolsUsed = pgTable("case_tools_used", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
+  toolId: varchar("tool_id", { length: 36 }).notNull().references(() => tools.id, { onDelete: "cascade" }),
+  attachedBy: varchar("attached_by", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const caseToolsUsedRelations = relations(caseToolsUsed, ({ one }) => ({
+  thread: one(threads, { fields: [caseToolsUsed.caseId], references: [threads.id] }),
+  tool: one(tools, { fields: [caseToolsUsed.toolId], references: [tools.id] }),
+}));
 
 export const RECOMMENDATION_TYPES = ["part", "tool", "service", "affiliate", "marketplace"] as const;
 export type RecommendationType = typeof RECOMMENDATION_TYPES[number];
@@ -573,6 +621,9 @@ export const insertSwapShopListingSchema = z.object({
   localPickup: z.boolean().optional().default(true),
   willShip: z.boolean().optional().default(false),
   imageUrl: z.string().nullable().optional(),
+  extraImageUrls: z.array(z.string()).max(8).optional().default([]),
+  contactMethod: z.enum(["in_app", "email", "phone", "external"]).nullable().optional(),
+  isDraft: z.boolean().optional().default(false),
   category: z.enum(LISTING_CATEGORIES).optional().default("parts"),
   attachedCaseId: z.string().nullable().optional(),
 });
@@ -600,6 +651,11 @@ export const insertVehicleNoteSchema = z.object({
   partsUsed: z.array(z.string()).optional().nullable(),
   beforeState: z.string().optional().nullable(),
   afterState: z.string().optional().nullable(),
+  nextDueMileage: z.number().int().positive().optional().nullable(),
+  nextDueDate: z.preprocess(
+    (v) => (typeof v === "string" && v ? new Date(v) : v),
+    z.date().optional().nullable(),
+  ),
   isPrivate: z.boolean().optional().default(false),
 });
 
@@ -634,6 +690,11 @@ export const updateVehicleNoteSchema = z.object({
   partsUsed: z.array(z.string()).optional().nullable(),
   beforeState: z.string().optional().nullable(),
   afterState: z.string().optional().nullable(),
+  nextDueMileage: z.number().int().positive().optional().nullable(),
+  nextDueDate: z.preprocess(
+    (v) => (typeof v === "string" && v ? new Date(v) : v),
+    z.date().optional().nullable(),
+  ),
   isPrivate: z.boolean().optional(),
 });
 
@@ -656,6 +717,9 @@ export const updateSwapShopListingSchema = z.object({
   localPickup: z.boolean().optional(),
   willShip: z.boolean().optional(),
   imageUrl: z.string().nullable().optional(),
+  extraImageUrls: z.array(z.string()).max(8).optional(),
+  contactMethod: z.enum(["in_app", "email", "phone", "external"]).nullable().optional(),
+  isDraft: z.boolean().optional(),
   isActive: z.boolean().optional(),
   category: z.enum(LISTING_CATEGORIES).optional(),
   attachedCaseId: z.string().nullable().optional(),
@@ -699,3 +763,21 @@ export type SellerProfile = typeof sellerProfiles.$inferSelect;
 export type ExpertReview = typeof expertReviews.$inferSelect;
 export type RepairPlanExport = typeof repairPlanExports.$inferSelect;
 export type CaseRecommendation = typeof caseRecommendations.$inferSelect;
+export type Tool = typeof tools.$inferSelect;
+export type CaseToolUsed = typeof caseToolsUsed.$inferSelect;
+
+export const insertToolSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  brand: z.string().max(100).nullable().optional(),
+  category: z.enum(TOOL_CATEGORIES).optional().default("hand_tool"),
+  notes: z.string().max(2000).nullable().optional(),
+  purchasePrice: z.string().max(50).nullable().optional(),
+  purchasedAt: z.preprocess(
+    (v) => (typeof v === "string" && v ? new Date(v) : v),
+    z.date().optional().nullable(),
+  ),
+  storageLocation: z.string().max(200).nullable().optional(),
+});
+
+export const updateToolSchema = insertToolSchema.partial();
+export type InsertTool = z.infer<typeof insertToolSchema>;

@@ -11,10 +11,19 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
+import { LockedFeature } from "@/components/LockedFeature";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
-import { Spacing } from "@/constants/theme";
+import { useEntitlements } from "@/lib/entitlements";
+import { Feather } from "@expo/vector-icons";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+
+const CONTACT_METHODS: { value: string; label: string }[] = [
+  { value: "in_app", label: "In-App" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+];
 
 const CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"];
 const CATEGORIES: { value: string; label: string }[] = [
@@ -34,9 +43,11 @@ export default function AddListingScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasFeature } = useEntitlements();
+  const canAdvancedListing = hasFeature("advanced_listing_options");
 
   const route = useRoute<any>();
   const presetCaseId: string | undefined = route?.params?.caseId;
@@ -46,6 +57,9 @@ export default function AddListingScreen() {
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [extraImageUrlsText, setExtraImageUrlsText] = useState("");
+  const [contactMethodIndex, setContactMethodIndex] = useState(0);
+  const [isDraft, setIsDraft] = useState(false);
   const [conditionIndex, setConditionIndex] = useState(2);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [attachedCaseId, setAttachedCaseId] = useState<string | null>(presetCaseId ?? null);
@@ -70,6 +84,12 @@ export default function AddListingScreen() {
 
   const createListingMutation = useMutation({
     mutationFn: async () => {
+      const extraImageUrls = canAdvancedListing
+        ? extraImageUrlsText
+            .split(/[\n,]/)
+            .map((u) => u.trim())
+            .filter((u) => u.length > 0)
+        : [];
       return apiRequest("POST", "/api/swap-shop", {
         title: title.trim(),
         description: description.trim() || null,
@@ -81,6 +101,13 @@ export default function AddListingScreen() {
         willShip,
         category: CATEGORIES[categoryIndex].value,
         attachedCaseId: attachedCaseId,
+        ...(canAdvancedListing
+          ? {
+              extraImageUrls,
+              contactMethod: CONTACT_METHODS[contactMethodIndex].value,
+              isDraft,
+            }
+          : {}),
       });
     },
     onSuccess: () => {
@@ -295,6 +322,76 @@ export default function AddListingScreen() {
           />
         </View>
         {errors.shipping ? <ThemedText type="caption" style={{ color: theme.error }}>{errors.shipping}</ThemedText> : null}
+
+        <View style={[styles.advancedSection, { borderTopColor: theme.border }]}>
+          <View style={styles.advancedHeader}>
+            <Feather name="settings" size={14} color={theme.textSecondary} />
+            <ThemedText type="body" style={{ color: theme.textSecondary, marginLeft: 6 }}>
+              Advanced listing options
+            </ThemedText>
+          </View>
+          {canAdvancedListing ? (
+            <View style={{ gap: Spacing.lg, marginTop: Spacing.sm }}>
+              <Input
+                label="Extra image URLs"
+                placeholder="One URL per line or comma-separated"
+                value={extraImageUrlsText}
+                onChangeText={setExtraImageUrlsText}
+                multiline
+                numberOfLines={3}
+                style={{ minHeight: 80, textAlignVertical: "top" }}
+                autoCapitalize="none"
+                keyboardType="url"
+                testID="input-extra-images"
+              />
+              <View style={{ gap: Spacing.sm }}>
+                <ThemedText type="body">Preferred contact method</ThemedText>
+                <View style={styles.chipRow}>
+                  {CONTACT_METHODS.map((c, i) => (
+                    <Pressable
+                      key={c.value}
+                      onPress={() => setContactMethodIndex(i)}
+                      style={[
+                        styles.chip,
+                        {
+                          borderColor: i === contactMethodIndex ? theme.primary : theme.border,
+                          backgroundColor: i === contactMethodIndex ? theme.primary : "transparent",
+                        },
+                      ]}
+                      testID={`chip-contact-${c.value}`}
+                    >
+                      <ThemedText type="caption" style={{ color: i === contactMethodIndex ? "#FFFFFF" : theme.text }}>
+                        {c.label}
+                      </ThemedText>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <View style={styles.switchRow}>
+                <View>
+                  <ThemedText type="body">Save as draft</ThemedText>
+                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                    Hidden from buyers until you publish
+                  </ThemedText>
+                </View>
+                <Switch
+                  value={isDraft}
+                  onValueChange={setIsDraft}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+          ) : (
+            <LockedFeature
+              feature="advanced_listing_options"
+              title="Pro listing tools"
+              description="Add multiple photos, save listings as drafts, and choose how buyers contact you."
+              onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+              compact
+            />
+          )}
+        </View>
       </View>
 
       <Button onPress={handleSubmit} disabled={!isValid || createListingMutation.isPending} testID="button-submit-listing">
@@ -344,5 +441,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: 999,
     borderWidth: 1,
+  },
+  advancedSection: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  advancedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

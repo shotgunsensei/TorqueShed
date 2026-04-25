@@ -9,6 +9,7 @@ import TrendingScreen from "@/screens/TrendingScreen";
 import SubscriptionScreen from "@/screens/SubscriptionScreen";
 import SellerDashboardScreen from "@/screens/SellerDashboardScreen";
 import MyListingsScreen from "@/screens/MyListingsScreen";
+import ToolInventoryScreen from "@/screens/ToolInventoryScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -25,6 +26,7 @@ export type MoreStackParamList = {
   Subscription: undefined;
   SellerDashboard: undefined;
   MyListings: undefined;
+  ToolInventory: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -90,6 +92,11 @@ export default function MoreStackNavigator() {
         name="MyListings"
         component={MyListingsScreen}
         options={{ headerTitle: "My Listings" }}
+      />
+      <Stack.Screen
+        name="ToolInventory"
+        component={ToolInventoryScreen}
+        options={{ headerTitle: "Tool Inventory" }}
       />
     </Stack.Navigator>
   );

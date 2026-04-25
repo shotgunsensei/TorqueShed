@@ -12,11 +12,12 @@ import { useEntitlements } from "@/lib/entitlements";
 
 interface Recommendation {
   type: "tool" | "part" | "consumable";
+  category: "required_tool" | "optional_tool" | "likely_part" | "consumable" | "safety_equipment";
   title: string;
   reason: string;
   affiliateUrl?: string | null;
-  isRequired?: boolean;
   estimatedPrice?: string | null;
+  fitmentNote?: string | null;
 }
 
 interface MarketplaceListing {
@@ -30,7 +31,10 @@ interface RecommendationResponse {
   requiredTools: Recommendation[];
   optionalTools: Recommendation[];
   likelyParts: Recommendation[];
+  consumables: Recommendation[];
+  safetyEquipment: Recommendation[];
   marketplaceListings: MarketplaceListing[];
+  totalCostRange: { min: number; max: number; label: string };
   affiliateNote: string;
 }
 
@@ -48,18 +52,64 @@ function Row({ rec, onOpen }: { rec: Recommendation; onOpen?: () => void }) {
       <View style={{ flex: 1 }}>
         <ThemedText type="body" style={{ fontWeight: "600" }}>{rec.title}</ThemedText>
         <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>{rec.reason}</ThemedText>
-        {rec.estimatedPrice ? (
-          <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 2 }}>{rec.estimatedPrice}</ThemedText>
+        {rec.fitmentNote ? (
+          <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 2, fontStyle: "italic" }}>
+            {rec.fitmentNote}
+          </ThemedText>
         ) : null}
       </View>
-      {rec.affiliateUrl ? <Feather name="external-link" size={16} color={theme.textMuted} /> : null}
+      <View style={styles.rowRight}>
+        {rec.estimatedPrice ? (
+          <ThemedText type="caption" style={{ color: theme.text, fontWeight: "600" }}>
+            {rec.estimatedPrice}
+          </ThemedText>
+        ) : null}
+        {rec.affiliateUrl ? <Feather name="external-link" size={14} color={theme.textMuted} style={{ marginTop: 2 }} /> : null}
+      </View>
     </Comp>
+  );
+}
+
+function Section({
+  label,
+  recs,
+  fullChecklist,
+  freeLimit,
+  onUpgrade,
+  testID,
+}: {
+  label: string;
+  recs: Recommendation[];
+  fullChecklist: boolean;
+  freeLimit: number;
+  onUpgrade: () => void;
+  testID?: string;
+}) {
+  const { theme } = useTheme();
+  if (recs.length === 0) return null;
+  const visible = fullChecklist ? recs : recs.slice(0, freeLimit);
+  const hidden = recs.length - visible.length;
+  return (
+    <View style={styles.section} testID={testID}>
+      <ThemedText type="caption" style={[styles.sectionLabel, { color: theme.textMuted }]}>{label}</ThemedText>
+      {visible.map((r, i) => (
+        <Row key={`${label}-${i}`} rec={r} onOpen={r.affiliateUrl ? () => Linking.openURL(r.affiliateUrl!) : undefined} />
+      ))}
+      {hidden > 0 ? (
+        <Pressable onPress={onUpgrade} style={[styles.lockedRow, { borderColor: theme.cardBorder }]}>
+          <Feather name="lock" size={14} color={theme.textMuted} />
+          <ThemedText type="small" style={{ color: theme.textMuted, marginLeft: Spacing.xs }}>
+            {hidden} more in DIY Pro
+          </ThemedText>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 export default function PartsAndToolsCard({ caseId, onUpgrade, onBrowseMarketplace }: Props) {
   const { theme } = useTheme();
-  const { hasFeature, tier } = useEntitlements();
+  const { hasFeature } = useEntitlements();
   const fullChecklist = hasFeature("full_parts_checklist");
 
   const { data, isLoading } = useQuery<RecommendationResponse>({
@@ -71,56 +121,26 @@ export default function PartsAndToolsCard({ caseId, onUpgrade, onBrowseMarketpla
       <View style={styles.header}>
         <Feather name="tool" size={18} color={theme.primary} />
         <ThemedText type="h4" style={styles.headerText}>Parts & Tools</ThemedText>
+        {data?.totalCostRange ? (
+          <View style={[styles.totalPill, { backgroundColor: theme.primary + "20" }]}>
+            <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
+              Est. {data.totalCostRange.label}
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
 
       {isLoading ? (
-        <Skeleton.Box width="100%" height={120} />
+        <Skeleton.Box width="100%" height={160} />
       ) : !data ? (
         <ThemedText type="small" style={{ color: theme.textMuted }}>No recommendations yet.</ThemedText>
       ) : (
         <>
-          {data.requiredTools.length > 0 ? (
-            <View style={styles.section}>
-              <ThemedText type="caption" style={[styles.sectionLabel, { color: theme.textMuted }]}>REQUIRED TOOLS</ThemedText>
-              {data.requiredTools.map((r, i) => (
-                <Row key={`rt-${i}`} rec={r} onOpen={r.affiliateUrl ? () => Linking.openURL(r.affiliateUrl!) : undefined} />
-              ))}
-            </View>
-          ) : null}
-
-          {data.optionalTools.length > 0 ? (
-            <View style={styles.section}>
-              <ThemedText type="caption" style={[styles.sectionLabel, { color: theme.textMuted }]}>OPTIONAL TOOLS</ThemedText>
-              {(fullChecklist ? data.optionalTools : data.optionalTools.slice(0, 1)).map((r, i) => (
-                <Row key={`ot-${i}`} rec={r} onOpen={r.affiliateUrl ? () => Linking.openURL(r.affiliateUrl!) : undefined} />
-              ))}
-              {!fullChecklist && data.optionalTools.length > 1 ? (
-                <Pressable onPress={onUpgrade} style={[styles.lockedRow, { borderColor: theme.cardBorder }]}>
-                  <Feather name="lock" size={14} color={theme.textMuted} />
-                  <ThemedText type="small" style={{ color: theme.textMuted, marginLeft: Spacing.xs }}>
-                    {data.optionalTools.length - 1} more in DIY Pro
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          {data.likelyParts.length > 0 ? (
-            <View style={styles.section}>
-              <ThemedText type="caption" style={[styles.sectionLabel, { color: theme.textMuted }]}>LIKELY PARTS</ThemedText>
-              {(fullChecklist ? data.likelyParts : data.likelyParts.slice(0, 2)).map((r, i) => (
-                <Row key={`p-${i}`} rec={r} onOpen={r.affiliateUrl ? () => Linking.openURL(r.affiliateUrl!) : undefined} />
-              ))}
-              {!fullChecklist && data.likelyParts.length > 2 ? (
-                <Pressable onPress={onUpgrade} style={[styles.lockedRow, { borderColor: theme.cardBorder }]}>
-                  <Feather name="lock" size={14} color={theme.textMuted} />
-                  <ThemedText type="small" style={{ color: theme.textMuted, marginLeft: Spacing.xs }}>
-                    Full parts checklist in DIY Pro
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
+          <Section label="REQUIRED TOOLS" recs={data.requiredTools} fullChecklist={true} freeLimit={data.requiredTools.length} onUpgrade={onUpgrade} testID="section-required-tools" />
+          <Section label="OPTIONAL TOOLS" recs={data.optionalTools} fullChecklist={fullChecklist} freeLimit={1} onUpgrade={onUpgrade} testID="section-optional-tools" />
+          <Section label="LIKELY PARTS" recs={data.likelyParts} fullChecklist={fullChecklist} freeLimit={2} onUpgrade={onUpgrade} testID="section-likely-parts" />
+          <Section label="CONSUMABLES" recs={data.consumables} fullChecklist={fullChecklist} freeLimit={1} onUpgrade={onUpgrade} testID="section-consumables" />
+          <Section label="SAFETY EQUIPMENT" recs={data.safetyEquipment} fullChecklist={true} freeLimit={data.safetyEquipment.length} onUpgrade={onUpgrade} testID="section-safety" />
 
           {data.marketplaceListings.length > 0 ? (
             <View style={styles.section}>
@@ -151,12 +171,14 @@ export default function PartsAndToolsCard({ caseId, onUpgrade, onBrowseMarketpla
 
 const styles = StyleSheet.create({
   card: { padding: Spacing.lg, marginBottom: Spacing.md, borderRadius: BorderRadius.xl },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.md },
-  headerText: { marginLeft: Spacing.sm },
+  header: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.md, gap: Spacing.sm, flexWrap: "wrap" },
+  headerText: { marginLeft: Spacing.sm, flex: 1 },
+  totalPill: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
   section: { marginBottom: Spacing.md },
   sectionLabel: { letterSpacing: 1, marginBottom: Spacing.xs },
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, gap: Spacing.sm },
-  lockedRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.md, marginTop: Spacing.xs },
+  row: { flexDirection: "row", alignItems: "flex-start", paddingVertical: Spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, gap: Spacing.sm },
+  rowRight: { alignItems: "flex-end", marginLeft: Spacing.sm },
+  lockedRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.md, marginTop: Spacing.xs, borderStyle: "dashed" },
   browseBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.full, marginTop: Spacing.sm },
   disclaimer: { textAlign: "center", marginTop: Spacing.sm },
 });

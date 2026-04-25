@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/Card";
 import { FAB } from "@/components/FAB";
 import { Skeleton } from "@/components/Skeleton";
+import { MaintenanceDueWidget } from "@/components/MaintenanceDueWidget";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -161,6 +162,7 @@ export default function NotesScreen() {
           }
           ListHeaderComponent={
             <View style={styles.headerSection}>
+              <MaintenanceDueWidget />
               <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
                 Your Builds ({vehicles.length})
               </Text>

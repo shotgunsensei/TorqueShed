@@ -27,6 +27,7 @@ import { Button } from "@/components/Button";
 import PartsAndToolsCard from "@/components/PartsAndToolsCard";
 import EscalateCaseCard from "@/components/EscalateCaseCard";
 import RepairPlanCard from "@/components/RepairPlanCard";
+import SimilarCasesCard from "@/components/SimilarCasesCard";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -105,6 +106,8 @@ interface ThreadReply {
   focusAreas: string[];
   solutionCountTotal: number;
   replyType: ReplyType | null;
+  replierTier?: string | null;
+  isPriority?: boolean;
 }
 
 const SEVERITY_LABELS = ["Minor", "Low", "Moderate", "High", "Critical"];
@@ -388,6 +391,7 @@ export default function ThreadDetailScreen() {
 
   const renderReplyBadges = (item: ThreadReply) => {
     const isTrustedSolver = (item.solutionCountTotal || 0) >= 3;
+    const isPriority = !!item.isPriority;
     const signals: string[] = [];
     if (item.yearsWrenching) {
       signals.push(`${item.yearsWrenching}yr`);
@@ -395,9 +399,15 @@ export default function ThreadDetailScreen() {
     if (item.focusAreas && item.focusAreas.length > 0) {
       signals.push(item.focusAreas.slice(0, 2).join(", "));
     }
-    if (!isTrustedSolver && signals.length === 0) return null;
+    if (!isTrustedSolver && !isPriority && signals.length === 0) return null;
     return (
       <View style={styles.replyBadgeRow}>
+        {isPriority ? (
+          <View style={[styles.trustedBadge, { backgroundColor: theme.primary + "18" }]} testID="badge-priority-member">
+            <Feather name="zap" size={11} color={theme.primary} />
+            <Text style={[styles.trustedBadgeText, { color: theme.primary }]}>Priority Member</Text>
+          </View>
+        ) : null}
         {isTrustedSolver ? (
           <View style={[styles.trustedBadge, { backgroundColor: theme.success + "18" }]}>
             <Feather name="award" size={11} color={theme.success} />
@@ -844,6 +854,10 @@ export default function ThreadDetailScreen() {
           onBrowseMarketplace={() => navigation.navigate("Main" as never, { screen: "MarketTab", params: { segment: "swap" } } as never)}
         />
         <RepairPlanCard
+          caseId={threadId}
+          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+        />
+        <SimilarCasesCard
           caseId={threadId}
           onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
         />

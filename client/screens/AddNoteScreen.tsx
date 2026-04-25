@@ -11,8 +11,10 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
+import { LockedFeature } from "@/components/LockedFeature";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
+import { useEntitlements } from "@/lib/entitlements";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { NoteType } from "@/constants/vehicles";
@@ -31,11 +33,13 @@ export default function AddNoteScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<RoutePropType>();
   const queryClient = useQueryClient();
   const toast = useToast();
   const { vehicleId } = route.params;
+  const { hasFeature } = useEntitlements();
+  const canTrackMaintenance = hasFeature("maintenance_tracking");
 
   const [type, setType] = useState<NoteType>("general");
   const [title, setTitle] = useState("");
@@ -45,12 +49,15 @@ export default function AddNoteScreen() {
   const [partsInput, setPartsInput] = useState("");
   const [beforeState, setBeforeState] = useState("");
   const [afterState, setAfterState] = useState("");
+  const [nextDueMileage, setNextDueMileage] = useState("");
+  const [nextDueDate, setNextDueDate] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
 
   const showCostField = type === "maintenance" || type === "mod";
   const showMileageField = type === "maintenance" || type === "issue";
   const showPartsField = type === "maintenance" || type === "mod";
   const showBeforeAfter = type === "mod";
+  const showNextDue = type === "maintenance";
 
   const createNoteMutation = useMutation({
     mutationFn: async () => {
@@ -66,6 +73,8 @@ export default function AddNoteScreen() {
         partsUsed,
         beforeState: beforeState.trim() || null,
         afterState: afterState.trim() || null,
+        nextDueMileage: canTrackMaintenance && nextDueMileage.trim() ? parseInt(nextDueMileage, 10) : null,
+        nextDueDate: canTrackMaintenance && nextDueDate.trim() ? nextDueDate.trim() : null,
         isPrivate,
       });
     },
@@ -240,6 +249,42 @@ export default function AddNoteScreen() {
             onChangeText={setPartsInput}
             leftIcon="package"
           />
+        ) : null}
+
+        {showNextDue ? (
+          canTrackMaintenance ? (
+            <View style={{ gap: Spacing.md, marginTop: Spacing.xs }}>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                Next service reminder (optional)
+              </ThemedText>
+              <Input
+                label="Next due mileage"
+                placeholder="e.g., 80000"
+                value={nextDueMileage}
+                onChangeText={setNextDueMileage}
+                leftIcon="navigation"
+                keyboardType="number-pad"
+                testID="input-next-due-mileage"
+              />
+              <Input
+                label="Next due date (YYYY-MM-DD)"
+                placeholder="e.g., 2026-08-15"
+                value={nextDueDate}
+                onChangeText={setNextDueDate}
+                leftIcon="calendar"
+                autoCapitalize="none"
+                testID="input-next-due-date"
+              />
+            </View>
+          ) : (
+            <LockedFeature
+              feature="maintenance_tracking"
+              title="Maintenance reminders"
+              description="Set a next-service date or mileage so TorqueShed reminds you before it's overdue."
+              onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+              compact
+            />
+          )
         ) : null}
 
         <View style={styles.switchRow}>

@@ -14,6 +14,7 @@ import {
   sellerProfiles,
   expertReviews,
   repairPlanExports,
+  tools,
   type User, 
   type InsertUser,
   type Garage,
@@ -782,13 +783,31 @@ export class DatabaseStorage implements IStorage {
         yearsWrenching: users.yearsWrenching,
         focusAreas: sql<string[]>`COALESCE(${users.focusAreas}, '[]'::json)`,
         solutionCountTotal: sql<number>`(SELECT COUNT(*) FROM thread_replies r2 WHERE r2.user_id = ${threadReplies.userId} AND r2.is_solution = true)::int`,
+        replierTier: sql<string>`COALESCE((SELECT tier FROM subscriptions s WHERE s.user_id = ${threadReplies.userId} AND s.status IN ('active','trialing') ORDER BY s.updated_at DESC NULLS LAST LIMIT 1), 'free')`,
       })
       .from(threadReplies)
       .leftJoin(users, eq(threadReplies.userId, users.id))
       .where(eq(threadReplies.threadId, threadId))
       .orderBy(threadReplies.createdAt);
-    
-    return replies as (ThreadReply & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[];
+
+    const PRIORITY_TIERS = new Set(["diy_pro", "garage_pro", "shop_pro"]);
+    const enriched = (replies as any[]).map((r) => ({
+      ...r,
+      isPriority: PRIORITY_TIERS.has(r.replierTier),
+    }));
+
+    enriched.sort((a, b) => {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const dayMs = 86_400_000;
+      const sameDay = Math.floor(aDate / dayMs) === Math.floor(bDate / dayMs);
+      if (sameDay && a.isPriority !== b.isPriority) {
+        return a.isPriority ? -1 : 1;
+      }
+      return aDate - bDate;
+    });
+
+    return enriched as (ThreadReply & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; replierTier: string; isPriority: boolean })[];
   }
 
   async createThreadReply(reply: InsertThreadReply, userId: string): Promise<ThreadReply> {
@@ -1098,6 +1117,115 @@ export class DatabaseStorage implements IStorage {
       .from(swapShopListings)
       .where(and(eq(swapShopListings.attachedCaseId, caseId), eq(swapShopListings.isActive, true)))
       .orderBy(desc(swapShopListings.updatedAt));
+  }
+
+  // ========== Tool Inventory ==========
+  async getToolsByUser(userId: string) {
+    return db
+      .select()
+      .from(tools)
+      .where(eq(tools.userId, userId))
+      .orderBy(desc(tools.updatedAt));
+  }
+
+  async getTool(id: string) {
+    const [tool] = await db.select().from(tools).where(eq(tools.id, id)).limit(1);
+    return tool;
+  }
+
+  async createTool(data: any, userId: string) {
+    const [created] = await db
+      .insert(tools)
+      .values({ ...data, userId })
+      .returning();
+    return created;
+  }
+
+  async updateTool(id: string, updates: any) {
+    const [updated] = await db
+      .update(tools)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tools.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTool(id: string): Promise<void> {
+    await db.delete(tools).where(eq(tools.id, id));
+  }
+
+  // ========== Maintenance Due ==========
+  async getMaintenanceDueForUser(userId: string) {
+    const userVehicles = await this.getVehiclesByUser(userId);
+    const now = new Date();
+    const inThirtyDays = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+    const items: Array<{
+      noteId: string;
+      vehicleId: string;
+      vehicleName: string;
+      title: string;
+      type: string;
+      nextDueDate: Date | null;
+      nextDueMileage: number | null;
+      currentMileage: number | null;
+      daysRemaining: number | null;
+      milesRemaining: number | null;
+      isOverdue: boolean;
+    }> = [];
+
+    for (const v of userVehicles) {
+      const notes = await this.getNotesByVehicle(v.id);
+      const sortedByMileage = [...notes].filter((n) => n.mileage !== null).sort((a, b) => (b.mileage ?? 0) - (a.mileage ?? 0));
+      const currentMileage = sortedByMileage[0]?.mileage ?? null;
+
+      for (const n of notes) {
+        let isDue = false;
+        let isOverdue = false;
+        let daysRemaining: number | null = null;
+        let milesRemaining: number | null = null;
+
+        if (n.nextDueDate) {
+          const due = new Date(n.nextDueDate as unknown as string);
+          if (due <= inThirtyDays) {
+            isDue = true;
+            daysRemaining = Math.round((due.getTime() - now.getTime()) / (1000 * 3600 * 24));
+            if (due <= now) isOverdue = true;
+          }
+        }
+        if (n.nextDueMileage && currentMileage !== null) {
+          const diff = n.nextDueMileage - currentMileage;
+          if (diff <= 1000) {
+            isDue = true;
+            milesRemaining = diff;
+            if (diff <= 0) isOverdue = true;
+          }
+        }
+        if (isDue) {
+          items.push({
+            noteId: n.id,
+            vehicleId: v.id,
+            vehicleName: v.nickname || `${v.year ?? ""} ${v.make ?? ""} ${v.model ?? ""}`.trim() || "Vehicle",
+            title: n.title,
+            type: n.type,
+            nextDueDate: n.nextDueDate as Date | null,
+            nextDueMileage: n.nextDueMileage,
+            currentMileage,
+            daysRemaining,
+            milesRemaining,
+            isOverdue,
+          });
+        }
+      }
+    }
+
+    items.sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      const aMin = Math.min(a.daysRemaining ?? Infinity, a.milesRemaining ?? Infinity);
+      const bMin = Math.min(b.daysRemaining ?? Infinity, b.milesRemaining ?? Infinity);
+      return aMin - bMin;
+    });
+
+    return items;
   }
 }
 
