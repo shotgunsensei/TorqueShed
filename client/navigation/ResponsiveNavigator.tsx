@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import type { NavigatorScreenParams } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform } from "react-native";
@@ -9,8 +10,8 @@ import HomeStackNavigator from "@/navigation/HomeStackNavigator";
 import DiagnoseStackNavigator from "@/navigation/DiagnoseStackNavigator";
 import CasesStackNavigator from "@/navigation/CasesStackNavigator";
 import NotesStackNavigator from "@/navigation/NotesStackNavigator";
-import MarketStackNavigator from "@/navigation/MarketStackNavigator";
-import MoreStackNavigator from "@/navigation/MoreStackNavigator";
+import MarketStackNavigator, { type MarketStackParamList } from "@/navigation/MarketStackNavigator";
+import MoreStackNavigator, { type MoreStackParamList } from "@/navigation/MoreStackNavigator";
 import DesktopSidebar from "@/components/DesktopSidebar";
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -20,8 +21,8 @@ export type MainTabParamList = {
   DiagnoseTab: undefined;
   CasesTab: undefined;
   NotesTab: undefined;
-  MarketTab: undefined;
-  MoreTab: undefined;
+  MarketTab: NavigatorScreenParams<MarketStackParamList> | undefined;
+  MoreTab: NavigatorScreenParams<MoreStackParamList> | undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();

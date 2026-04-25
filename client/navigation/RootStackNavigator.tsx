@@ -1,6 +1,8 @@
 import React from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import type { NavigatorScreenParams } from "@react-navigation/native";
+import type { MainTabParamList } from "@/navigation/ResponsiveNavigator";
 
 import ResponsiveNavigator from "@/navigation/ResponsiveNavigator";
 import ProfileScreen from "@/screens/ProfileScreen";
@@ -28,7 +30,7 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Onboarding: undefined;
-  Main: undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Profile: { userId?: string } | undefined;
   AddVehicle: undefined;
   AddNote: { vehicleId: string };

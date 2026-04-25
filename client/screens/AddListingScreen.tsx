@@ -3,6 +3,8 @@ import { View, StyleSheet, Switch, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 
@@ -43,7 +45,7 @@ export default function AddListingScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasFeature } = useEntitlements();

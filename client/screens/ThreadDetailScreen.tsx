@@ -851,21 +851,21 @@ export default function ThreadDetailScreen() {
 
         <PartsAndToolsCard
           caseId={threadId}
-          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
-          onBrowseMarketplace={() => navigation.navigate("Main" as never, { screen: "MarketTab", params: { segment: "swap" } } as never)}
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+          onBrowseMarketplace={() => navigation.navigate("Main", { screen: "MarketTab", params: { screen: "Market", params: { segment: "swap" } } })}
         />
         <RepairPlanCard
           caseId={threadId}
-          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
         />
         <SimilarCasesCard
           caseId={threadId}
-          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
         />
         <CaseToolsUsedCard
           caseId={threadId}
           isAuthor={isThreadAuthor}
-          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
         />
         <EscalateCaseCard caseId={threadId} />
 

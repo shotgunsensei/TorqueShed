@@ -43,7 +43,7 @@ import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
-import { getUserTier, tierHasFeature, minimumTierFor, tierLabel, requireFeature } from "./entitlements";
+import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature } from "./entitlements";
 import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
@@ -1104,6 +1104,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.beforeState !== undefined) updates.beforeState = parsed.beforeState;
       if (parsed.afterState !== undefined) updates.afterState = parsed.afterState;
       if (parsed.isPrivate !== undefined) updates.isPrivate = parsed.isPrivate;
+
+      const wantsMaintenanceFields =
+        parsed.nextDueMileage !== undefined || parsed.nextDueDate !== undefined;
+      if (wantsMaintenanceFields) {
+        if (!(await userHasFeature(req.userId!, "maintenance_tracking"))) {
+          return res.status(402).json({
+            error: "Maintenance tracking is a Garage Pro feature.",
+            upgradeRequired: true,
+            feature: "maintenance_tracking",
+          });
+        }
+        if (parsed.nextDueMileage !== undefined) updates.nextDueMileage = parsed.nextDueMileage;
+        if (parsed.nextDueDate !== undefined) updates.nextDueDate = parsed.nextDueDate;
+      }
 
       const updated = await storage.updateNote(req.params.id, updates);
       res.json(updated);
@@ -2377,10 +2391,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tier = await getUserTier(req.userId!);
       const hasFeature = tierHasFeature(tier, "maintenance_tracking");
-      const items = await storage.getMaintenanceDueForUser(req.userId!);
       if (!hasFeature) {
-        return res.json({ items: items.slice(0, 1), hasFeature: false, totalCount: items.length });
+        return res.json({ items: [], hasFeature: false, totalCount: 0 });
       }
+      const items = await storage.getMaintenanceDueForUser(req.userId!);
       res.json({ items, hasFeature: true, totalCount: items.length });
     } catch (error) {
       console.error("Error loading maintenance due:", error);

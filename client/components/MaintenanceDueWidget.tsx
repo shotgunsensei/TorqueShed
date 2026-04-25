@@ -2,6 +2,15 @@ import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { CompositeNavigationProp } from "@react-navigation/native";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
+
+type MaintenanceNavProp = CompositeNavigationProp<
+  NativeStackNavigationProp<NotesStackParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 import { Feather } from "@expo/vector-icons";
 
 import { Card } from "@/components/Card";
@@ -37,7 +46,7 @@ interface WidgetProps {
 
 export function MaintenanceDueWidget({ vehicleId, title }: WidgetProps = {}) {
   const { theme } = useTheme();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<MaintenanceNavProp>();
   const { data: rawData, isLoading, isError } = useQuery<MaintenanceResponse>({
     queryKey: ["/api/vehicles/me/maintenance-due"],
   });
@@ -55,7 +64,7 @@ export function MaintenanceDueWidget({ vehicleId, title }: WidgetProps = {}) {
   if (data.totalCount === 0 && data.hasFeature) return null;
 
   const navigateToSubscription = () => {
-    navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never);
+    navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } });
   };
 
   if (!data.hasFeature && data.totalCount === 0) {
