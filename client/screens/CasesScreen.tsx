@@ -562,7 +562,7 @@ export default function CasesScreen() {
             description={
               statusFilter !== "all" || systemFilter !== null || garageFilter !== null || search
                 ? "Try clearing your filters."
-                : "Open a new case to get help with a repair."
+                : "Start a repair case or ask Torque Assist."
             }
             actionLabel="New Case"
             onAction={() => rootNav.navigate("NewCase")}

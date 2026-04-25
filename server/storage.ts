@@ -10,6 +10,10 @@ import {
   threadReplies,
   swapShopListings,
   diagnosticSessions,
+  subscriptions,
+  sellerProfiles,
+  expertReviews,
+  repairPlanExports,
   type User, 
   type InsertUser,
   type Garage,
@@ -29,6 +33,15 @@ import {
   type SwapShopListing,
   type InsertSwapShopListing,
   type DiagnosticSession,
+  type Subscription,
+  type SubscriptionTier,
+  type SubscriptionStatus,
+  type SellerProfile,
+  type SellerType,
+  type ExpertReview,
+  type ExpertServiceLevel,
+  type RepairPlanExport,
+  type RepairPlanExportType,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, or, isNull, gt, inArray } from "drizzle-orm";
@@ -959,6 +972,132 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDiagnosticSession(id: string): Promise<void> {
     await db.delete(diagnosticSessions).where(eq(diagnosticSessions.id, id));
+  }
+
+  // ========== Subscriptions ==========
+  async getSubscription(userId: string): Promise<Subscription | undefined> {
+    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+    return sub || undefined;
+  }
+
+  async upsertSubscription(userId: string, tier: SubscriptionTier, status: SubscriptionStatus = "active"): Promise<Subscription> {
+    const existing = await this.getSubscription(userId);
+    if (existing) {
+      const [updated] = await db
+        .update(subscriptions)
+        .set({ tier, status, updatedAt: new Date() })
+        .where(eq(subscriptions.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(subscriptions)
+      .values({ userId, tier, status })
+      .returning();
+    return created;
+  }
+
+  // ========== Seller Profiles ==========
+  async getSellerProfile(userId: string): Promise<SellerProfile | undefined> {
+    const [sp] = await db.select().from(sellerProfiles).where(eq(sellerProfiles.userId, userId)).limit(1);
+    return sp || undefined;
+  }
+
+  async upsertSellerProfile(userId: string, data: { displayName: string; sellerType: SellerType; bio: string | null; location: string | null }): Promise<SellerProfile> {
+    const existing = await this.getSellerProfile(userId);
+    if (existing) {
+      const [updated] = await db
+        .update(sellerProfiles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(sellerProfiles.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(sellerProfiles)
+      .values({ userId, ...data })
+      .returning();
+    return created;
+  }
+
+  async getSellerDashboard(userId: string): Promise<{
+    profile: SellerProfile | undefined;
+    activeListings: SwapShopListing[];
+    draftListings: SwapShopListing[];
+    attachedCaseCount: number;
+  }> {
+    const profile = await this.getSellerProfile(userId);
+    const all = await db
+      .select()
+      .from(swapShopListings)
+      .where(eq(swapShopListings.userId, userId))
+      .orderBy(desc(swapShopListings.updatedAt));
+    const activeListings = all.filter((l) => l.isActive && !l.isDraft);
+    const draftListings = all.filter((l) => l.isDraft);
+    const attachedCaseCount = all.filter((l) => l.attachedCaseId).length;
+    return { profile, activeListings, draftListings, attachedCaseCount };
+  }
+
+  // ========== Expert Reviews ==========
+  async createExpertReview(
+    caseId: string,
+    userId: string,
+    serviceLevel: ExpertServiceLevel,
+    userNotes: string | null,
+    priceCents: number,
+  ): Promise<ExpertReview> {
+    const [created] = await db
+      .insert(expertReviews)
+      .values({
+        caseId,
+        userId,
+        serviceLevel,
+        userNotes,
+        priceCents,
+        status: "requested",
+        paymentStatus: "pending",
+      })
+      .returning();
+    return created;
+  }
+
+  async getExpertReviewsByCase(caseId: string): Promise<ExpertReview[]> {
+    return db
+      .select()
+      .from(expertReviews)
+      .where(eq(expertReviews.caseId, caseId))
+      .orderBy(desc(expertReviews.createdAt));
+  }
+
+  // ========== Repair Plan Exports ==========
+  async createRepairPlanExport(
+    caseId: string,
+    userId: string,
+    exportType: RepairPlanExportType,
+    payload: unknown,
+  ): Promise<RepairPlanExport> {
+    const [created] = await db
+      .insert(repairPlanExports)
+      .values({ caseId, userId, exportType, payload: payload as never, status: "ready" })
+      .returning();
+    return created;
+  }
+
+  // ========== Marketplace listings (extended) ==========
+  async getListingsByUser(userId: string): Promise<SwapShopListing[]> {
+    return db
+      .select()
+      .from(swapShopListings)
+      .where(eq(swapShopListings.userId, userId))
+      .orderBy(desc(swapShopListings.updatedAt));
+  }
+
+  async getListingsForCase(caseId: string): Promise<SwapShopListing[]> {
+    return db
+      .select()
+      .from(swapShopListings)
+      .where(and(eq(swapShopListings.attachedCaseId, caseId), eq(swapShopListings.isActive, true)))
+      .orderBy(desc(swapShopListings.updatedAt));
   }
 }
 

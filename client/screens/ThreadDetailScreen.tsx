@@ -24,6 +24,9 @@ import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
+import PartsAndToolsCard from "@/components/PartsAndToolsCard";
+import EscalateCaseCard from "@/components/EscalateCaseCard";
+import RepairPlanCard from "@/components/RepairPlanCard";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -834,6 +837,18 @@ export default function ThreadDetailScreen() {
             ) : null}
           </View>
         </Card>
+
+        <PartsAndToolsCard
+          caseId={threadId}
+          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+          onBrowseMarketplace={() => navigation.navigate("Main" as never, { screen: "MarketTab", params: { segment: "swap" } } as never)}
+        />
+        <RepairPlanCard
+          caseId={threadId}
+          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+        />
+        <EscalateCaseCard caseId={threadId} />
+
         <ThemedText type="h4" style={styles.repliesHeader}>
           Replies ({replies.length})
         </ThemedText>

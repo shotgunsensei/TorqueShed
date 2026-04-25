@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Switch } from "react-native";
+import { View, StyleSheet, Switch, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useNavigation } from "@react-navigation/native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -17,6 +17,18 @@ import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
 const CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"];
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: "parts", label: "Parts" },
+  { value: "tools", label: "Tools" },
+  { value: "scan_tools", label: "Scan Tools" },
+  { value: "services", label: "Services" },
+  { value: "project_vehicles", label: "Project Vehicles" },
+];
+
+interface CaseOption {
+  id: string;
+  title: string;
+}
 
 export default function AddListingScreen() {
   const insets = useSafeAreaInsets();
@@ -26,15 +38,24 @@ export default function AddListingScreen() {
   const queryClient = useQueryClient();
   const toast = useToast();
 
+  const route = useRoute<any>();
+  const presetCaseId: string | undefined = route?.params?.caseId;
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [conditionIndex, setConditionIndex] = useState(2);
+  const [categoryIndex, setCategoryIndex] = useState(0);
+  const [attachedCaseId, setAttachedCaseId] = useState<string | null>(presetCaseId ?? null);
   const [localPickup, setLocalPickup] = useState(true);
   const [willShip, setWillShip] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const { data: caseOptions = [] } = useQuery<CaseOption[]>({
+    queryKey: ["/api/threads/me"],
+  });
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -58,6 +79,8 @@ export default function AddListingScreen() {
         imageUrl: imageUrl.trim() || null,
         localPickup,
         willShip,
+        category: CATEGORIES[categoryIndex].value,
+        attachedCaseId: attachedCaseId,
       });
     },
     onSuccess: () => {
@@ -157,6 +180,82 @@ export default function AddListingScreen() {
 
         <View style={styles.conditionSection}>
           <ThemedText type="body" style={styles.conditionLabel}>
+            Category
+          </ThemedText>
+          <View style={styles.chipRow}>
+            {CATEGORIES.map((c, i) => (
+              <Pressable
+                key={c.value}
+                onPress={() => setCategoryIndex(i)}
+                style={[
+                  styles.chip,
+                  {
+                    borderColor: i === categoryIndex ? theme.primary : theme.border,
+                    backgroundColor: i === categoryIndex ? theme.primary : "transparent",
+                  },
+                ]}
+                testID={`chip-category-${c.value}`}
+              >
+                <ThemedText
+                  type="caption"
+                  style={{ color: i === categoryIndex ? "#FFFFFF" : theme.text }}
+                >
+                  {c.label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {caseOptions.length > 0 ? (
+          <View style={styles.conditionSection}>
+            <ThemedText type="body" style={styles.conditionLabel}>
+              Attach to a case (optional)
+            </ThemedText>
+            <View style={styles.chipRow}>
+              <Pressable
+                onPress={() => setAttachedCaseId(null)}
+                style={[
+                  styles.chip,
+                  {
+                    borderColor: attachedCaseId === null ? theme.primary : theme.border,
+                    backgroundColor: attachedCaseId === null ? theme.primary : "transparent",
+                  },
+                ]}
+                testID="chip-case-none"
+              >
+                <ThemedText type="caption" style={{ color: attachedCaseId === null ? "#FFFFFF" : theme.text }}>
+                  None
+                </ThemedText>
+              </Pressable>
+              {caseOptions.slice(0, 8).map((c) => (
+                <Pressable
+                  key={c.id}
+                  onPress={() => setAttachedCaseId(c.id)}
+                  style={[
+                    styles.chip,
+                    {
+                      borderColor: attachedCaseId === c.id ? theme.primary : theme.border,
+                      backgroundColor: attachedCaseId === c.id ? theme.primary : "transparent",
+                    },
+                  ]}
+                  testID={`chip-case-${c.id}`}
+                >
+                  <ThemedText
+                    type="caption"
+                    style={{ color: attachedCaseId === c.id ? "#FFFFFF" : theme.text }}
+                    numberOfLines={1}
+                  >
+                    {c.title.length > 24 ? c.title.slice(0, 24) + "…" : c.title}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.conditionSection}>
+          <ThemedText type="body" style={styles.conditionLabel}>
             Condition
           </ThemedText>
           <SegmentedControl
@@ -234,5 +333,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: Spacing.sm,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: 999,
+    borderWidth: 1,
   },
 });

@@ -1,0 +1,312 @@
+Now continue from the Repair Case-first redesign and focus specifically on smooth transition, monetization integration, and preserving the existing TorqueShed foundation without breaking the current app.
+
+Objective:
+Integrate monetization areas naturally into the new TorqueShed experience without making the app feel spammy, unfinished, or like a generic marketplace. Monetization should feel like a helpful extension of diagnostics, repair planning, parts sourcing, tool recommendations, expert help, and seller activity.
+
+Transition requirements:
+1. Do not remove the existing Garage/Bay concept entirely.
+2. Convert Bays into category/community filters that support the new Repair Case system.
+3. Preserve existing users, bay memberships, thread data, and visual styling where possible.
+4. Any existing thread should be migrated or displayed as a basic Repair Case.
+5. Add fallback handling for old posts that do not yet have full diagnostic data.
+6. Maintain the current dark mobile-first TorqueShed style with orange accent color.
+7. Fix any existing navigation typo such as “Bavs” and ensure labels are clean and professional.
+
+New navigation model:
+Use this primary nav:
+- Home
+- Diagnose
+- Cases
+- Garage
+- Market
+
+Move secondary items into More/Profile:
+- Bays
+- Saved Cases
+- My Listings
+- Seller Dashboard
+- Subscription
+- Settings
+- Help
+
+Monetization areas to integrate:
+1. Premium Torque Assist
+2. Parts recommendations
+3. Tool recommendations
+4. Marketplace listings
+5. Seller accounts
+6. Paid expert review
+7. Downloadable repair plans/checklists
+8. Shop/garage accounts
+9. Sponsored but clearly labeled listings
+
+Premium Torque Assist:
+Create feature gates without blocking the basic user experience.
+
+Free users should get:
+- Basic case creation
+- Basic Torque Assist summary
+- Community replies
+- Limited saved cases
+- Basic parts/tool suggestions
+
+DIY Pro users should get:
+- Advanced diagnostic tree
+- Unlimited saved cases
+- PDF repair plan export
+- Full parts/tool checklist
+- Similar solved case matching
+- Priority AI follow-up questions
+
+Garage Pro users should get:
+- Multiple vehicles
+- Maintenance tracking
+- Advanced repair history
+- Cost tracking
+- Build logs
+- Saved tool inventory
+- Advanced marketplace listing options
+
+Shop Pro users should get:
+- Shop profile
+- Service listings
+- Lead capture
+- Team/member access placeholder
+- Public credibility profile
+- Case intake workflow
+- Customer-facing diagnostic summaries
+
+Subscription tiers:
+Add a Pricing/Subscription screen with these placeholder tiers:
+- Free: $0
+- DIY Pro: $9.99/month
+- Garage Pro: $29/month
+- Shop Pro: $79/month
+
+Do not activate live billing unless Stripe is already configured. Instead:
+- Create clean placeholder hooks for Stripe checkout
+- Add environment variable placeholders
+- Add safe error handling if Stripe keys are missing
+- Add comments showing where live Stripe integration should connect
+- Do not hardcode secret keys
+- Use existing auth/user profile structure if present
+
+Marketplace integration:
+Create a Market section with these tabs:
+- Parts
+- Tools
+- Scan Tools
+- Services
+- Project Vehicles
+- Saved
+
+Listings should include:
+- Title
+- Category
+- Vehicle compatibility
+- Condition
+- Price
+- Location optional
+- Seller name/profile
+- Photos placeholder
+- Description
+- Attach to repair case option
+- Mark as recommended for a case option
+
+Parts/tools panels inside Repair Cases:
+Every repair case should have a right-side or lower mobile card section called:
+“Parts & Tools for This Case”
+
+This panel should show:
+- Required tools
+- Optional tools
+- Likely parts
+- Confirmed parts after solved
+- User marketplace listings
+- Affiliate-style recommendation placeholders
+- Clear disclaimer that users should verify fitment before purchase
+
+Make recommendations context-aware:
+If a case includes P0304, show:
+- OBD2 scanner
+- Spark plug socket
+- Coil pack
+- Fuel injector
+- Compression tester
+- Noid light
+- Multimeter
+
+If a case includes brake vibration, show:
+- Brake pads
+- Rotors
+- Caliper hardware
+- Dial indicator
+- Torque wrench
+- Brake cleaner
+- Jack stands
+
+If a case includes no-start, show:
+- Battery tester
+- Multimeter
+- Starter relay
+- Fuel pressure tester
+- Scan tool
+- Test light
+
+Paid expert review:
+Add an “Escalate Case” button on case detail pages.
+
+Escalation options:
+- Quick Review: $15
+- Full Diagnostic Plan: $39
+- Live Remote Help Placeholder: $99
+
+For now, create UI and data structure only unless payment infrastructure already exists.
+Escalated cases should have:
+- Status
+- Requested service level
+- User notes
+- Attached case ID
+- Payment status placeholder
+- Assigned expert placeholder
+
+Downloadable repair plans:
+Add a “Generate Repair Plan” button.
+Free users see a preview.
+Premium users can export a full PDF-style repair plan.
+
+Repair plan should include:
+- Vehicle info
+- Symptoms
+- Codes
+- Probable causes
+- Diagnostic steps
+- Tools needed
+- Parts list
+- Safety warnings
+- Estimated difficulty
+- Estimated cost range
+- Final notes
+
+Seller dashboard:
+Create a basic seller dashboard for users who list parts, tools, or services.
+
+Seller dashboard should show:
+- Active listings
+- Draft listings
+- Sold/closed listings placeholder
+- Attached repair cases
+- Messages/leads placeholder
+- Seller profile completeness
+- Upgrade prompt for Garage Pro or Shop Pro if limits are reached
+
+Soft monetization rules:
+- Do not show aggressive popups.
+- Do not block case creation behind a paywall.
+- Do not hide community help behind a paywall.
+- Monetization should appear at moments of intent:
+  - when user needs a diagnostic plan
+  - when user needs parts
+  - when user needs tools
+  - when user wants expert help
+  - when user wants to sell something
+  - when user wants to export/save/share a professional repair plan
+
+Data model additions:
+Add or update entities/tables as needed:
+
+subscriptions:
+- id
+- user_id
+- tier
+- status
+- stripe_customer_id placeholder
+- stripe_subscription_id placeholder
+- current_period_end
+- created_at
+
+marketplace_listings:
+- id
+- user_id
+- title
+- category
+- vehicle_compatibility
+- condition
+- price
+- location
+- description
+- photos
+- status
+- attached_case_id
+- created_at
+- updated_at
+
+case_recommendations:
+- id
+- case_id
+- type: part, tool, service, affiliate, marketplace
+- title
+- description
+- estimated_price
+- source
+- url placeholder
+- fitment_note
+- created_at
+
+expert_reviews:
+- id
+- case_id
+- user_id
+- service_level
+- status
+- payment_status
+- assigned_expert_id placeholder
+- user_notes
+- expert_notes
+- created_at
+- updated_at
+
+repair_plan_exports:
+- id
+- case_id
+- user_id
+- export_type
+- status
+- created_at
+
+seller_profiles:
+- id
+- user_id
+- display_name
+- seller_type
+- bio
+- location
+- rating placeholder
+- verified placeholder
+- created_at
+- updated_at
+
+UI polish:
+Add empty states that point users toward monetizable but helpful actions:
+- No cases yet: “Start a repair case or ask Torque Assist.”
+- No listings yet: “List a spare part, tool, or service.”
+- No saved vehicles: “Add your vehicle to get better diagnostics.”
+- No premium plan: “Unlock advanced diagnostic plans when you need deeper help.”
+
+Important implementation behavior:
+- Keep all monetization hooks modular.
+- Do not break existing pages.
+- Add feature flags or safe fallbacks where needed.
+- Use placeholder data where backend support does not exist yet.
+- Clearly separate UI placeholders from production payment logic.
+- Ensure the app remains usable with no Stripe keys configured.
+- Ensure marketplace and subscription UI can be connected to live Stripe later with minimal refactor.
+
+Final result:
+TorqueShed should now feel like a repair platform with a natural money engine:
+Cases drive diagnosis.
+Diagnosis drives parts and tools.
+Parts and tools drive marketplace and affiliate revenue.
+Complex cases drive premium Torque Assist and expert review.
+Garage profiles drive retention.
+Solved cases create searchable repair knowledge.

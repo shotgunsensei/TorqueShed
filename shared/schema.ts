@@ -301,6 +301,9 @@ export const threadRepliesRelations = relations(threadReplies, ({ one }) => ({
 export const ITEM_CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"] as const;
 export type ItemCondition = typeof ITEM_CONDITIONS[number];
 
+export const LISTING_CATEGORIES = ["parts", "tools", "scan_tools", "services", "project_vehicles"] as const;
+export type ListingCategory = typeof LISTING_CATEGORIES[number];
+
 export const swapShopListings = pgTable("swap_shop_listings", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -310,11 +313,16 @@ export const swapShopListings = pgTable("swap_shop_listings", {
   description: text("description"),
   price: varchar("price", { length: 50 }).notNull(),
   condition: varchar("condition", { length: 20 }).notNull(),
+  category: varchar("category", { length: 30 }).default("parts"),
+  vehicleCompatibility: text("vehicle_compatibility"),
   location: varchar("location", { length: 100 }),
   localPickup: boolean("local_pickup").default(true),
   willShip: boolean("will_ship").default(false),
   imageUrl: text("image_url"),
+  attachedCaseId: varchar("attached_case_id", { length: 36 }),
+  isRecommendedForCase: boolean("is_recommended_for_case").default(false),
   isActive: boolean("is_active").default(true),
+  isDraft: boolean("is_draft").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -365,6 +373,121 @@ export const savedListings = pgTable("saved_listings", {
 }, (t) => [
   primaryKey({ columns: [t.userId, t.listingId] }),
 ]);
+
+export const SUBSCRIPTION_TIERS = ["free", "diy_pro", "garage_pro", "shop_pro"] as const;
+export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[number];
+
+export const SUBSCRIPTION_STATUSES = ["active", "canceled", "past_due", "trialing", "incomplete"] as const;
+export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
+
+export const subscriptions = pgTable("subscriptions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  tier: varchar("tier", { length: 20 }).notNull().default("free"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const SELLER_TYPES = ["individual", "garage", "shop"] as const;
+export type SellerType = typeof SELLER_TYPES[number];
+
+export const sellerProfiles = pgTable("seller_profiles", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  displayName: varchar("display_name", { length: 100 }).notNull(),
+  sellerType: varchar("seller_type", { length: 20 }).notNull().default("individual"),
+  bio: text("bio"),
+  location: varchar("location", { length: 100 }),
+  ratingAverage: integer("rating_average").default(0),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const EXPERT_SERVICE_LEVELS = ["quick_review", "full_diagnostic", "live_remote"] as const;
+export type ExpertServiceLevel = typeof EXPERT_SERVICE_LEVELS[number];
+
+export const EXPERT_REVIEW_STATUSES = ["requested", "in_review", "responded", "closed", "canceled"] as const;
+export type ExpertReviewStatus = typeof EXPERT_REVIEW_STATUSES[number];
+
+export const PAYMENT_STATUSES = ["pending", "paid", "refunded", "failed"] as const;
+export type PaymentStatus = typeof PAYMENT_STATUSES[number];
+
+export const expertReviews = pgTable("expert_reviews", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  serviceLevel: varchar("service_level", { length: 30 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("requested"),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"),
+  assignedExpertId: varchar("assigned_expert_id", { length: 36 }),
+  userNotes: text("user_notes"),
+  expertNotes: text("expert_notes"),
+  priceCents: integer("price_cents").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const REPAIR_PLAN_EXPORT_TYPES = ["preview", "pdf"] as const;
+export type RepairPlanExportType = typeof REPAIR_PLAN_EXPORT_TYPES[number];
+
+export const repairPlanExports = pgTable("repair_plan_exports", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  exportType: varchar("export_type", { length: 20 }).notNull().default("preview"),
+  status: varchar("status", { length: 20 }).notNull().default("ready"),
+  payload: json("payload"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const RECOMMENDATION_TYPES = ["part", "tool", "service", "affiliate", "marketplace"] as const;
+export type RecommendationType = typeof RECOMMENDATION_TYPES[number];
+
+export const caseRecommendations = pgTable("case_recommendations", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 20 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  estimatedPrice: varchar("estimated_price", { length: 50 }),
+  source: varchar("source", { length: 100 }),
+  url: text("url"),
+  fitmentNote: text("fitment_note"),
+  isRequired: boolean("is_required").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSubscriptionSchema = z.object({
+  tier: z.enum(SUBSCRIPTION_TIERS),
+});
+
+export const insertSellerProfileSchema = z.object({
+  displayName: z.string().min(1).max(100),
+  sellerType: z.enum(SELLER_TYPES).default("individual"),
+  bio: z.string().max(2000).nullable().optional(),
+  location: z.string().max(100).nullable().optional(),
+});
+
+export const escalateCaseSchema = z.object({
+  serviceLevel: z.enum(EXPERT_SERVICE_LEVELS),
+  userNotes: z.string().max(2000).nullable().optional(),
+});
+
+export const insertCaseRecommendationSchema = z.object({
+  type: z.enum(RECOMMENDATION_TYPES),
+  title: z.string().min(1).max(200),
+  description: z.string().nullable().optional(),
+  estimatedPrice: z.string().max(50).nullable().optional(),
+  source: z.string().max(100).nullable().optional(),
+  url: z.string().nullable().optional(),
+  fitmentNote: z.string().nullable().optional(),
+  isRequired: z.boolean().default(false),
+});
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -450,6 +573,8 @@ export const insertSwapShopListingSchema = z.object({
   localPickup: z.boolean().optional().default(true),
   willShip: z.boolean().optional().default(false),
   imageUrl: z.string().nullable().optional(),
+  category: z.enum(LISTING_CATEGORIES).optional().default("parts"),
+  attachedCaseId: z.string().nullable().optional(),
 });
 
 export const insertVehicleSchema = z.object({
@@ -532,6 +657,8 @@ export const updateSwapShopListingSchema = z.object({
   willShip: z.boolean().optional(),
   imageUrl: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+  category: z.enum(LISTING_CATEGORIES).optional(),
+  attachedCaseId: z.string().nullable().optional(),
 });
 
 export const updateProductSchema = z.object({
@@ -567,3 +694,8 @@ export type InsertSwapShopListing = z.infer<typeof insertSwapShopListingSchema>;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type InsertVehicleNote = z.infer<typeof insertVehicleNoteSchema>;
 export type DiagnosticSession = typeof diagnosticSessions.$inferSelect;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type SellerProfile = typeof sellerProfiles.$inferSelect;
+export type ExpertReview = typeof expertReviews.$inferSelect;
+export type RepairPlanExport = typeof repairPlanExports.$inferSelect;
+export type CaseRecommendation = typeof caseRecommendations.$inferSelect;

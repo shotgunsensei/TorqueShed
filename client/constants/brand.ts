@@ -186,7 +186,7 @@ export const lightTheme = {
 export const emptyStates = {
   vehicles: {
     title: 'No Vehicles Yet',
-    message: 'Add your first vehicle to start tracking maintenance and notes.',
+    message: 'Add your vehicle to get better diagnostics.',
     action: 'Add Vehicle',
   },
   notes: {
@@ -216,8 +216,8 @@ export const emptyStates = {
   },
   swapShop: {
     title: 'Nothing Listed Yet',
-    message: 'Be the first to post something for sale or trade.',
-    action: 'Post Item',
+    message: 'List a spare part, tool, or service.',
+    action: 'New Listing',
   },
 } as const;
 

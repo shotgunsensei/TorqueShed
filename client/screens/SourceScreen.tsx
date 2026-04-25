@@ -39,11 +39,16 @@ const MAX_SEARCH_HISTORY = 8;
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type SegmentKey = "shop" | "swap" | "find";
+type SegmentKey = "shop" | "swap" | "find" | "tools" | "scan_tools" | "services" | "project_vehicles" | "saved";
 
 const SEGMENTS: { key: SegmentKey; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: "swap", label: "Parts", icon: "settings" },
+  { key: "tools", label: "Tools", icon: "tool" },
+  { key: "scan_tools", label: "Scan Tools", icon: "cpu" },
+  { key: "services", label: "Services", icon: "briefcase" },
+  { key: "project_vehicles", label: "Project Vehicles", icon: "truck" },
+  { key: "saved", label: "Saved", icon: "bookmark" },
   { key: "shop", label: "Shop", icon: "package" },
-  { key: "swap", label: "Swap", icon: "repeat" },
   { key: "find", label: "Find Parts", icon: "search" },
 ];
 
@@ -61,6 +66,8 @@ interface SwapListing {
   imageUrl: string | null;
   sellerJoinDate: string | null;
   sellerListingCount: number;
+  category?: string | null;
+  attachedCaseId?: string | null;
 }
 
 interface Product {
@@ -334,7 +341,7 @@ function ShopSection() {
   );
 }
 
-function SwapSection() {
+function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; savedOnly?: boolean } = {}) {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
@@ -344,17 +351,22 @@ function SwapSection() {
   const [selectedItem, setSelectedItem] = useState<SwapListing | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
 
+  const queryKey = savedOnly ? ["/api/saved/listings"] : ["/api/swap-shop"];
   const { data: listings = [], isLoading, isError: isSwapError, refetch, isRefetching } = useQuery<SwapListing[]>({
-    queryKey: ["/api/swap-shop"],
+    queryKey,
   });
 
+  const byCategory = categoryFilter
+    ? listings.filter((item) => (item.category ?? "parts") === categoryFilter)
+    : listings;
+
   const filtered = searchQuery.trim()
-    ? listings.filter((item) =>
+    ? byCategory.filter((item) =>
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.location || "").toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : listings;
+    : byCategory;
 
   const REPORT_REASONS = [
     { id: "scam", label: "Suspected scam" },
@@ -708,10 +720,15 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
       </View>
 
       {activeSegment === "shop" ? <ShopSection /> : null}
-      {activeSegment === "swap" ? <SwapSection /> : null}
+      {activeSegment === "swap" ? <SwapSection categoryFilter="parts" /> : null}
+      {activeSegment === "tools" ? <SwapSection categoryFilter="tools" /> : null}
+      {activeSegment === "scan_tools" ? <SwapSection categoryFilter="scan_tools" /> : null}
+      {activeSegment === "services" ? <SwapSection categoryFilter="services" /> : null}
+      {activeSegment === "project_vehicles" ? <SwapSection categoryFilter="project_vehicles" /> : null}
+      {activeSegment === "saved" ? <SwapSection savedOnly /> : null}
       {activeSegment === "find" ? <FindPartsSection /> : null}
 
-      {activeSegment === "swap" ? (
+      {(activeSegment === "swap" || activeSegment === "tools" || activeSegment === "scan_tools" || activeSegment === "services" || activeSegment === "project_vehicles") ? (
         currentUser != null ? (
           <Pressable
             style={[s.fab, { backgroundColor: theme.primary, bottom: tabBarHeight + Spacing.lg }]}

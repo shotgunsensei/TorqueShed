@@ -64,7 +64,22 @@ RootStackNavigator
 - **Admin**: Product management (approve/reject/delete), curated product curation. Reports tab with pending report queue, dismiss/remove content actions.
 
 ### Database Schema (Drizzle ORM)
-Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`, `savedThreads`, `savedListings`, `diagnosticSessions`
+Key tables: `users`, `garages`, `garageMembers`, `vehicles`, `vehicleNotes`, `threads`, `threadReplies`, `swapShopListings`, `products`, `reports`, `savedThreads`, `savedListings`, `diagnosticSessions`, `subscriptions`, `sellerProfiles`, `expertReviews`, `repairPlanExports`, `caseRecommendations`.
+
+`swapShopListings` is extended with `category` (parts/tools/scan_tools/services/project_vehicles), `attachedCaseId` (optional FK to a thread), and `isRecommendedForCase` for context-aware recommendations.
+
+### Monetization Model (placeholder Stripe)
+Tiers: Free, DIY Pro ($9.99/mo), Garage Pro ($29/mo), Shop Pro ($79/mo). Soft monetization — no paywalls on case creation or community help. Upsells appear at points of intent:
+- **Premium diagnostics** — TorqueAssist deep mode gated by `useEntitlements().hasFeature('deepDiagnostics')`.
+- **Parts & Tools panel** (`PartsAndToolsCard` on ThreadDetail) — shows required tools, optional tools, likely parts, confirmed parts (post-solve), and user listings attached to the case via `attachedCaseId`.
+- **Expert Review** (`EscalateCaseCard`) — Quick ($15), Full ($39), Live ($99). Posts to `POST /api/cases/:id/escalate`. UI + records only; no real expert assignment.
+- **Repair Plan export** (`RepairPlanCard`) — free preview; premium tiers can "Export PDF" (currently JSON to clipboard).
+- **Seller Dashboard** — listing limit 3 on Free; unlimited on Garage Pro+. Free-tier sellers see upgrade prompt when at limit.
+
+Stripe integration is a stub: `/api/subscription` POST simulates the upgrade and returns 503 with a helpful message if `STRIPE_SECRET_KEY` is missing.
+
+### Marketplace Tabs
+The Market tab has 8 segments: Shop, Parts, Tools, Scan Tools, Services, Project Vehicles, Saved, Find Parts. The first 5 of those (Parts → Project Vehicles) reuse `SwapSection` filtered by `categoryFilter`. Saved is `SwapSection` with `savedOnly`. Add/Edit listing screens include a category chip-row picker; Add Listing also lets the seller attach the listing to one of their open cases (chip selector populated from `GET /api/threads/me`).
 
 ### UI Component Library
 - `Card` — themed card with 1px border (cardBorder), elevation levels, press feedback

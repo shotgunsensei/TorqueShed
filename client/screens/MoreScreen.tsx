@@ -9,9 +9,11 @@ import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/Toast";
 import { UserAvatar, getUserRoleDisplay } from "@/components/UserAvatar";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { useEntitlements } from "@/lib/entitlements";
 import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
 
 type MoreNavProp = NativeStackNavigationProp<MoreStackParamList>;
@@ -19,22 +21,37 @@ type MoreNavProp = NativeStackNavigationProp<MoreStackParamList>;
 interface MenuItem {
   label: string;
   icon: keyof typeof Feather.glyphMap;
-  screen: keyof MoreStackParamList;
   description: string;
+  action: "stack" | "tab" | "toast";
+  screen?: keyof MoreStackParamList;
+  tab?: string;
+  toastMessage?: string;
 }
 
-const MENU_ITEMS: MenuItem[] = [
+const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
   {
-    label: "TorqueAssist",
-    icon: "tool",
-    screen: "TorqueAssist",
-    description: "Diagnostic wizard and checklists",
+    title: "Diagnostics",
+    items: [
+      { label: "TorqueAssist", icon: "tool", action: "stack", screen: "TorqueAssist", description: "Diagnostic wizard and checklists" },
+      { label: "Bays", icon: "grid", action: "tab", tab: "CasesTab", description: "Browse brand-specific community garages" },
+      { label: "Saved Cases", icon: "bookmark", action: "toast", toastMessage: "Saved cases live on your profile.", description: "Review the cases you've bookmarked" },
+    ],
   },
   {
-    label: "Tool & Gear",
-    icon: "shopping-bag",
-    screen: "ToolAndGear",
-    description: "Curated tools and gear picks",
+    title: "Marketplace",
+    items: [
+      { label: "Tool & Gear", icon: "shopping-bag", action: "stack", screen: "ToolAndGear", description: "Curated tools and gear picks" },
+      { label: "My Listings", icon: "package", action: "stack", screen: "MyListings", description: "Manage your swap shop listings" },
+      { label: "Seller Dashboard", icon: "bar-chart-2", action: "stack", screen: "SellerDashboard", description: "Active listings, drafts, and attached cases" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { label: "Subscription", icon: "star", action: "stack", screen: "Subscription", description: "Plans, billing, and premium features" },
+      { label: "Settings", icon: "settings", action: "toast", toastMessage: "Settings panel is coming soon.", description: "App preferences and notifications" },
+      { label: "Help", icon: "help-circle", action: "toast", toastMessage: "Help center is coming soon.", description: "FAQs, support, and contact" },
+    ],
   },
 ];
 
@@ -44,8 +61,27 @@ export default function MoreScreen() {
   const navigation = useNavigation<MoreNavProp>();
   const tabBarHeight = useSafeTabBarHeight();
   const headerHeight = useHeaderHeight();
+  const toast = useToast();
+  const { tier } = useEntitlements();
 
   const userRole = getUserRoleDisplay(currentUser?.role);
+
+  const handleMenuPress = (item: MenuItem) => {
+    if (item.action === "stack" && item.screen) {
+      navigation.navigate(item.screen);
+      return;
+    }
+    if (item.action === "tab" && item.tab) {
+      const parent = navigation.getParent();
+      if (parent) parent.navigate(item.tab as never);
+      return;
+    }
+    if (item.action === "toast" && item.toastMessage) {
+      toast.show(item.toastMessage, "info");
+    }
+  };
+
+  const tierLabel = tier === "free" ? "Free" : tier === "diy_pro" ? "DIY Pro" : tier === "garage_pro" ? "Garage Pro" : "Shop Pro";
 
   return (
     <ScrollView
@@ -69,37 +105,48 @@ export default function MoreScreen() {
         <UserAvatar user={currentUser} size="md" />
         <View style={styles.profileInfo}>
           <ThemedText type="h4">{currentUser?.username || "Guest"}</ThemedText>
-          {userRole ? (
-            <ThemedText type="caption" style={{ color: theme.textMuted }}>
-              {userRole}
-            </ThemedText>
-          ) : null}
+          <View style={styles.profileMetaRow}>
+            {userRole ? (
+              <ThemedText type="caption" style={{ color: theme.textMuted }}>
+                {userRole}
+              </ThemedText>
+            ) : null}
+            {userRole ? <ThemedText type="caption" style={{ color: theme.textMuted, marginHorizontal: 4 }}>·</ThemedText> : null}
+            <View style={[styles.tierPill, { backgroundColor: theme.primary + "20" }]}>
+              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>{tierLabel}</ThemedText>
+            </View>
+          </View>
         </View>
         <Feather name="chevron-right" size={20} color={theme.textMuted} />
       </Pressable>
 
-      <View style={styles.menuList}>
-        {MENU_ITEMS.map((item) => (
-          <Card
-            key={item.screen}
-            onPress={() => navigation.navigate(item.screen)}
-            testID={`menu-item-${item.screen}`}
-          >
-            <View style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: theme.primary + "15" }]}>
-                <Feather name={item.icon} size={22} color={theme.primary} />
-              </View>
-              <View style={styles.menuText}>
-                <ThemedText type="h4">{item.label}</ThemedText>
-                <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  {item.description}
-                </ThemedText>
-              </View>
-              <Feather name="chevron-right" size={20} color={theme.textMuted} />
-            </View>
-          </Card>
-        ))}
-      </View>
+      {MENU_GROUPS.map((group) => (
+        <View key={group.title} style={styles.group}>
+          <ThemedText type="caption" style={[styles.groupTitle, { color: theme.textMuted }]}>{group.title.toUpperCase()}</ThemedText>
+          <View style={styles.menuList}>
+            {group.items.map((item) => (
+              <Card
+                key={item.label}
+                onPress={() => handleMenuPress(item)}
+                testID={`menu-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <View style={styles.menuItem}>
+                  <View style={[styles.menuIcon, { backgroundColor: theme.primary + "15" }]}>
+                    <Feather name={item.icon} size={22} color={theme.primary} />
+                  </View>
+                  <View style={styles.menuText}>
+                    <ThemedText type="h4">{item.label}</ThemedText>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                      {item.description}
+                    </ThemedText>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={theme.textMuted} />
+                </View>
+              </Card>
+            ))}
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 }
@@ -118,6 +165,24 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
     marginLeft: Spacing.md,
+  },
+  profileMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  tierPill: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  group: {
+    marginBottom: Spacing.lg,
+  },
+  groupTitle: {
+    letterSpacing: 1,
+    marginBottom: Spacing.xs,
+    marginLeft: Spacing.xs,
   },
   menuList: {
     gap: Spacing.sm,

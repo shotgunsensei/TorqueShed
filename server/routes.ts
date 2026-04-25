@@ -28,11 +28,19 @@ import {
   markSolvedSchema,
   updateSwapShopListingSchema,
   updateProductSchema,
+  insertSubscriptionSchema,
+  insertSellerProfileSchema,
+  escalateCaseSchema,
+  SUBSCRIPTION_TIERS,
+  EXPERT_SERVICE_LEVELS,
+  type SubscriptionTier,
+  type ExpertServiceLevel,
 } from "@shared/schema";
 import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
+import { getContextRecommendations } from "./case-recommendations";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -1123,6 +1131,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/threads/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const all = await storage.getAllThreads();
+      const mine = all
+        .filter((t) => t.userId === req.userId)
+        .map((t) => ({ id: t.id, title: t.title, status: t.status, hasSolution: t.hasSolution }));
+      res.json(mine);
+    } catch (error) {
+      console.error("Error fetching my threads:", error);
+      res.status(500).json({ error: "Failed to load threads" });
+    }
+  });
+
   app.get("/api/threads/:id", async (req: Request, res: Response) => {
     try {
       const thread = await storage.getThread(req.params.id);
@@ -1404,6 +1425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         localPickup: req.body.localPickup !== false,
         willShip: req.body.willShip === true,
         imageUrl: req.body.imageUrl || null,
+        category: req.body.category || "parts",
+        attachedCaseId: req.body.attachedCaseId || null,
       });
 
       const listing = await storage.createSwapShopListing(parsed, req.userId!);
@@ -1439,6 +1462,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.willShip !== undefined) updates.willShip = parsed.willShip;
       if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
       if (parsed.isActive !== undefined) updates.isActive = parsed.isActive;
+      if (parsed.category !== undefined) updates.category = parsed.category;
+      if (parsed.attachedCaseId !== undefined) updates.attachedCaseId = parsed.attachedCaseId;
 
       const updated = await storage.updateSwapShopListing(req.params.id, updates);
       res.json(updated);
@@ -1756,6 +1781,274 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating report:", error);
       res.status(500).json({ error: "Failed to update report" });
+    }
+  });
+
+  // ========== Subscriptions ==========
+  const TIER_PRICE_MAP: Record<SubscriptionTier, { monthly: number; label: string }> = {
+    free: { monthly: 0, label: "Free" },
+    diy_pro: { monthly: 999, label: "DIY Pro" },
+    garage_pro: { monthly: 2900, label: "Garage Pro" },
+    shop_pro: { monthly: 7900, label: "Shop Pro" },
+  };
+
+  app.get("/api/subscription", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const sub = await storage.getSubscription(req.userId!);
+      const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
+      const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+      res.json({
+        tier,
+        status: sub?.status ?? "active",
+        currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+        stripeConfigured,
+        prices: TIER_PRICE_MAP,
+      });
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
+      res.status(500).json({ error: "Failed to load subscription" });
+    }
+  });
+
+  app.post("/api/subscription/upgrade", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = insertSubscriptionSchema.parse(req.body);
+      const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+
+      // STRIPE INTEGRATION POINT:
+      // When STRIPE_SECRET_KEY is set, this endpoint should:
+      //   1. Create or retrieve a Stripe customer
+      //   2. Create a Checkout Session (mode: "subscription") with the matching price ID
+      //   3. Return { checkoutUrl } so the client can redirect
+      // For now we accept upgrades only when Stripe is not configured (sandbox mode).
+      if (stripeConfigured && parsed.tier !== "free") {
+        return res.status(503).json({
+          error: "Live billing not yet wired up. Set up Stripe price IDs to enable paid upgrades.",
+          stripeConfigured: true,
+        });
+      }
+
+      const sub = await storage.upsertSubscription(req.userId!, parsed.tier, "active");
+      res.json({ tier: sub.tier, status: sub.status, sandbox: !stripeConfigured });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error upgrading subscription:", error);
+      res.status(500).json({ error: "Failed to upgrade subscription" });
+    }
+  });
+
+  // ========== Seller Profile ==========
+  app.get("/api/seller-profile/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const profile = await storage.getSellerProfile(req.userId!);
+      res.json(profile ?? null);
+    } catch (error) {
+      console.error("Error fetching seller profile:", error);
+      res.status(500).json({ error: "Failed to load seller profile" });
+    }
+  });
+
+  app.put("/api/seller-profile/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = insertSellerProfileSchema.parse(req.body);
+      const saved = await storage.upsertSellerProfile(req.userId!, {
+        displayName: parsed.displayName.trim(),
+        sellerType: parsed.sellerType,
+        bio: parsed.bio?.trim() || null,
+        location: parsed.location?.trim() || null,
+      });
+      res.json(saved);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error saving seller profile:", error);
+      res.status(500).json({ error: "Failed to save seller profile" });
+    }
+  });
+
+  app.get("/api/seller-dashboard", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const dash = await storage.getSellerDashboard(req.userId!);
+      const sub = await storage.getSubscription(req.userId!);
+      const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
+      const FREE_LISTING_LIMIT = 3;
+      res.json({
+        profile: dash.profile,
+        activeListings: dash.activeListings,
+        drafts: dash.draftListings,
+        attachedCasesCount: dash.attachedCaseCount,
+        tier,
+        listingLimit: tier === "free" ? FREE_LISTING_LIMIT : null,
+        atLimit: tier === "free" && dash.activeListings.length >= FREE_LISTING_LIMIT,
+      });
+    } catch (error) {
+      console.error("Error fetching seller dashboard:", error);
+      res.status(500).json({ error: "Failed to load seller dashboard" });
+    }
+  });
+
+  // ========== Expert Review Escalation ==========
+  const EXPERT_PRICE_CENTS: Record<ExpertServiceLevel, number> = {
+    quick_review: 1500,
+    full_diagnostic: 3900,
+    live_remote: 9900,
+  };
+
+  app.post("/api/cases/:caseId/escalate", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.caseId);
+      if (!thread) return res.status(404).json({ error: "Case not found" });
+
+      const parsed = escalateCaseSchema.parse(req.body);
+      const priceCents = EXPERT_PRICE_CENTS[parsed.serviceLevel];
+
+      // STRIPE INTEGRATION POINT:
+      // When STRIPE_SECRET_KEY is set, this endpoint should create a one-time
+      // Payment Intent for `priceCents`, hold the expert review record in
+      // payment_status: "pending" until the webhook flips it to "paid".
+
+      const review = await storage.createExpertReview(
+        req.params.caseId,
+        req.userId!,
+        parsed.serviceLevel,
+        parsed.userNotes?.trim() || null,
+        priceCents,
+      );
+      res.json(review);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error escalating case:", error);
+      res.status(500).json({ error: "Failed to escalate case" });
+    }
+  });
+
+  app.get("/api/cases/:caseId/escalations", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const reviews = await storage.getExpertReviewsByCase(req.params.caseId);
+      const own = reviews.filter((r) => r.userId === req.userId);
+      res.json(own);
+    } catch (error) {
+      console.error("Error fetching escalations:", error);
+      res.status(500).json({ error: "Failed to load escalations" });
+    }
+  });
+
+  // ========== Repair Plan Export ==========
+  app.post("/api/cases/:caseId/repair-plan", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.caseId);
+      if (!thread) return res.status(404).json({ error: "Case not found" });
+
+      const sub = await storage.getSubscription(req.userId!);
+      const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
+      const wantsPdf = req.body?.exportType === "pdf";
+      if (wantsPdf && tier === "free") {
+        return res.status(402).json({ error: "PDF export requires DIY Pro or higher.", upgradeRequired: true });
+      }
+
+      const recs = getContextRecommendations({
+        obdCodes: thread.obdCodes,
+        systemCategory: thread.systemCategory,
+        symptoms: thread.symptoms,
+        title: thread.title,
+      });
+
+      const planRec = (r: typeof recs[number]) => ({ title: r.title, reason: r.description });
+
+      const plan = {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        vehicle: {
+          name: thread.vehicleName ?? null,
+          mileage: null,
+        },
+        case: {
+          id: thread.id,
+          title: thread.title,
+          systemCategory: thread.systemCategory,
+          urgency: thread.urgency,
+          status: thread.status,
+        },
+        symptoms: thread.symptoms ?? [],
+        obdCodes: thread.obdCodes ?? [],
+        probableCauses: recs.filter((r) => r.type === "part" && r.isRequired === false).slice(0, 5).map((r) => r.title),
+        diagnosticSteps: [
+          "Verify the symptom is reproducible.",
+          "Pull and document any current and pending DTCs.",
+          "Inspect related connectors, wiring, and hoses for obvious damage.",
+          "Run the targeted tests for each top hypothesis before swapping parts.",
+        ],
+        toolsNeeded: recs.filter((r) => r.type === "tool").map(planRec),
+        partsList: recs.filter((r) => r.type === "part").map(planRec),
+        safetyWarnings: [
+          "Always use jack stands when working under a vehicle.",
+          "Disconnect the battery before any work on airbag, fuel, or high-voltage systems.",
+          "Verify fitment of every part by VIN before installing.",
+        ],
+        difficulty: thread.urgency === "stranded" ? "advanced" : "moderate",
+        estimatedCostRange: tier === "free" ? "Hidden in preview — upgrade for full estimate" : "$50-$600 depending on root cause",
+        finalNotes: "Document each test result on the case so the community can verify your final fix.",
+        tier,
+        exportType: wantsPdf ? "pdf" : "preview",
+      };
+
+      const exportType = wantsPdf ? "pdf" : "preview";
+      await storage.createRepairPlanExport(req.params.caseId, req.userId!, exportType, plan);
+      res.json(plan);
+    } catch (error) {
+      console.error("Error generating repair plan:", error);
+      res.status(500).json({ error: "Failed to generate repair plan" });
+    }
+  });
+
+  // ========== Case Recommendations ==========
+  app.get("/api/cases/:caseId/recommendations", async (req: Request, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.caseId);
+      if (!thread) return res.status(404).json({ error: "Case not found" });
+
+      const seeded = getContextRecommendations({
+        obdCodes: thread.obdCodes,
+        systemCategory: thread.systemCategory,
+        symptoms: thread.symptoms,
+        title: thread.title,
+      });
+
+      const userListings = await storage.getListingsForCase(req.params.caseId);
+      const toClient = (r: typeof seeded[number]) => ({
+        title: r.title,
+        reason: r.description,
+        affiliateUrl: r.url,
+        estimatedPrice: r.estimatedPrice,
+        fitmentNote: r.fitmentNote,
+        type: r.type,
+      });
+      res.json({
+        requiredTools: seeded.filter((r) => r.type === "tool" && r.isRequired).map(toClient),
+        optionalTools: seeded.filter((r) => r.type === "tool" && !r.isRequired).map(toClient),
+        likelyParts: seeded.filter((r) => r.type === "part").map(toClient),
+        marketplaceListings: userListings,
+        affiliateNote: "Affiliate links shown when available. Always verify fitment by VIN before purchase.",
+      });
+    } catch (error) {
+      console.error("Error fetching recommendations:", error);
+      res.status(500).json({ error: "Failed to load recommendations" });
+    }
+  });
+
+  // ========== Listings extras ==========
+  app.get("/api/listings/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const listings = await storage.getListingsByUser(req.userId!);
+      res.json(listings);
+    } catch (error) {
+      console.error("Error fetching my listings:", error);
+      res.status(500).json({ error: "Failed to load listings" });
     }
   });
 

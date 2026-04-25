@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Switch, Alert } from "react-native";
+import { View, StyleSheet, Switch, Alert, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -21,6 +21,13 @@ import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 type RoutePropType = RouteProp<RootStackParamList, "EditListing">;
 
 const CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"];
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: "parts", label: "Parts" },
+  { value: "tools", label: "Tools" },
+  { value: "scan_tools", label: "Scan Tools" },
+  { value: "services", label: "Services" },
+  { value: "project_vehicles", label: "Project Vehicles" },
+];
 
 interface Listing {
   id: string;
@@ -52,6 +59,7 @@ export default function EditListingScreen() {
   const [location, setLocation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [conditionIndex, setConditionIndex] = useState(2);
+  const [categoryIndex, setCategoryIndex] = useState(0);
   const [localPickup, setLocalPickup] = useState(true);
   const [willShip, setWillShip] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -70,6 +78,8 @@ export default function EditListingScreen() {
       setImageUrl(listing.imageUrl || "");
       const condIdx = CONDITIONS.indexOf(listing.condition);
       setConditionIndex(condIdx >= 0 ? condIdx : 2);
+      const catIdx = CATEGORIES.findIndex((c) => c.value === (listing as any).category);
+      setCategoryIndex(catIdx >= 0 ? catIdx : 0);
       setLocalPickup(listing.localPickup);
       setWillShip(listing.willShip);
       setIsInitialized(true);
@@ -98,6 +108,7 @@ export default function EditListingScreen() {
         imageUrl: imageUrl.trim() || null,
         localPickup,
         willShip,
+        category: CATEGORIES[categoryIndex].value,
       });
     },
     onSuccess: () => {
@@ -206,6 +217,35 @@ export default function EditListingScreen() {
 
         <View style={styles.conditionSection}>
           <ThemedText type="body" style={styles.conditionLabel}>
+            Category
+          </ThemedText>
+          <View style={styles.chipRow}>
+            {CATEGORIES.map((c, i) => (
+              <Pressable
+                key={c.value}
+                onPress={() => setCategoryIndex(i)}
+                style={[
+                  styles.chip,
+                  {
+                    borderColor: i === categoryIndex ? theme.primary : theme.border,
+                    backgroundColor: i === categoryIndex ? theme.primary : "transparent",
+                  },
+                ]}
+                testID={`chip-category-${c.value}`}
+              >
+                <ThemedText
+                  type="caption"
+                  style={{ color: i === categoryIndex ? "#FFFFFF" : theme.text }}
+                >
+                  {c.label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.conditionSection}>
+          <ThemedText type="body" style={styles.conditionLabel}>
             Condition
           </ThemedText>
           <SegmentedControl
@@ -288,5 +328,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: Spacing.sm,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: 999,
+    borderWidth: 1,
   },
 });

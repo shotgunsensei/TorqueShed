@@ -6,6 +6,9 @@ import { Feather } from "@expo/vector-icons";
 import MoreScreen from "@/screens/MoreScreen";
 import PartsScreen from "@/screens/PartsScreen";
 import TrendingScreen from "@/screens/TrendingScreen";
+import SubscriptionScreen from "@/screens/SubscriptionScreen";
+import SellerDashboardScreen from "@/screens/SellerDashboardScreen";
+import MyListingsScreen from "@/screens/MyListingsScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -19,6 +22,9 @@ export type MoreStackParamList = {
   MoreMenu: undefined;
   TorqueAssist: undefined;
   ToolAndGear: undefined;
+  Subscription: undefined;
+  SellerDashboard: undefined;
+  MyListings: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -69,6 +75,21 @@ export default function MoreStackNavigator() {
         name="ToolAndGear"
         component={TrendingScreen}
         options={{ headerTitle: screenTitles.toolGear }}
+      />
+      <Stack.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
+        options={{ headerTitle: "Subscription" }}
+      />
+      <Stack.Screen
+        name="SellerDashboard"
+        component={SellerDashboardScreen}
+        options={{ headerTitle: "Seller Dashboard" }}
+      />
+      <Stack.Screen
+        name="MyListings"
+        component={MyListingsScreen}
+        options={{ headerTitle: "My Listings" }}
       />
     </Stack.Navigator>
   );
