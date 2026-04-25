@@ -1,0 +1,152 @@
+We need to redesign the TorqueShed.pro Garage Bay/message board experience into a more useful automotive repair case system.
+
+Current problem:
+The existing Garage Bays layout is a simple manufacturer-based message board with bays like Chevy Bay, Dodge Bay, Ford Bay, General Bay, and Jeep Bay. This is too passive and does not create enough value for diagnostics, community interaction, parts sales, tool sales, or repeat engagement.
+
+New direction:
+Replace the Garage Bay-first experience with a Repair Case-first experience. TorqueShed should feel like a mobile-first diagnostic and repair community where every user post becomes a structured repair case that can be helped by Torque Assist, solved by the community, and connected to parts/tools/marketplace listings.
+
+Primary navigation should be:
+Home
+Diagnose
+Cases
+Garage
+Market
+More
+
+Rename or de-emphasize Bays. Manufacturer bays should become filters/categories, not the main screen.
+
+Build the new Cases screen:
+- Header: TorqueShed Cases
+- Search input: "Search by code, symptom, vehicle, or part..."
+- Quick actions:
+  - New Case
+  - Ask Torque Assist
+  - Scan Code
+  - Sell Part/Tool
+- Filter chips:
+  - All
+  - Open
+  - Testing
+  - Solved
+  - Pinned
+  - Near Me
+  - Jeep
+  - Dodge
+  - Chevy
+  - Ford
+  - Electrical
+  - Engine
+  - Transmission
+  - Brakes
+  - No-Start
+  - Misfire
+
+Create repair case cards that show:
+- Case title
+- Vehicle year/make/model/engine
+- OBD codes
+- Status: Open, Testing, Solved, Needs Expert
+- System category
+- Most likely cause if AI has generated one
+- Number of replies
+- Number of suggested tests
+- Number of similar solved cases
+- Parts/tools attached
+- Last activity time
+
+Create a New Case workflow:
+Step 1: Select or add vehicle
+Fields:
+- Year
+- Make
+- Model
+- Trim
+- Engine
+- Mileage
+- VIN optional
+
+Step 2: Problem details
+Fields:
+- Problem title
+- Symptoms
+- OBD codes
+- When it happens
+- Recent repairs
+- Parts already replaced
+- Photos/video/audio upload placeholders
+- Urgency
+- Budget
+- Tools available
+
+Step 3: Torque Assist preview
+After submission, Torque Assist should generate:
+- Summary of the problem
+- Top probable causes
+- Diagnostic steps in order
+- Tools needed
+- Parts that may be needed
+- Similar solved cases placeholder
+- Safety warnings if applicable
+
+Create structured replies:
+Reply types should include:
+- Question
+- Suggested Test
+- Test Result
+- Confirmed Fix
+- Warning
+- Part Recommendation
+- Tool Recommendation
+- Shop Estimate
+
+Create a Case Detail page:
+Sections:
+- Vehicle summary
+- Problem summary
+- Codes and symptoms
+- Torque Assist diagnostic path
+- Community replies grouped by reply type
+- Suggested tests
+- Parts/tools panel
+- Similar solved cases
+- Mark as solved button
+- Final fix form
+
+Create solved case flow:
+When a case is marked solved, require:
+- Root cause
+- Final fix
+- Parts used
+- Tools used
+- Approximate cost
+- Labor time
+- Verification notes
+- Optional photos
+
+Marketplace integration:
+Create a Market section for:
+- Parts
+- Tools
+- Scan tools
+- Project vehicles
+- Services
+Listings should be attachable to repair cases.
+
+Add monetization hooks:
+- Free users can create basic cases and view community replies.
+- Premium users can generate advanced Torque Assist diagnostic plans, PDF repair plans, advanced parts/tool lists, and unlimited saved cases.
+- Add placeholder Stripe subscription tiers:
+  - Free
+  - DIY Pro at $9.99/month
+  - Garage Pro at $29/month
+  - Shop Pro at $79/month
+
+Design style:
+Keep the current dark TorqueShed visual foundation with orange accent color, rounded cards, mobile-first layout, strong contrast, clean automotive aesthetic, and professional UI polish.
+Fix the bottom navigation typo currently showing "Bavs"; if any bay label remains, it should say "Bays."
+No empty screens should feel dead. Empty states should invite users to start a case, ask Torque Assist, browse solved cases, or list a part/tool.
+
+Important:
+Do not build a generic forum. Build a structured automotive diagnostic case platform.
+The goal is to help people solve real vehicle problems, document verified fixes, build searchable repair knowledge, and monetize through premium diagnostics, parts, tools, and marketplace activity.

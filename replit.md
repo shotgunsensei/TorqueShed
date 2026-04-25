@@ -34,23 +34,27 @@ TorqueShed is a mobile-first automotive community platform designed to connect m
 RootStackNavigator
   ├── Login / Signup (auth flow)
   ├── Onboarding
-  ├── Main → ResponsiveNavigator
+  ├── Main → ResponsiveNavigator (6 tabs, Cases is initial route)
   │     ├── HomeTab → HomeStackNavigator (Home feed)
-  │     ├── GaragesTab → GaragesStackNavigator (Bay list)
-  │     ├── SourceTab → SourceStackNavigator (Shop/Swap/Find Parts)
-  │     ├── NotesTab → NotesStackNavigator (Vehicles + VehicleDetail)
-  │     └── MoreTab → MoreStackNavigator (TorqueAssist, Tool & Gear)
+  │     ├── DiagnoseTab → DiagnoseStackNavigator (TorqueAssist diagnostic engine)
+  │     ├── CasesTab → CasesStackNavigator (Cases feed + Bays browser)
+  │     ├── NotesTab → NotesStackNavigator (Garage: Vehicles + VehicleDetail)
+  │     ├── MarketTab → MarketStackNavigator (Shop / Swap / Find Parts)
+  │     └── MoreTab → MoreStackNavigator (Tool & Gear, settings)
   ├── Profile, AddVehicle, AddNote, AddListing, ListingDetail
-  ├── EditListing, AddThread, ThreadDetail, AskForHelp
+  ├── EditListing, AddThread, ThreadDetail, AskForHelp, NewCase (modal)
   ├── SubmitProduct, AdminProducts, GarageDetail
 ```
 
 ### Key Features
 - **Home Feed**: Personalized feed with sections ordered by onboarding goals (vehicles, bay threads, garage threads, swap listings). Pull-to-refresh, error state with retry.
-- **Bays (Garages)**: Brand-specific community forums (Ford, Chevy, Dodge, Jeep, General). Join/leave, discussion threads with solution marking. Credibility signals on thread cards (Trusted Solver badge, years wrenching).
+- **Cases (primary tab)**: Flat case feed across all bays. Search bar, 4 quick actions (New Case, TorqueAssist, Scan Code, Sell Part), and chip-row filters for status (Open / Testing / Solved / Pinned), system category, and bay. Case cards display title, vehicle, OBD chips, status/system/urgency badges, root-cause preview, reply count, last activity. The Bays browser is reachable from a header grid icon.
+- **New Case wizard**: 3-step modal (Vehicle → Problem details → Review). Step 1 picks an existing vehicle or quick-adds year/make/model/trim/engine/mileage/VIN. Step 2 captures title, symptoms, OBD codes (with autocomplete + system inference), urgency, budget, tools available, when it happens, recent repairs, parts replaced. Step 3 shows TorqueAssist preview (top probable causes from decoded OBD codes) and posts to the bay matched by vehicle make. Photo upload is a placeholder.
+- **Bays (Garages)**: Brand-specific community forums (Ford, Chevy, Dodge, Jeep, General). Join/leave, discussion threads with solution marking. Credibility signals on thread cards (Trusted Solver badge, years wrenching). Reachable from the Cases tab header.
 - **Garage (Build Journal)**: Vehicle build journals with typed entries (maintenance, mod, issue, general). Tracks cost, mileage, parts. VIN decoding via NHTSA API.
-- **TorqueAssist**: Professional diagnostic engine with 10 category decision trees (no-crank, no-start, overheating, misfire, charging-system, brake-noise, front-end-clunk, parasitic-drain, ac-not-cold, transmission-issue). Four-phase flow: intake (vehicle info + DTC codes), category selection, narrowing questions (one-at-a-time with "why asking" context), and diagnostic dashboard (ranked hypotheses with confidence bars, safety/difficulty/cost metadata, expandable test procedures with pass/fail/inconclusive recording). Session persistence via API. Export summary to clipboard. Hypothesis scoring engine in `shared/diagnostic-engine.ts`. DTC code integration: 57 DTC-to-hypothesis mappings across all 10 categories (regex pattern matching, +15-30 confidence deltas). Question prerequisites: conditional question gating based on prior answers (e.g., coil swap test only shown for single-cylinder misfires).
-- **Source Tab**: Unified parts sourcing hub with three segments:
+- **Structured replies & verified solved-case flow**: Reply composer has a chip selector for reply type (comment / question / suggested test / test result / confirmed fix / warning / part rec / tool rec / shop estimate); each reply renders a type-colored badge. Case authors get an inline status changer (Open / Testing / Needs Expert) and a "Mark Case Solved" button that opens a FinalFix form (root cause, final fix, parts used, tools used, total cost, labor minutes, verification notes). Submission posts to `POST /api/threads/:id/solved`; the `PATCH /api/threads/:id/status` endpoint rejects "solved" so verified solving must always go through FinalFix.
+- **TorqueAssist (Diagnose tab)**: Professional diagnostic engine with 10 category decision trees (no-crank, no-start, overheating, misfire, charging-system, brake-noise, front-end-clunk, parasitic-drain, ac-not-cold, transmission-issue). Four-phase flow: intake (vehicle info + DTC codes), category selection, narrowing questions (one-at-a-time with "why asking" context), and diagnostic dashboard (ranked hypotheses with confidence bars, safety/difficulty/cost metadata, expandable test procedures with pass/fail/inconclusive recording). Session persistence via API. Export summary to clipboard. Hypothesis scoring engine in `shared/diagnostic-engine.ts`. DTC code integration: 57 DTC-to-hypothesis mappings across all 10 categories (regex pattern matching, +15-30 confidence deltas). Question prerequisites: conditional question gating based on prior answers (e.g., coil swap test only shown for single-cylinder misfires).
+- **Market Tab** (formerly Source): Unified parts sourcing hub with three segments:
   - **Shop**: Curated products with category filters, "Why It Matters" context boxes, sponsored/featured badges, affiliate tracking
   - **Swap Shop**: Peer-to-peer marketplace with condition badges, shipping options, seller credibility (join date, listing count), report flow, share via clipboard, image URL support in listing forms
   - **Find Parts**: Search across major vendors (RockAuto, AutoZone, O'Reilly, Amazon) with vehicle context badge, expo-web-browser in-app browsing, search history (AsyncStorage)

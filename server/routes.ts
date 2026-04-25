@@ -24,6 +24,8 @@ import {
   updateVehicleSchema,
   updateVehicleNoteSchema,
   updateThreadSchema,
+  updateThreadStatusSchema,
+  markSolvedSchema,
   updateSwapShopListingSchema,
   updateProductSchema,
 } from "@shared/schema";
@@ -1134,6 +1136,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/threads", async (req: Request, res: Response) => {
+    try {
+      const filter = req.query.filter as string | undefined;
+      const search = req.query.search as string | undefined;
+      const garageIdFilter = req.query.garageId as string | undefined;
+      const systemFilter = req.query.system as string | undefined;
+
+      let threadsList = await storage.getAllThreads();
+
+      if (garageIdFilter) {
+        threadsList = threadsList.filter((t) => t.garageId === garageIdFilter);
+      }
+
+      if (filter === "open") {
+        threadsList = threadsList.filter((t) => (t.status ?? "open") === "open");
+      } else if (filter === "testing") {
+        threadsList = threadsList.filter((t) => t.status === "testing");
+      } else if (filter === "needs_expert") {
+        threadsList = threadsList.filter((t) => t.status === "needs_expert");
+      } else if (filter === "solved") {
+        threadsList = threadsList.filter((t) => t.hasSolution || t.status === "solved");
+      } else if (filter === "pinned") {
+        threadsList = threadsList.filter((t) => t.isPinned);
+      }
+
+      if (systemFilter) {
+        threadsList = threadsList.filter((t) => t.systemCategory === systemFilter);
+      }
+
+      if (search && search.trim()) {
+        const term = search.trim().toLowerCase();
+        threadsList = threadsList.filter((t) =>
+          t.title.toLowerCase().includes(term) ||
+          (t.userName ?? "").toLowerCase().includes(term) ||
+          (t.vehicleName ?? "").toLowerCase().includes(term) ||
+          (t.obdCodes ?? []).some((code) => code.toLowerCase().includes(term))
+        );
+      }
+
+      res.json(threadsList);
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+      res.status(500).json({ error: "Failed to fetch cases" });
+    }
+  });
+
   app.post("/api/garages/:garageId/threads", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const parsed = insertThreadSchema.parse({
@@ -1146,6 +1194,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         severity: req.body.severity ? Number(req.body.severity) : null,
         drivability: req.body.drivability ? Number(req.body.drivability) : null,
         recentChanges: req.body.recentChanges?.trim() || null,
+        systemCategory: req.body.systemCategory || null,
+        urgency: req.body.urgency || null,
+        budget: req.body.budget?.trim() || null,
+        toolsAvailable: req.body.toolsAvailable?.trim() || null,
+        whenItHappens: req.body.whenItHappens?.trim() || null,
+        partsReplaced: req.body.partsReplaced?.trim() || null,
       });
 
       const thread = await storage.createThread(parsed, req.userId!);
@@ -1175,6 +1229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.title !== undefined) updates.title = parsed.title;
       if (parsed.content !== undefined) updates.content = parsed.content;
       if (parsed.hasSolution !== undefined) updates.hasSolution = parsed.hasSolution;
+      if (parsed.status !== undefined) updates.status = parsed.status;
+      if (parsed.systemCategory !== undefined) updates.systemCategory = parsed.systemCategory;
+      if (parsed.urgency !== undefined) updates.urgency = parsed.urgency;
       if (parsed.isPinned !== undefined && req.userRole === "admin") updates.isPinned = parsed.isPinned;
 
       const updated = await storage.updateThread(req.params.id, updates);
@@ -1222,6 +1279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsed = insertThreadReplySchema.parse({
         threadId: req.params.threadId,
         content: req.body.content?.trim(),
+        replyType: req.body.replyType || undefined,
       });
 
       const reply = await storage.createThreadReply(parsed, req.userId!);
@@ -1236,28 +1294,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/threads/:threadId/replies/:replyId/solution", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.patch("/api/threads/:id/status", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.id);
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+      if (thread.userId !== req.userId && req.userRole !== "admin") {
+        return res.status(403).json({ error: "Only the case owner can change status" });
+      }
+
+      const { status } = updateThreadStatusSchema.parse(req.body);
+      if (status === "solved") {
+        return res.status(400).json({ error: "Use Mark Solved endpoint to close a case" });
+      }
+      const updated = await storage.updateThread(req.params.id, { status });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
+      console.error("Error updating status:", error);
+      res.status(500).json({ error: "Failed to update status" });
+    }
+  });
+
+  app.post("/api/threads/:threadId/solved", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const thread = await storage.getThread(req.params.threadId);
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
       if (thread.userId !== req.userId && req.userRole !== "admin") {
-        return res.status(403).json({ error: "Only thread owner can mark solutions" });
+        return res.status(403).json({ error: "Only the case owner can mark solved" });
       }
 
-      const solutionMeta = {
-        solutionDifficulty: req.body.solutionDifficulty ? Number(req.body.solutionDifficulty) : null,
-        solutionCost: req.body.solutionCost?.trim() || null,
-        solutionTools: req.body.solutionTools || null,
-        solutionParts: req.body.solutionParts || null,
-      };
+      const parsed = markSolvedSchema.parse(req.body);
+      const replyId: string | null = parsed.replyId ?? null;
 
-      await storage.markReplyAsSolution(req.params.replyId, req.params.threadId, solutionMeta);
+      if (replyId) {
+        const allReplies = await storage.getRepliesByThread(req.params.threadId);
+        const owned = allReplies.find((r) => r.id === replyId);
+        if (!owned) {
+          return res.status(400).json({ error: "Reply does not belong to this case" });
+        }
+      }
+
+      await storage.markThreadSolved(req.params.threadId, replyId, {
+        rootCause: parsed.rootCause.trim(),
+        finalFix: parsed.finalFix.trim(),
+        partsUsed: parsed.partsUsed && parsed.partsUsed.length > 0 ? parsed.partsUsed : null,
+        toolsUsed: parsed.toolsUsed && parsed.toolsUsed.length > 0 ? parsed.toolsUsed : null,
+        solvedCost: parsed.solvedCost?.trim() || null,
+        laborMinutes: parsed.laborMinutes ?? null,
+        verificationNotes: parsed.verificationNotes?.trim() || null,
+      });
       res.json({ success: true });
     } catch (error) {
-      console.error("Error marking solution:", error);
-      res.status(500).json({ error: "Failed to mark solution" });
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map(e => e.message).join(", ") });
+      }
+      console.error("Error marking solved:", error);
+      res.status(500).json({ error: "Failed to mark solved" });
     }
   });
 

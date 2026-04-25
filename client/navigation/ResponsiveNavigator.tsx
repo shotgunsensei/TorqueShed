@@ -6,9 +6,10 @@ import { BlurView } from "expo-blur";
 import { Platform } from "react-native";
 
 import HomeStackNavigator from "@/navigation/HomeStackNavigator";
-import GaragesStackNavigator from "@/navigation/GaragesStackNavigator";
-import SourceStackNavigator from "@/navigation/SourceStackNavigator";
+import DiagnoseStackNavigator from "@/navigation/DiagnoseStackNavigator";
+import CasesStackNavigator from "@/navigation/CasesStackNavigator";
 import NotesStackNavigator from "@/navigation/NotesStackNavigator";
+import MarketStackNavigator from "@/navigation/MarketStackNavigator";
 import MoreStackNavigator from "@/navigation/MoreStackNavigator";
 import DesktopSidebar from "@/components/DesktopSidebar";
 import { useTheme } from "@/hooks/useTheme";
@@ -16,9 +17,10 @@ import { useResponsive } from "@/hooks/useResponsive";
 
 export type MainTabParamList = {
   HomeTab: undefined;
-  GaragesTab: undefined;
-  SourceTab: undefined;
+  DiagnoseTab: undefined;
+  CasesTab: undefined;
   NotesTab: undefined;
+  MarketTab: undefined;
   MoreTab: undefined;
 };
 
@@ -26,9 +28,10 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TAB_SCREENS = {
   HomeTab: HomeStackNavigator,
-  GaragesTab: GaragesStackNavigator,
-  SourceTab: SourceStackNavigator,
+  DiagnoseTab: DiagnoseStackNavigator,
+  CasesTab: CasesStackNavigator,
   NotesTab: NotesStackNavigator,
+  MarketTab: MarketStackNavigator,
   MoreTab: MoreStackNavigator,
 } as const;
 
@@ -37,7 +40,7 @@ function MobileTabNavigator() {
 
   return (
     <Tab.Navigator
-      initialRouteName="HomeTab"
+      initialRouteName="CasesTab"
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -77,22 +80,22 @@ function MobileTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="GaragesTab"
-        component={GaragesStackNavigator}
+        name="DiagnoseTab"
+        component={DiagnoseStackNavigator}
         options={{
-          title: "Bays",
+          title: "Diagnose",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="message-circle" size={size} color={color} />
+            <Feather name="activity" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="SourceTab"
-        component={SourceStackNavigator}
+        name="CasesTab"
+        component={CasesStackNavigator}
         options={{
-          title: "Source",
+          title: "Cases",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="compass" size={size} color={color} />
+            <Feather name="clipboard" size={size} color={color} />
           ),
         }}
       />
@@ -103,6 +106,16 @@ function MobileTabNavigator() {
           title: "Garage",
           tabBarIcon: ({ color, size }) => (
             <Feather name="tool" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="MarketTab"
+        component={MarketStackNavigator}
+        options={{
+          title: "Market",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="shopping-bag" size={size} color={color} />
           ),
         }}
       />
@@ -122,7 +135,7 @@ function MobileTabNavigator() {
 
 function DesktopNavigator() {
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<keyof typeof TAB_SCREENS>("HomeTab");
+  const [activeTab, setActiveTab] = useState<keyof typeof TAB_SCREENS>("CasesTab");
 
   const handleTabPress = (key: string) => {
     setActiveTab(key as keyof typeof TAB_SCREENS);

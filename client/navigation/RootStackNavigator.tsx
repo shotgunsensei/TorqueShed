@@ -12,6 +12,7 @@ import EditListingScreen from "@/screens/EditListingScreen";
 import AddThreadScreen from "@/screens/AddThreadScreen";
 import ThreadDetailScreen from "@/screens/ThreadDetailScreen";
 import AskForHelpScreen from "@/screens/AskForHelpScreen";
+import NewCaseScreen from "@/screens/NewCaseScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
 import AdminProductsScreen from "@/screens/AdminProductsScreen";
 import GarageDetailScreen from "@/screens/GarageDetailScreen";
@@ -37,6 +38,7 @@ export type RootStackParamList = {
   AddThread: { garageId: string };
   ThreadDetail: { threadId: string };
   AskForHelp: undefined;
+  NewCase: undefined;
   SubmitProduct: undefined;
   AdminProducts: undefined;
   GarageDetail: { garageId: string; garageName: string };
@@ -152,6 +154,14 @@ export default function RootStackNavigator() {
             options={{
               presentation: "modal",
               headerTitle: "Ask for Help",
+            }}
+          />
+          <Stack.Screen
+            name="NewCase"
+            component={NewCaseScreen}
+            options={{
+              presentation: "modal",
+              headerTitle: "New Case",
             }}
           />
           <Stack.Screen

@@ -561,7 +561,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(vehicleNotes).where(eq(vehicleNotes.id, id));
   }
 
-  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[]> {
+  async getThreadsByGarage(garageId: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; vehicleName: string | null })[]> {
     const garageThreads = await db
       .select({
         id: threads.id,
@@ -578,6 +578,20 @@ export class DatabaseStorage implements IStorage {
         severity: threads.severity,
         drivability: threads.drivability,
         recentChanges: threads.recentChanges,
+        status: threads.status,
+        systemCategory: threads.systemCategory,
+        urgency: threads.urgency,
+        budget: threads.budget,
+        toolsAvailable: threads.toolsAvailable,
+        whenItHappens: threads.whenItHappens,
+        partsReplaced: threads.partsReplaced,
+        rootCause: threads.rootCause,
+        finalFix: threads.finalFix,
+        partsUsed: threads.partsUsed,
+        toolsUsed: threads.toolsUsed,
+        solvedCost: threads.solvedCost,
+        laborMinutes: threads.laborMinutes,
+        verificationNotes: threads.verificationNotes,
         lastActivityAt: threads.lastActivityAt,
         createdAt: threads.createdAt,
         updatedAt: threads.updatedAt,
@@ -585,13 +599,61 @@ export class DatabaseStorage implements IStorage {
         yearsWrenching: users.yearsWrenching,
         focusAreas: users.focusAreas,
         solutionCountTotal: sql<number>`(SELECT COUNT(*) FROM thread_replies r2 WHERE r2.user_id = ${threads.userId} AND r2.is_solution = true)::int`,
+        vehicleName: sql<string | null>`(SELECT CONCAT(${vehicles.year}, ' ', ${vehicles.make}, ' ', ${vehicles.model}) FROM ${vehicles} WHERE ${vehicles.id} = ${threads.vehicleId})`,
       })
       .from(threads)
       .leftJoin(users, eq(threads.userId, users.id))
       .where(eq(threads.garageId, garageId))
       .orderBy(desc(threads.isPinned), desc(threads.lastActivityAt));
     
-    return garageThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number })[];
+    return garageThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; vehicleName: string | null })[];
+  }
+
+  async getAllThreads(): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; vehicleName: string | null })[]> {
+    const allThreads = await db
+      .select({
+        id: threads.id,
+        garageId: threads.garageId,
+        userId: threads.userId,
+        title: threads.title,
+        content: threads.content,
+        hasSolution: threads.hasSolution,
+        isPinned: threads.isPinned,
+        replyCount: threads.replyCount,
+        vehicleId: threads.vehicleId,
+        symptoms: threads.symptoms,
+        obdCodes: threads.obdCodes,
+        severity: threads.severity,
+        drivability: threads.drivability,
+        recentChanges: threads.recentChanges,
+        status: threads.status,
+        systemCategory: threads.systemCategory,
+        urgency: threads.urgency,
+        budget: threads.budget,
+        toolsAvailable: threads.toolsAvailable,
+        whenItHappens: threads.whenItHappens,
+        partsReplaced: threads.partsReplaced,
+        rootCause: threads.rootCause,
+        finalFix: threads.finalFix,
+        partsUsed: threads.partsUsed,
+        toolsUsed: threads.toolsUsed,
+        solvedCost: threads.solvedCost,
+        laborMinutes: threads.laborMinutes,
+        verificationNotes: threads.verificationNotes,
+        lastActivityAt: threads.lastActivityAt,
+        createdAt: threads.createdAt,
+        updatedAt: threads.updatedAt,
+        userName: sql<string>`COALESCE(${users.username}, 'Unknown')`,
+        yearsWrenching: users.yearsWrenching,
+        focusAreas: users.focusAreas,
+        solutionCountTotal: sql<number>`(SELECT COUNT(*) FROM thread_replies r2 WHERE r2.user_id = ${threads.userId} AND r2.is_solution = true)::int`,
+        vehicleName: sql<string | null>`(SELECT CONCAT(${vehicles.year}, ' ', ${vehicles.make}, ' ', ${vehicles.model}) FROM ${vehicles} WHERE ${vehicles.id} = ${threads.vehicleId})`,
+      })
+      .from(threads)
+      .leftJoin(users, eq(threads.userId, users.id))
+      .orderBy(desc(threads.isPinned), desc(threads.lastActivityAt));
+
+    return allThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; vehicleName: string | null })[];
   }
 
   async getThread(id: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; vehicleName: string | null }) | undefined> {
@@ -611,6 +673,20 @@ export class DatabaseStorage implements IStorage {
         severity: threads.severity,
         drivability: threads.drivability,
         recentChanges: threads.recentChanges,
+        status: threads.status,
+        systemCategory: threads.systemCategory,
+        urgency: threads.urgency,
+        budget: threads.budget,
+        toolsAvailable: threads.toolsAvailable,
+        whenItHappens: threads.whenItHappens,
+        partsReplaced: threads.partsReplaced,
+        rootCause: threads.rootCause,
+        finalFix: threads.finalFix,
+        partsUsed: threads.partsUsed,
+        toolsUsed: threads.toolsUsed,
+        solvedCost: threads.solvedCost,
+        laborMinutes: threads.laborMinutes,
+        verificationNotes: threads.verificationNotes,
         lastActivityAt: threads.lastActivityAt,
         createdAt: threads.createdAt,
         updatedAt: threads.updatedAt,
@@ -633,13 +709,40 @@ export class DatabaseStorage implements IStorage {
     return newThread;
   }
 
-  async updateThread(id: string, updates: Partial<{ title: string; content: string; hasSolution: boolean; isPinned: boolean }>): Promise<Thread | undefined> {
+  async updateThread(id: string, updates: Partial<{ title: string; content: string; hasSolution: boolean; isPinned: boolean; status: string; systemCategory: string | null; urgency: string | null }>): Promise<Thread | undefined> {
     const [updated] = await db
       .update(threads)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(threads.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async markThreadSolved(threadId: string, replyId: string | null, fix: { rootCause: string; finalFix: string; partsUsed: string[] | null; toolsUsed: string[] | null; solvedCost: string | null; laborMinutes: number | null; verificationNotes: string | null }): Promise<void> {
+    await db.transaction(async (tx) => {
+      if (replyId) {
+        await tx
+          .update(threadReplies)
+          .set({ isSolution: false, replyType: "comment" })
+          .where(and(eq(threadReplies.threadId, threadId), eq(threadReplies.isSolution, true)));
+        await tx
+          .update(threadReplies)
+          .set({ isSolution: true, replyType: "confirmed_fix" })
+          .where(and(eq(threadReplies.id, replyId), eq(threadReplies.threadId, threadId)));
+      }
+      await tx.update(threads).set({
+        hasSolution: true,
+        status: "solved",
+        rootCause: fix.rootCause,
+        finalFix: fix.finalFix,
+        partsUsed: fix.partsUsed,
+        toolsUsed: fix.toolsUsed,
+        solvedCost: fix.solvedCost,
+        laborMinutes: fix.laborMinutes,
+        verificationNotes: fix.verificationNotes,
+        updatedAt: new Date(),
+      }).where(eq(threads.id, threadId));
+    });
   }
 
   async deleteThread(id: string): Promise<void> {
@@ -654,6 +757,7 @@ export class DatabaseStorage implements IStorage {
         threadId: threadReplies.threadId,
         userId: threadReplies.userId,
         content: threadReplies.content,
+        replyType: threadReplies.replyType,
         isSolution: threadReplies.isSolution,
         solutionDifficulty: threadReplies.solutionDifficulty,
         solutionCost: threadReplies.solutionCost,

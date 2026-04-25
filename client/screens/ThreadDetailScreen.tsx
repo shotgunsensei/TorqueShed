@@ -59,7 +59,32 @@ interface Thread {
   userName: string;
   yearsWrenching: number | null;
   focusAreas: string[];
+  status: string | null;
+  systemCategory: string | null;
+  urgency: string | null;
+  budget: string | null;
+  toolsAvailable: string[] | null;
+  whenItHappens: string | null;
+  partsReplaced: string | null;
+  rootCause: string | null;
+  finalFix: string | null;
+  partsUsed: string[] | null;
+  toolsUsed: string[] | null;
+  solvedCost: string | null;
+  laborMinutes: number | null;
+  verificationNotes: string | null;
 }
+
+type ReplyType =
+  | "comment"
+  | "question"
+  | "suggested_test"
+  | "test_result"
+  | "confirmed_fix"
+  | "warning"
+  | "part_recommendation"
+  | "tool_recommendation"
+  | "shop_estimate";
 
 interface ThreadReply {
   id: string;
@@ -76,11 +101,30 @@ interface ThreadReply {
   yearsWrenching: number | null;
   focusAreas: string[];
   solutionCountTotal: number;
+  replyType: ReplyType | null;
 }
 
 const SEVERITY_LABELS = ["Minor", "Low", "Moderate", "High", "Critical"];
 const DRIVABILITY_LABELS = ["Not Drivable", "Barely", "With Caution", "Mostly Fine", "Normal"];
 const DIFFICULTY_LABELS = ["Easy", "Simple", "Moderate", "Difficult", "Expert"];
+
+const REPLY_TYPE_META: Record<ReplyType, { label: string; icon: keyof typeof Feather.glyphMap; color: string }> = {
+  comment: { label: "Comment", icon: "message-circle", color: "#6B7280" },
+  question: { label: "Question", icon: "help-circle", color: "#3B82F6" },
+  suggested_test: { label: "Suggested test", icon: "clipboard", color: "#8B5CF6" },
+  test_result: { label: "Test result", icon: "check-square", color: "#0EA5E9" },
+  confirmed_fix: { label: "Confirmed fix", icon: "check-circle", color: "#10B981" },
+  warning: { label: "Warning", icon: "alert-triangle", color: "#EF4444" },
+  part_recommendation: { label: "Part rec", icon: "package", color: "#F59E0B" },
+  tool_recommendation: { label: "Tool rec", icon: "tool", color: "#F59E0B" },
+  shop_estimate: { label: "Shop estimate", icon: "dollar-sign", color: "#EC4899" },
+};
+
+const STATUS_OPTIONS: Array<{ key: "open" | "testing" | "needs_expert"; label: string; icon: keyof typeof Feather.glyphMap }> = [
+  { key: "open", label: "Open", icon: "circle" },
+  { key: "testing", label: "Testing", icon: "activity" },
+  { key: "needs_expert", label: "Needs Expert", icon: "alert-circle" },
+];
 
 export default function ThreadDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -95,13 +139,18 @@ export default function ThreadDetailScreen() {
 
   const [replyText, setReplyText] = useState("");
   const [isComposing, setIsComposing] = useState(false);
+  const [replyType, setReplyType] = useState<ReplyType>("comment");
   const inputRef = useRef<TextInput>(null);
 
-  const [showSolutionModal, setShowSolutionModal] = useState<string | null>(null);
-  const [solDifficulty, setSolDifficulty] = useState<number | null>(null);
-  const [solCost, setSolCost] = useState("");
-  const [solTools, setSolTools] = useState("");
-  const [solParts, setSolParts] = useState("");
+  const [showFinalFix, setShowFinalFix] = useState(false);
+  const [solvedReplyId, setSolvedReplyId] = useState<string | null>(null);
+  const [rootCause, setRootCause] = useState("");
+  const [finalFix, setFinalFix] = useState("");
+  const [solvedCost, setSolvedCost] = useState("");
+  const [laborMin, setLaborMin] = useState("");
+  const [partsUsedText, setPartsUsedText] = useState("");
+  const [toolsUsedText, setToolsUsedText] = useState("");
+  const [verificationNotes, setVerificationNotes] = useState("");
 
   const { data: thread, isLoading: threadLoading } = useQuery<Thread>({
     queryKey: [`/api/threads/${threadId}`],
@@ -149,6 +198,7 @@ export default function ThreadDetailScreen() {
     mutationFn: async () => {
       return apiRequest("POST", `/api/threads/${threadId}/replies`, {
         content: replyText.trim(),
+        replyType,
       });
     },
     onSuccess: () => {
@@ -157,6 +207,7 @@ export default function ThreadDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Reply posted", "success");
       setReplyText("");
+      setReplyType("comment");
       inputRef.current?.blur();
     },
     onError: (error: Error) => {
@@ -164,19 +215,58 @@ export default function ThreadDetailScreen() {
     },
   });
 
-  const markSolutionMutation = useMutation({
-    mutationFn: async ({ replyId, meta }: { replyId: string; meta: any }) => {
-      return apiRequest("POST", `/api/threads/${threadId}/replies/${replyId}/solution`, meta);
+  const updateStatusMutation = useMutation({
+    mutationFn: async (newStatus: "open" | "testing" | "needs_expert") => {
+      return apiRequest("PATCH", `/api/threads/${threadId}/status`, { status: newStatus });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/threads"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.show("Case status updated", "success");
+    },
+    onError: (error: Error) => {
+      toast.show(error.message || "Failed to update status", "error");
+    },
+  });
+
+  const markSolvedMutation = useMutation({
+    mutationFn: async () => {
+      const partsList = partsUsedText.trim()
+        ? partsUsedText.split(",").map((p) => p.trim()).filter(Boolean)
+        : null;
+      const toolsList = toolsUsedText.trim()
+        ? toolsUsedText.split(",").map((t) => t.trim()).filter(Boolean)
+        : null;
+      return apiRequest("POST", `/api/threads/${threadId}/solved`, {
+        rootCause: rootCause.trim(),
+        finalFix: finalFix.trim(),
+        partsUsed: partsList,
+        toolsUsed: toolsList,
+        solvedCost: solvedCost.trim() || null,
+        laborMinutes: laborMin.trim() ? Number(laborMin.trim()) : null,
+        verificationNotes: verificationNotes.trim() || null,
+        replyId: solvedReplyId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}/replies`] });
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/threads"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Solution marked", "success");
-      setShowSolutionModal(null);
+      toast.show("Case marked solved", "success");
+      setShowFinalFix(false);
+      setSolvedReplyId(null);
+      setRootCause("");
+      setFinalFix("");
+      setSolvedCost("");
+      setLaborMin("");
+      setPartsUsedText("");
+      setToolsUsedText("");
+      setVerificationNotes("");
     },
     onError: (error: Error) => {
-      toast.show(error.message || "Failed to mark solution", "error");
+      toast.show(error.message || "Failed to mark solved", "error");
     },
   });
 
@@ -200,27 +290,23 @@ export default function ThreadDetailScreen() {
     },
   });
 
-  const handleMarkSolution = (replyId: string) => {
-    setShowSolutionModal(replyId);
-    setSolDifficulty(null);
-    setSolCost("");
-    setSolTools("");
-    setSolParts("");
+  const openFinalFix = (replyId: string | null) => {
+    setSolvedReplyId(replyId);
+    setShowFinalFix(true);
+    if (replyId) {
+      const reply = replies.find((r) => r.id === replyId);
+      if (reply && !finalFix) {
+        setFinalFix(reply.content);
+      }
+    }
   };
 
-  const handleConfirmSolution = () => {
-    if (!showSolutionModal) return;
-    const toolsList = solTools.trim() ? solTools.split(",").map((t) => t.trim()).filter(Boolean) : null;
-    const partsList = solParts.trim() ? solParts.split(",").map((p) => p.trim()).filter(Boolean) : null;
-    markSolutionMutation.mutate({
-      replyId: showSolutionModal,
-      meta: {
-        solutionDifficulty: solDifficulty,
-        solutionCost: solCost.trim() || null,
-        solutionTools: toolsList,
-        solutionParts: partsList,
-      },
-    });
+  const handleConfirmSolved = () => {
+    if (!rootCause.trim() || !finalFix.trim()) {
+      toast.show("Root cause and final fix are required", "error");
+      return;
+    }
+    markSolvedMutation.mutate();
   };
 
   const handleDeleteThread = () => {
@@ -325,6 +411,18 @@ export default function ThreadDetailScreen() {
     );
   };
 
+  const renderTypeChip = (item: ThreadReply) => {
+    const t = (item.replyType ?? "comment") as ReplyType;
+    const meta = REPLY_TYPE_META[t];
+    if (!meta) return null;
+    return (
+      <View style={[styles.typeChip, { backgroundColor: meta.color + "1A", borderColor: meta.color + "55" }]}>
+        <Feather name={meta.icon} size={10} color={meta.color} />
+        <Text style={[styles.typeChipText, { color: meta.color }]}>{meta.label}</Text>
+      </View>
+    );
+  };
+
   const renderReply = ({ item }: { item: ThreadReply }) => {
     if (item.isSolution) {
       return (
@@ -342,7 +440,10 @@ export default function ThreadDetailScreen() {
                 {formatDate(item.createdAt)}
               </ThemedText>
             </View>
-            {renderReplyBadges(item)}
+            <View style={styles.replyTypeRow}>
+              {renderTypeChip(item)}
+              {renderReplyBadges(item)}
+            </View>
             <ThemedText type="body" style={styles.replyContent}>
               {item.content}
             </ThemedText>
@@ -360,18 +461,22 @@ export default function ThreadDetailScreen() {
             {formatDate(item.createdAt)}
           </ThemedText>
         </View>
-        {renderReplyBadges(item)}
+        <View style={styles.replyTypeRow}>
+          {renderTypeChip(item)}
+          {renderReplyBadges(item)}
+        </View>
         <ThemedText type="body" style={styles.replyContent}>
           {item.content}
         </ThemedText>
         {isThreadAuthor && !thread?.hasSolution ? (
           <Pressable
             style={[styles.solutionButton, { borderColor: theme.success }]}
-            onPress={() => handleMarkSolution(item.id)}
+            onPress={() => openFinalFix(item.id)}
+            testID={`button-mark-solution-${item.id}`}
           >
             <Feather name="check" size={14} color={theme.success} />
             <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4 }}>
-              Mark as Solution
+              This solved it
             </ThemedText>
           </Pressable>
         ) : null}
@@ -529,82 +634,94 @@ export default function ThreadDetailScreen() {
     );
   };
 
-  const renderSolutionForm = () => {
-    if (!showSolutionModal) return null;
+  const renderFinalFixForm = () => {
+    if (!showFinalFix) return null;
 
     return (
       <View style={[styles.solutionForm, { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border }]}>
         <View style={styles.solutionFormHeader}>
-          <ThemedText type="h4">Solution Details</ThemedText>
-          <Pressable onPress={() => setShowSolutionModal(null)}>
+          <ThemedText type="h4">Mark Case Solved</ThemedText>
+          <Pressable onPress={() => setShowFinalFix(false)} testID="button-close-finalfix">
             <Feather name="x" size={20} color={theme.textSecondary} />
           </Pressable>
         </View>
         <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-          Help others by adding details about this fix (optional)
+          Capture exactly what fixed it so the next person can verify and reuse it.
         </ThemedText>
-
-        <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
-          Difficulty
-        </ThemedText>
-        <View style={styles.difficultyRow}>
-          {DIFFICULTY_LABELS.map((label, i) => {
-            const val = i + 1;
-            const isActive = solDifficulty === val;
-            return (
-              <Pressable
-                key={label}
-                onPress={() => setSolDifficulty(solDifficulty === val ? null : val)}
-                style={[
-                  styles.difficultyOption,
-                  {
-                    backgroundColor: isActive ? theme.primary + "20" : theme.backgroundDefault,
-                    borderColor: isActive ? theme.primary : theme.cardBorder,
-                  },
-                ]}
-              >
-                <Text style={[styles.difficultyText, { color: isActive ? theme.primary : theme.textSecondary }]}>
-                  {val}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
 
         <Input
-          label="Estimated Cost"
-          placeholder="e.g., 150"
-          value={solCost}
-          onChangeText={setSolCost}
+          label="Root cause *"
+          placeholder="e.g., Cracked vacuum line on intake manifold"
+          value={rootCause}
+          onChangeText={setRootCause}
+          multiline
+          numberOfLines={2}
+          leftIcon="search"
+        />
+        <Input
+          label="Final fix *"
+          placeholder="What you actually did to fix it"
+          value={finalFix}
+          onChangeText={setFinalFix}
+          multiline
+          numberOfLines={3}
+          leftIcon="check-circle"
+        />
+        <Input
+          label="Parts used"
+          placeholder="Comma-separated"
+          value={partsUsedText}
+          onChangeText={setPartsUsedText}
+          leftIcon="package"
+        />
+        <Input
+          label="Tools used"
+          placeholder="Comma-separated"
+          value={toolsUsedText}
+          onChangeText={setToolsUsedText}
+          leftIcon="tool"
+        />
+        <Input
+          label="Total cost"
+          placeholder="e.g., 145"
+          value={solvedCost}
+          onChangeText={setSolvedCost}
           leftIcon="dollar-sign"
           keyboardType="decimal-pad"
         />
         <Input
-          label="Tools Used"
-          placeholder="Comma-separated, e.g., Socket set, Torque wrench"
-          value={solTools}
-          onChangeText={setSolTools}
-          leftIcon="tool"
+          label="Labor minutes"
+          placeholder="e.g., 90"
+          value={laborMin}
+          onChangeText={setLaborMin}
+          leftIcon="clock"
+          keyboardType="number-pad"
         />
         <Input
-          label="Parts Used"
-          placeholder="Comma-separated, e.g., Spark plugs, Ignition coils"
-          value={solParts}
-          onChangeText={setSolParts}
-          leftIcon="package"
+          label="Verification notes"
+          placeholder="How you confirmed it's actually fixed (drove 50mi, no codes returned, etc.)"
+          value={verificationNotes}
+          onChangeText={setVerificationNotes}
+          multiline
+          numberOfLines={2}
+          leftIcon="shield"
         />
 
         <View style={styles.solutionFormButtons}>
-          <Button variant="outline" onPress={() => setShowSolutionModal(null)} style={{ flex: 1 }}>
-            Cancel
-          </Button>
+          <Pressable
+            onPress={() => setShowFinalFix(false)}
+            style={[styles.secondaryBtn, { borderColor: theme.border, flex: 1 }]}
+            testID="button-cancel-finalfix"
+          >
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Cancel</ThemedText>
+          </Pressable>
           <View style={{ width: Spacing.sm }} />
           <Button
-            onPress={handleConfirmSolution}
-            disabled={markSolutionMutation.isPending}
+            onPress={handleConfirmSolved}
+            disabled={markSolvedMutation.isPending}
             style={{ flex: 1 }}
           >
-            {markSolutionMutation.isPending ? "Saving..." : "Confirm Solution"}
+            {markSolvedMutation.isPending ? "Saving..." : "Mark Solved"}
           </Button>
         </View>
       </View>
@@ -649,6 +766,46 @@ export default function ThreadDetailScreen() {
           <ThemedText type="body" style={styles.threadContent}>
             {thread.content}
           </ThemedText>
+          {isThreadAuthor && !thread.hasSolution ? (
+            <View style={styles.statusChanger}>
+              <ThemedText type="caption" style={{ color: theme.textMuted, marginBottom: Spacing.xs }}>
+                Case status
+              </ThemedText>
+              <View style={styles.statusRow}>
+                {STATUS_OPTIONS.map((opt) => {
+                  const active = (thread.status || "open") === opt.key;
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      onPress={() => updateStatusMutation.mutate(opt.key)}
+                      disabled={updateStatusMutation.isPending || active}
+                      style={[
+                        styles.statusOption,
+                        {
+                          backgroundColor: active ? theme.primary + "20" : theme.backgroundDefault,
+                          borderColor: active ? theme.primary : theme.cardBorder,
+                        },
+                      ]}
+                      testID={`button-status-${opt.key}`}
+                    >
+                      <Feather name={opt.icon} size={12} color={active ? theme.primary : theme.textSecondary} />
+                      <Text style={[styles.statusOptionText, { color: active ? theme.primary : theme.textSecondary }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Pressable
+                onPress={() => openFinalFix(null)}
+                style={[styles.markSolvedBtn, { backgroundColor: theme.success }]}
+                testID="button-mark-case-solved"
+              >
+                <Feather name="check-circle" size={14} color="#fff" />
+                <Text style={styles.markSolvedBtnText}>Mark Case Solved</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.threadActions}>
             {currentUser ? (
               <Pressable
@@ -683,6 +840,18 @@ export default function ThreadDetailScreen() {
       </View>
     );
   };
+
+  const REPLY_TYPE_PICKER: ReplyType[] = [
+    "comment",
+    "question",
+    "suggested_test",
+    "test_result",
+    "confirmed_fix",
+    "warning",
+    "part_recommendation",
+    "tool_recommendation",
+    "shop_estimate",
+  ];
 
   if (threadLoading) {
     return (
@@ -719,8 +888,8 @@ export default function ThreadDetailScreen() {
         }}
         showsVerticalScrollIndicator={false}
       />
-      {showSolutionModal ? (
-        renderSolutionForm()
+      {showFinalFix ? (
+        renderFinalFixForm()
       ) : (
         <View
           style={[
@@ -732,11 +901,30 @@ export default function ThreadDetailScreen() {
             },
           ]}
         >
-          <View style={styles.replyLabel}>
-            <Feather name="corner-down-right" size={16} color={theme.textSecondary} />
-            <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.xs }}>
-              Replying to thread
-            </ThemedText>
+          <View style={styles.typePickerRow}>
+            {REPLY_TYPE_PICKER.map((t) => {
+              const meta = REPLY_TYPE_META[t];
+              const active = replyType === t;
+              return (
+                <Pressable
+                  key={t}
+                  onPress={() => setReplyType(t)}
+                  style={[
+                    styles.typePickerChip,
+                    {
+                      backgroundColor: active ? meta.color + "26" : theme.backgroundDefault,
+                      borderColor: active ? meta.color : theme.border,
+                    },
+                  ]}
+                  testID={`button-reply-type-${t}`}
+                >
+                  <Feather name={meta.icon} size={11} color={active ? meta.color : theme.textSecondary} />
+                  <Text style={[styles.typePickerText, { color: active ? meta.color : theme.textSecondary }]}>
+                    {meta.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
           <View style={styles.inputRow}>
             <TextInput
@@ -749,7 +937,7 @@ export default function ThreadDetailScreen() {
                   borderColor: replyText.trim() ? theme.primary : theme.border,
                 },
               ]}
-              placeholder="Write your reply..."
+              placeholder={`Add a ${REPLY_TYPE_META[replyType].label.toLowerCase()}...`}
               placeholderTextColor={theme.textSecondary}
               value={replyText}
               onChangeText={setReplyText}
@@ -757,6 +945,7 @@ export default function ThreadDetailScreen() {
               maxLength={2000}
               onFocus={() => setIsComposing(true)}
               onBlur={() => setIsComposing(false)}
+              testID="input-reply"
             />
             <Pressable
               style={[
@@ -765,6 +954,7 @@ export default function ThreadDetailScreen() {
               ]}
               onPress={handleSubmitReply}
               disabled={!replyText.trim() || createReplyMutation.isPending}
+              testID="button-send-reply"
             >
               {createReplyMutation.isPending ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -1057,5 +1247,92 @@ const styles = StyleSheet.create({
   },
   replyCredText: {
     fontSize: 10,
+  },
+  typeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  typeChipText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  replyTypeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  statusChanger: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  statusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  statusOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  statusOptionText: {
+    ...Typography.caption,
+    fontWeight: "600",
+  },
+  markSolvedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+    marginTop: Spacing.xs,
+  },
+  markSolvedBtnText: {
+    color: "#fff",
+    ...Typography.body,
+    fontWeight: "700",
+  },
+  typePickerRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  typePickerChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  typePickerText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  secondaryBtn: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

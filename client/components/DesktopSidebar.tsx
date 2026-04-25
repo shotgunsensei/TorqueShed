@@ -18,9 +18,10 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { key: "HomeTab", label: "Home", icon: "home" },
-  { key: "GaragesTab", label: "Bays", icon: "message-circle" },
-  { key: "SourceTab", label: "Source", icon: "compass" },
+  { key: "DiagnoseTab", label: "Diagnose", icon: "activity" },
+  { key: "CasesTab", label: "Cases", icon: "clipboard" },
   { key: "NotesTab", label: "Garage", icon: "tool" },
+  { key: "MarketTab", label: "Market", icon: "shopping-bag" },
   { key: "MoreTab", label: "More", icon: "more-horizontal" },
 ];
 

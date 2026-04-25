@@ -198,6 +198,29 @@ export const insertProductSchema = z.object({
   isSponsored: z.boolean().optional().default(false),
 });
 
+export const CASE_STATUSES = ["open", "testing", "needs_expert", "solved"] as const;
+export type CaseStatus = typeof CASE_STATUSES[number];
+
+export const SYSTEM_CATEGORIES = [
+  "engine",
+  "electrical",
+  "transmission",
+  "brakes",
+  "suspension",
+  "cooling",
+  "fuel",
+  "exhaust",
+  "hvac",
+  "interior",
+  "body",
+  "tires",
+  "other",
+] as const;
+export type SystemCategory = typeof SYSTEM_CATEGORIES[number];
+
+export const URGENCY_LEVELS = ["low", "normal", "high", "stranded"] as const;
+export type UrgencyLevel = typeof URGENCY_LEVELS[number];
+
 export const threads = pgTable("threads", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -215,6 +238,20 @@ export const threads = pgTable("threads", {
   severity: integer("severity"),
   drivability: integer("drivability"),
   recentChanges: text("recent_changes"),
+  status: varchar("status", { length: 20 }).default("open"),
+  systemCategory: varchar("system_category", { length: 20 }),
+  urgency: varchar("urgency", { length: 20 }),
+  budget: varchar("budget", { length: 50 }),
+  toolsAvailable: text("tools_available"),
+  whenItHappens: text("when_it_happens"),
+  partsReplaced: text("parts_replaced"),
+  rootCause: text("root_cause"),
+  finalFix: text("final_fix"),
+  partsUsed: json("parts_used").$type<string[]>(),
+  toolsUsed: json("tools_used").$type<string[]>(),
+  solvedCost: varchar("solved_cost", { length: 50 }),
+  laborMinutes: integer("labor_minutes"),
+  verificationNotes: text("verification_notes"),
   lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -226,6 +263,19 @@ export const threadsRelations = relations(threads, ({ one, many }) => ({
   replies: many(threadReplies),
 }));
 
+export const REPLY_TYPES = [
+  "comment",
+  "question",
+  "suggested_test",
+  "test_result",
+  "confirmed_fix",
+  "warning",
+  "part_recommendation",
+  "tool_recommendation",
+  "shop_estimate",
+] as const;
+export type ReplyType = typeof REPLY_TYPES[number];
+
 export const threadReplies = pgTable("thread_replies", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -233,6 +283,7 @@ export const threadReplies = pgTable("thread_replies", {
   threadId: varchar("thread_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }),
   userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   content: text("content").notNull(),
+  replyType: varchar("reply_type", { length: 30 }).default("comment"),
   isSolution: boolean("is_solution").default(false),
   solutionDifficulty: integer("solution_difficulty"),
   solutionCost: varchar("solution_cost", { length: 50 }),
@@ -361,11 +412,33 @@ export const insertThreadSchema = z.object({
   severity: z.number().int().min(1).max(5).nullable().optional(),
   drivability: z.number().int().min(1).max(5).nullable().optional(),
   recentChanges: z.string().nullable().optional(),
+  systemCategory: z.enum(SYSTEM_CATEGORIES).nullable().optional(),
+  urgency: z.enum(URGENCY_LEVELS).nullable().optional(),
+  budget: z.string().max(50).nullable().optional(),
+  toolsAvailable: z.string().nullable().optional(),
+  whenItHappens: z.string().nullable().optional(),
+  partsReplaced: z.string().nullable().optional(),
 });
 
 export const insertThreadReplySchema = z.object({
   threadId: z.string().min(1, "Thread ID is required"),
   content: z.string().min(1, "Content is required"),
+  replyType: z.enum(REPLY_TYPES).optional(),
+});
+
+export const updateThreadStatusSchema = z.object({
+  status: z.enum(CASE_STATUSES),
+});
+
+export const markSolvedSchema = z.object({
+  rootCause: z.string().min(1, "Root cause is required").max(500),
+  finalFix: z.string().min(1, "Final fix description is required"),
+  partsUsed: z.array(z.string()).nullable().optional(),
+  toolsUsed: z.array(z.string()).nullable().optional(),
+  solvedCost: z.string().max(50).nullable().optional(),
+  laborMinutes: z.number().int().min(0).max(100000).nullable().optional(),
+  verificationNotes: z.string().nullable().optional(),
+  replyId: z.string().nullable().optional(),
 });
 
 export const insertSwapShopListingSchema = z.object({
@@ -444,6 +517,9 @@ export const updateThreadSchema = z.object({
   content: z.string().min(1, "Content cannot be empty").optional(),
   hasSolution: z.boolean().optional(),
   isPinned: z.boolean().optional(),
+  status: z.enum(CASE_STATUSES).optional(),
+  systemCategory: z.enum(SYSTEM_CATEGORIES).nullable().optional(),
+  urgency: z.enum(URGENCY_LEVELS).nullable().optional(),
 });
 
 export const updateSwapShopListingSchema = z.object({

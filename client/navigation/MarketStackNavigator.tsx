@@ -10,11 +10,11 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
-export type SourceStackParamList = {
-  Source: { segment?: "shop" | "swap" | "find" } | undefined;
+export type MarketStackParamList = {
+  Market: { segment?: "shop" | "swap" | "find" } | undefined;
 };
 
-const Stack = createNativeStackNavigator<SourceStackParamList>();
+const Stack = createNativeStackNavigator<MarketStackParamList>();
 
 type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -29,16 +29,16 @@ function ProfileButton() {
   );
 }
 
-export default function SourceStackNavigator() {
+export default function MarketStackNavigator() {
   const screenOptions = useScreenOptions();
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
-        name="Source"
+        name="Market"
         component={SourceScreen}
         options={{
-          headerTitle: "Source",
+          headerTitle: "Market",
           headerRight: () => <ProfileButton />,
         }}
       />
