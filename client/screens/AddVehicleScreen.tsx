@@ -20,6 +20,7 @@ import { useToast } from "@/components/Toast";
 import { useEntitlements } from "@/lib/entitlements";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import type { Vehicle } from "@shared/schema";
 
 interface VinDecodeResult {
   year: string;
@@ -58,7 +59,7 @@ export default function AddVehicleScreen() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasFeature } = useEntitlements();
-  const { data: existingVehicles = [] } = useQuery<any[]>({ queryKey: ["/api/vehicles"] });
+  const { data: existingVehicles = [] } = useQuery<Vehicle[]>({ queryKey: ["/api/vehicles"] });
   const atVehicleLimit = !hasFeature("multi_vehicle") && existingVehicles.length >= 1;
 
   const [inputMode, setInputMode] = useState(0);
