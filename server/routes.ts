@@ -2244,6 +2244,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/cases/:caseId/tools-used", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const thread = await storage.getThread(req.params.caseId);
+      if (!thread) return res.status(404).json({ error: "Case not found" });
+      if (thread.userId !== req.userId) {
+        return res.status(403).json({ error: "Only the case author can view attached tools." });
+      }
       const items = await storage.getToolsUsedForCase(req.params.caseId);
       res.json(items.map(sanitizeCaseToolLink));
     } catch (error) {
