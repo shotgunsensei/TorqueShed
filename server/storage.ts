@@ -801,13 +801,11 @@ export class DatabaseStorage implements IStorage {
     }));
 
     enriched.sort((a, b) => {
-      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      const dayMs = 86_400_000;
-      const sameDay = Math.floor(aDate / dayMs) === Math.floor(bDate / dayMs);
-      if (sameDay && a.isPriority !== b.isPriority) {
+      if (a.isPriority !== b.isPriority) {
         return a.isPriority ? -1 : 1;
       }
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return aDate - bDate;
     });
 

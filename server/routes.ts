@@ -2217,10 +2217,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== Case Tools Used (attach inventory tools to a case) ==========
+  const sanitizeCaseToolLink = (link: { id: string; caseId: string; toolId: string; attachedBy: string; createdAt: Date | null; tool: { id: string; name: string; brand: string | null; category: string } | null }) => ({
+    id: link.id,
+    caseId: link.caseId,
+    toolId: link.toolId,
+    attachedBy: link.attachedBy,
+    createdAt: link.createdAt,
+    tool: link.tool
+      ? { id: link.tool.id, name: link.tool.name, brand: link.tool.brand, category: link.tool.category }
+      : null,
+  });
+
   app.get("/api/cases/:caseId/tools-used", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const items = await storage.getToolsUsedForCase(req.params.caseId);
-      res.json(items);
+      res.json(items.map(sanitizeCaseToolLink));
     } catch (error) {
       console.error("Error listing case tools:", error);
       res.status(500).json({ error: "Failed to list tools used" });
@@ -2242,7 +2253,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const created = await storage.attachToolToCase(req.params.caseId, toolId, req.userId!);
-      res.status(201).json(created);
+      res.status(201).json({
+        id: created.id,
+        caseId: created.caseId,
+        toolId: created.toolId,
+        attachedBy: created.attachedBy,
+        createdAt: created.createdAt,
+      });
     } catch (error) {
       console.error("Error attaching tool:", error);
       res.status(500).json({ error: "Failed to attach tool" });
