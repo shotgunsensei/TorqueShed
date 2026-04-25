@@ -1117,7 +1117,13 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(swapShopListings)
-      .where(and(eq(swapShopListings.attachedCaseId, caseId), eq(swapShopListings.isActive, true)))
+      .where(
+        and(
+          eq(swapShopListings.attachedCaseId, caseId),
+          eq(swapShopListings.isActive, true),
+          eq(swapShopListings.isDraft, false),
+        ),
+      )
       .orderBy(desc(swapShopListings.updatedAt));
   }
 

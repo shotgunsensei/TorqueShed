@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { Card } from "@/components/Card";
@@ -9,6 +10,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { LockedFeature } from "@/components/LockedFeature";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 interface SimilarCase {
   id: string;
@@ -34,7 +36,7 @@ interface Props {
 
 export function SimilarCasesCard({ caseId, onUpgrade }: Props) {
   const { theme } = useTheme();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const { data, isLoading, isError } = useQuery<SimilarResponse>({
     queryKey: [`/api/cases/${caseId}/similar`],
@@ -78,7 +80,7 @@ export function SimilarCasesCard({ caseId, onUpgrade }: Props) {
       {data.cases.map((c) => (
         <Pressable
           key={c.id}
-          onPress={() => navigation.push("ThreadDetail", { threadId: c.id, garageId: "" })}
+          onPress={() => navigation.push("ThreadDetail", { threadId: c.id })}
           style={[styles.row, { borderColor: theme.cardBorder }]}
           testID={`similar-case-${c.id}`}
         >
