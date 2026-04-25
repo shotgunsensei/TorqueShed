@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useEntitlements } from "@/lib/entitlements";
+import { LockedFeature } from "@/components/LockedFeature";
 import { apiRequest } from "@/lib/query-client";
 
 interface Plan {
@@ -160,13 +161,21 @@ export default function RepairPlanCard({ caseId, onUpgrade }: Props) {
               {pdfMutation.isPending ? "Building..." : "Export PDF"}
             </ThemedText>
           </Pressable>
-        ) : (
-          <Pressable onPress={onUpgrade} style={[styles.btn, { borderColor: theme.cardBorder, borderWidth: 1 }]} testID="repair-plan-upgrade">
-            <Feather name="lock" size={14} color={theme.textMuted} />
-            <ThemedText type="small" style={{ marginLeft: Spacing.xs, color: theme.textMuted }}>PDF in DIY Pro</ThemedText>
-          </Pressable>
-        )}
+        ) : null}
       </View>
+
+      {!canExportPdf ? (
+        <View style={{ marginTop: Spacing.sm }}>
+          <LockedFeature
+            feature="pdf_repair_plan"
+            title="Export PDF Repair Plan"
+            description="Download a printable PDF with causes, tests, parts, tools, and safety notes."
+            onUpgrade={onUpgrade}
+            testID="repair-plan-upgrade"
+            compact
+          />
+        </View>
+      ) : null}
 
       {plan ? (
         <ScrollView style={[styles.preview, { backgroundColor: theme.backgroundTertiary, borderColor: theme.cardBorder }]} nestedScrollEnabled>
