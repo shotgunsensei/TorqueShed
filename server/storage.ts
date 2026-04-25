@@ -865,7 +865,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(swapShopListings)
       .leftJoin(users, eq(swapShopListings.userId, users.id))
-      .where(eq(swapShopListings.isActive, true))
+      .where(and(eq(swapShopListings.isActive, true), eq(swapShopListings.isDraft, false)))
       .orderBy(desc(swapShopListings.createdAt));
     
     return listings.map(l => ({ ...l, userSwapCount: 0 })) as (SwapShopListing & { userName: string; userSwapCount: number; sellerJoinDate: string | null; sellerListingCount: number })[];

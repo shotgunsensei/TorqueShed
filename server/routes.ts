@@ -1445,11 +1445,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/swap-shop/:id", async (req: Request, res: Response) => {
+  app.get("/api/swap-shop/:id", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const listing = await storage.getSwapShopListing(req.params.id);
       if (!listing) {
         return res.status(404).json({ error: "Listing not found" });
+      }
+      if (listing.isDraft) {
+        const viewerId = req.userId;
+        const isOwner = viewerId && viewerId === listing.userId;
+        let isAdmin = false;
+        if (viewerId) {
+          const viewer = await storage.getUser(viewerId);
+          isAdmin = viewer?.role === "admin";
+        }
+        if (!isOwner && !isAdmin) {
+          return res.status(404).json({ error: "Listing not found" });
+        }
       }
       res.json(listing);
     } catch (error) {
