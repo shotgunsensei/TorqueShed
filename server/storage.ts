@@ -1249,7 +1249,7 @@ export class DatabaseStorage implements IStorage {
             vehicleId: v.id,
             vehicleName: v.nickname || `${v.year ?? ""} ${v.make ?? ""} ${v.model ?? ""}`.trim() || "Vehicle",
             title: n.title,
-            type: n.type,
+            type: n.type ?? "general",
             nextDueDate: n.nextDueDate as Date | null,
             nextDueMileage: n.nextDueMileage,
             currentMileage,
