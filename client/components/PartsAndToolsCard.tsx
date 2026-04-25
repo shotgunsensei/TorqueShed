@@ -36,6 +36,8 @@ interface RecommendationResponse {
   marketplaceListings: MarketplaceListing[];
   totalCostRange: { min: number; max: number; label: string };
   affiliateNote: string;
+  fullChecklist?: boolean;
+  hiddenCounts?: { optionalTools: number; likelyParts: number; consumables: number } | null;
 }
 
 interface Props {
@@ -73,33 +75,29 @@ function Row({ rec, onOpen }: { rec: Recommendation; onOpen?: () => void }) {
 function Section({
   label,
   recs,
-  fullChecklist,
-  freeLimit,
+  hiddenCount,
   onUpgrade,
   testID,
 }: {
   label: string;
   recs: Recommendation[];
-  fullChecklist: boolean;
-  freeLimit: number;
+  hiddenCount: number;
   onUpgrade: () => void;
   testID?: string;
 }) {
   const { theme } = useTheme();
-  if (recs.length === 0) return null;
-  const visible = fullChecklist ? recs : recs.slice(0, freeLimit);
-  const hidden = recs.length - visible.length;
+  if (recs.length === 0 && hiddenCount === 0) return null;
   return (
     <View style={styles.section} testID={testID}>
       <ThemedText type="caption" style={[styles.sectionLabel, { color: theme.textMuted }]}>{label}</ThemedText>
-      {visible.map((r, i) => (
+      {recs.map((r, i) => (
         <Row key={`${label}-${i}`} rec={r} onOpen={r.affiliateUrl ? () => Linking.openURL(r.affiliateUrl!) : undefined} />
       ))}
-      {hidden > 0 ? (
+      {hiddenCount > 0 ? (
         <Pressable onPress={onUpgrade} style={[styles.lockedRow, { borderColor: theme.cardBorder }]}>
           <Feather name="lock" size={14} color={theme.textMuted} />
           <ThemedText type="small" style={{ color: theme.textMuted, marginLeft: Spacing.xs }}>
-            {hidden} more in DIY Pro
+            {hiddenCount} more in DIY Pro
           </ThemedText>
         </Pressable>
       ) : null}
@@ -109,8 +107,7 @@ function Section({
 
 export default function PartsAndToolsCard({ caseId, onUpgrade, onBrowseMarketplace }: Props) {
   const { theme } = useTheme();
-  const { hasFeature } = useEntitlements();
-  const fullChecklist = hasFeature("full_parts_checklist");
+  useEntitlements();
 
   const { data, isLoading } = useQuery<RecommendationResponse>({
     queryKey: [`/api/cases/${caseId}/recommendations`],
@@ -136,11 +133,11 @@ export default function PartsAndToolsCard({ caseId, onUpgrade, onBrowseMarketpla
         <ThemedText type="small" style={{ color: theme.textMuted }}>No recommendations yet.</ThemedText>
       ) : (
         <>
-          <Section label="REQUIRED TOOLS" recs={data.requiredTools} fullChecklist={true} freeLimit={data.requiredTools.length} onUpgrade={onUpgrade} testID="section-required-tools" />
-          <Section label="OPTIONAL TOOLS" recs={data.optionalTools} fullChecklist={fullChecklist} freeLimit={1} onUpgrade={onUpgrade} testID="section-optional-tools" />
-          <Section label="LIKELY PARTS" recs={data.likelyParts} fullChecklist={fullChecklist} freeLimit={2} onUpgrade={onUpgrade} testID="section-likely-parts" />
-          <Section label="CONSUMABLES" recs={data.consumables} fullChecklist={fullChecklist} freeLimit={1} onUpgrade={onUpgrade} testID="section-consumables" />
-          <Section label="SAFETY EQUIPMENT" recs={data.safetyEquipment} fullChecklist={true} freeLimit={data.safetyEquipment.length} onUpgrade={onUpgrade} testID="section-safety" />
+          <Section label="REQUIRED TOOLS" recs={data.requiredTools} hiddenCount={0} onUpgrade={onUpgrade} testID="section-required-tools" />
+          <Section label="OPTIONAL TOOLS" recs={data.optionalTools} hiddenCount={data.hiddenCounts?.optionalTools ?? 0} onUpgrade={onUpgrade} testID="section-optional-tools" />
+          <Section label="LIKELY PARTS" recs={data.likelyParts} hiddenCount={data.hiddenCounts?.likelyParts ?? 0} onUpgrade={onUpgrade} testID="section-likely-parts" />
+          <Section label="CONSUMABLES" recs={data.consumables} hiddenCount={data.hiddenCounts?.consumables ?? 0} onUpgrade={onUpgrade} testID="section-consumables" />
+          <Section label="SAFETY EQUIPMENT" recs={data.safetyEquipment} hiddenCount={0} onUpgrade={onUpgrade} testID="section-safety" />
 
           {data.marketplaceListings.length > 0 ? (
             <View style={styles.section}>

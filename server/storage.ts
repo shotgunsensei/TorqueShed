@@ -15,6 +15,10 @@ import {
   expertReviews,
   repairPlanExports,
   tools,
+  caseToolsUsed,
+  type Tool,
+  type InsertTool,
+  type CaseToolUsed,
   type User, 
   type InsertUser,
   type Garage,
@@ -791,7 +795,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(threadReplies.createdAt);
 
     const PRIORITY_TIERS = new Set(["diy_pro", "garage_pro", "shop_pro"]);
-    const enriched = (replies as any[]).map((r) => ({
+    const enriched = replies.map((r) => ({
       ...r,
       isPriority: PRIORITY_TIERS.has(r.replierTier),
     }));
@@ -1119,8 +1123,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(swapShopListings.updatedAt));
   }
 
+  async getActiveListingsByUser(userId: string): Promise<SwapShopListing[]> {
+    return db
+      .select()
+      .from(swapShopListings)
+      .where(and(eq(swapShopListings.userId, userId), eq(swapShopListings.isActive, true)))
+      .orderBy(desc(swapShopListings.updatedAt));
+  }
+
   // ========== Tool Inventory ==========
-  async getToolsByUser(userId: string) {
+  async getToolsByUser(userId: string): Promise<Tool[]> {
     return db
       .select()
       .from(tools)
@@ -1128,12 +1140,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(tools.updatedAt));
   }
 
-  async getTool(id: string) {
+  async getTool(id: string): Promise<Tool | undefined> {
     const [tool] = await db.select().from(tools).where(eq(tools.id, id)).limit(1);
     return tool;
   }
 
-  async createTool(data: any, userId: string) {
+  async createTool(data: InsertTool, userId: string): Promise<Tool> {
     const [created] = await db
       .insert(tools)
       .values({ ...data, userId })
@@ -1141,7 +1153,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateTool(id: string, updates: any) {
+  async updateTool(id: string, updates: Partial<InsertTool>): Promise<Tool> {
     const [updated] = await db
       .update(tools)
       .set({ ...updates, updatedAt: new Date() })
@@ -1152,6 +1164,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTool(id: string): Promise<void> {
     await db.delete(tools).where(eq(tools.id, id));
+  }
+
+  // ========== Case Tools Used ==========
+  async getToolsUsedForCase(caseId: string): Promise<(CaseToolUsed & { tool: Tool | null })[]> {
+    const rows = await db
+      .select({
+        link: caseToolsUsed,
+        tool: tools,
+      })
+      .from(caseToolsUsed)
+      .leftJoin(tools, eq(caseToolsUsed.toolId, tools.id))
+      .where(eq(caseToolsUsed.caseId, caseId))
+      .orderBy(desc(caseToolsUsed.createdAt));
+    return rows.map((r) => ({ ...r.link, tool: r.tool }));
+  }
+
+  async getCaseToolUsed(linkId: string): Promise<CaseToolUsed | undefined> {
+    const [row] = await db.select().from(caseToolsUsed).where(eq(caseToolsUsed.id, linkId)).limit(1);
+    return row;
+  }
+
+  async attachToolToCase(caseId: string, toolId: string, attachedBy: string): Promise<CaseToolUsed> {
+    const [created] = await db
+      .insert(caseToolsUsed)
+      .values({ caseId, toolId, attachedBy })
+      .returning();
+    return created;
+  }
+
+  async detachToolFromCase(linkId: string): Promise<void> {
+    await db.delete(caseToolsUsed).where(eq(caseToolsUsed.id, linkId));
   }
 
   // ========== Maintenance Due ==========

@@ -35,6 +35,8 @@ interface Props {
   onUpgrade: () => void;
 }
 
+declare const btoa: (input: string) => string;
+
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -43,9 +45,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     const chunk = bytes.subarray(i, i + chunkSize);
     binary += String.fromCharCode.apply(null, Array.from(chunk) as number[]);
   }
-  // btoa is available globally in RN and browsers
-  // eslint-disable-next-line no-undef
-  return (globalThis as any).btoa(binary);
+  return btoa(binary);
 }
 
 export default function RepairPlanCard({ caseId, onUpgrade }: Props) {
@@ -96,8 +96,9 @@ export default function RepairPlanCard({ caseId, onUpgrade }: Props) {
         } else {
           toast.show(`PDF saved to ${fileUri}`, "success");
         }
-      } catch (e: any) {
-        toast.show(e?.message || "Failed to save PDF", "error");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to save PDF";
+        toast.show(msg, "error");
       }
     },
     onError: (e: Error) => toast.show(e.message || "Failed to export PDF", "error"),

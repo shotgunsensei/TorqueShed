@@ -38,7 +38,7 @@ import {
   type SubscriptionTier,
   type ExpertServiceLevel,
 } from "@shared/schema";
-import { requireAuth, requireAdmin, signJWT, type AuthenticatedRequest } from "./middleware/auth";
+import { requireAuth, requireAdmin, optionalAuth, signJWT, type AuthenticatedRequest } from "./middleware/auth";
 import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/torque-assist", async (req: Request, res: Response) => {
+  app.post("/api/torque-assist", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const clientId = req.ip || "unknown";
       
@@ -405,16 +405,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const parsed = torqueAssistRequestSchema.parse(req.body);
-      
+
+      const tier = await getUserTier(req.userId ?? null);
+      const isPaid = tierHasFeature(tier, "advanced_diagnostic_tree");
+
       const cached = getCachedResponse(parsed);
-      if (cached) {
-        return res.json(cached);
+      const fullResponse = cached ?? generateTorqueAssistResponse(parsed);
+      if (!cached) cacheResponse(parsed, fullResponse);
+
+      if (isPaid) {
+        return res.json({ ...fullResponse, tier, gated: false });
       }
-      
-      const response = generateTorqueAssistResponse(parsed);
-      cacheResponse(parsed, response);
-      
-      res.json(response);
+
+      const trimmed = {
+        ...fullResponse,
+        likelyCauses: fullResponse.likelyCauses.slice(0, 1),
+        recommendedChecks: fullResponse.recommendedChecks.slice(0, 2).map((c) => ({ ...c, tools: c.tools.slice(0, 2) })),
+        torqueSpecs: null,
+        suggestedParts: [],
+        purchaseLinks: [],
+        purchaseOptions: [],
+        tier,
+        gated: true,
+        upgradeHint: {
+          feature: "advanced_diagnostic_tree" as const,
+          requiredTier: "diy_pro",
+          message: "Upgrade to DIY Pro for the full diagnostic walkthrough, parts list, and torque specs.",
+        },
+      };
+      res.json(trimmed);
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ 
@@ -1444,6 +1463,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tier = await getUserTier(req.userId!);
       const hasAdvanced = tierHasFeature(tier, "advanced_listing_options");
 
+      const FREE_LISTING_LIMIT = 3;
+      if (tier === "free") {
+        const existing = await storage.getActiveListingsByUser(req.userId!);
+        if (existing.length >= FREE_LISTING_LIMIT) {
+          return res.status(402).json({
+            error: `Free tier is limited to ${FREE_LISTING_LIMIT} active listings. Upgrade to Garage Pro for unlimited listings.`,
+            upgradeRequired: true,
+            feature: "advanced_listing_options",
+            currentTier: tier,
+            requiredTier: "garage_pro",
+            requiredTierLabel: "Garage Pro",
+          });
+        }
+      }
+
       let attachedCaseId: string | null = req.body.attachedCaseId || null;
       if (attachedCaseId) {
         const attachedThread = await storage.getThread(attachedCaseId);
@@ -2108,10 +2142,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== Case Recommendations ==========
-  app.get("/api/cases/:caseId/recommendations", async (req: Request, res: Response) => {
+  app.get("/api/cases/:caseId/recommendations", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const thread = await storage.getThread(req.params.caseId);
       if (!thread) return res.status(404).json({ error: "Case not found" });
+
+      const tier = await getUserTier(req.userId ?? null);
+      const fullChecklist = tierHasFeature(tier, "full_parts_checklist");
 
       const seeded = getContextRecommendations({
         obdCodes: thread.obdCodes,
@@ -2130,12 +2167,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: r.type,
         category: r.category,
       });
+
+      const requiredTools = seeded.filter((r) => r.category === "required_tool").map(toClient);
+      const optionalTools = seeded.filter((r) => r.category === "optional_tool").map(toClient);
+      const likelyParts = seeded.filter((r) => r.category === "likely_part").map(toClient);
+      const consumables = seeded.filter((r) => r.category === "consumable").map(toClient);
+      const safetyEquipment = seeded.filter((r) => r.category === "safety_equipment").map(toClient);
+
+      const FREE_LIMITS = { optionalTools: 1, likelyParts: 2, consumables: 1 } as const;
+
       res.json({
-        requiredTools: seeded.filter((r) => r.category === "required_tool").map(toClient),
-        optionalTools: seeded.filter((r) => r.category === "optional_tool").map(toClient),
-        likelyParts: seeded.filter((r) => r.category === "likely_part").map(toClient),
-        consumables: seeded.filter((r) => r.category === "consumable").map(toClient),
-        safetyEquipment: seeded.filter((r) => r.category === "safety_equipment").map(toClient),
+        requiredTools,
+        optionalTools: fullChecklist ? optionalTools : optionalTools.slice(0, FREE_LIMITS.optionalTools),
+        likelyParts: fullChecklist ? likelyParts : likelyParts.slice(0, FREE_LIMITS.likelyParts),
+        consumables: fullChecklist ? consumables : consumables.slice(0, FREE_LIMITS.consumables),
+        safetyEquipment,
         marketplaceListings: userListings.map((l) => ({
           id: l.id,
           title: l.title,
@@ -2144,10 +2190,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
         totalCostRange: summarizeCostRange(seeded),
         affiliateNote: "Affiliate links shown when available. Always verify fitment by VIN before purchase.",
+        hiddenCounts: fullChecklist ? null : {
+          optionalTools: Math.max(0, optionalTools.length - FREE_LIMITS.optionalTools),
+          likelyParts: Math.max(0, likelyParts.length - FREE_LIMITS.likelyParts),
+          consumables: Math.max(0, consumables.length - FREE_LIMITS.consumables),
+        },
+        fullChecklist,
+        tier,
       });
     } catch (error) {
       console.error("Error fetching recommendations:", error);
       res.status(500).json({ error: "Failed to load recommendations" });
+    }
+  });
+
+  // ========== Case Tools Used (attach inventory tools to a case) ==========
+  app.get("/api/cases/:caseId/tools-used", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const items = await storage.getToolsUsedForCase(req.params.caseId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error listing case tools:", error);
+      res.status(500).json({ error: "Failed to list tools used" });
+    }
+  });
+
+  app.post("/api/cases/:caseId/tools-used", requireAuth, requireFeature("tool_inventory"), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.caseId);
+      if (!thread) return res.status(404).json({ error: "Case not found" });
+      if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can attach tools." });
+
+      const toolId = typeof req.body.toolId === "string" ? req.body.toolId : null;
+      if (!toolId) return res.status(400).json({ error: "toolId is required" });
+
+      const tool = await storage.getTool(toolId);
+      if (!tool || tool.userId !== req.userId) {
+        return res.status(403).json({ error: "Tool not found in your inventory." });
+      }
+
+      const created = await storage.attachToolToCase(req.params.caseId, toolId, req.userId!);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error attaching tool:", error);
+      res.status(500).json({ error: "Failed to attach tool" });
+    }
+  });
+
+  app.delete("/api/cases/:caseId/tools-used/:linkId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const link = await storage.getCaseToolUsed(req.params.linkId);
+      if (!link) return res.status(404).json({ error: "Attachment not found" });
+      if (link.caseId !== req.params.caseId) return res.status(404).json({ error: "Attachment not found" });
+      if (link.attachedBy !== req.userId) return res.status(403).json({ error: "Not authorized" });
+      await storage.detachToolFromCase(req.params.linkId);
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error detaching tool:", error);
+      res.status(500).json({ error: "Failed to detach tool" });
     }
   });
 

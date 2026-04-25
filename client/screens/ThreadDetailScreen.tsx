@@ -28,6 +28,7 @@ import PartsAndToolsCard from "@/components/PartsAndToolsCard";
 import EscalateCaseCard from "@/components/EscalateCaseCard";
 import RepairPlanCard from "@/components/RepairPlanCard";
 import SimilarCasesCard from "@/components/SimilarCasesCard";
+import CaseToolsUsedCard from "@/components/CaseToolsUsedCard";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -859,6 +860,11 @@ export default function ThreadDetailScreen() {
         />
         <SimilarCasesCard
           caseId={threadId}
+          onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
+        />
+        <CaseToolsUsedCard
+          caseId={threadId}
+          isAuthor={isThreadAuthor}
           onUpgrade={() => navigation.navigate("Main" as never, { screen: "MoreTab", params: { screen: "Subscription" } } as never)}
         />
         <EscalateCaseCard caseId={threadId} />

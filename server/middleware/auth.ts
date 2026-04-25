@@ -71,6 +71,22 @@ export function signJWT(payload: { sub: string; role?: string }, expiresInSecond
   });
 }
 
+export function optionalAuth(
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction
+): void {
+  const token = extractToken(req);
+  if (token) {
+    const payload = verifyJWT(token);
+    if (payload) {
+      req.userId = payload.sub;
+      req.userRole = payload.role;
+    }
+  }
+  next();
+}
+
 export function requireAuth(
   req: AuthenticatedRequest,
   res: Response,
