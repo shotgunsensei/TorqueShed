@@ -35,17 +35,36 @@ interface Props {
   onUpgrade: () => void;
 }
 
-declare const btoa: (input: string) => string;
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = "";
   const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, Array.from(chunk) as number[]);
+  let result = "";
+  const len = bytes.length;
+  let i = 0;
+  for (; i + 2 < len; i += 3) {
+    const b1 = bytes[i];
+    const b2 = bytes[i + 1];
+    const b3 = bytes[i + 2];
+    result += BASE64_ALPHABET[b1 >> 2];
+    result += BASE64_ALPHABET[((b1 & 0x03) << 4) | (b2 >> 4)];
+    result += BASE64_ALPHABET[((b2 & 0x0f) << 2) | (b3 >> 6)];
+    result += BASE64_ALPHABET[b3 & 0x3f];
   }
-  return btoa(binary);
+  if (i < len) {
+    const b1 = bytes[i];
+    result += BASE64_ALPHABET[b1 >> 2];
+    if (i + 1 < len) {
+      const b2 = bytes[i + 1];
+      result += BASE64_ALPHABET[((b1 & 0x03) << 4) | (b2 >> 4)];
+      result += BASE64_ALPHABET[(b2 & 0x0f) << 2];
+      result += "=";
+    } else {
+      result += BASE64_ALPHABET[(b1 & 0x03) << 4];
+      result += "==";
+    }
+  }
+  return result;
 }
 
 export default function RepairPlanCard({ caseId, onUpgrade }: Props) {
