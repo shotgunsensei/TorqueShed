@@ -1,0 +1,580 @@
+You are working inside the existing TorqueShed.pro codebase. Your job is to convert the current subscription/monetization system from visual/sandbox-only into a real production-ready Stripe-backed subscription system with working plan entitlements across the app.
+
+Primary goal:
+Make every monetization channel on the subscription page actually work with my Stripe account, and make every feature promised in each subscription tier functionally available or gated correctly.
+
+Important:
+Do not rebuild the app from scratch.
+Inspect the existing project structure first.
+Preserve the current TorqueShed branding, UI style, routes, components, database patterns, auth flow, and existing diagnostic/case functionality.
+Do not hardcode Stripe secrets.
+Use environment variables through Replit Secrets.
+Use Stripe-hosted Checkout and Stripe Customer Portal.
+Do not collect, store, or process raw card data inside TorqueShed.
+
+Required Replit Secrets / environment variables:
+
+STRIPE_SECRET_KEY=
+VITE_STRIPE_PUBLISHABLE_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_DIY_PRO_PRICE_ID=
+STRIPE_GARAGE_PRO_PRICE_ID=
+STRIPE_SHOP_PRO_PRICE_ID=
+APP_BASE_URL=
+
+APP_BASE_URL should point to the deployed TorqueShed URL in production.
+
+Subscription plans to implement:
+
+Free:
+Price: $0
+Features:
+- Get help from the community
+- Basic case creation
+- Basic Torque Assist summary
+- Community replies
+- Up to 3 saved cases
+- Basic parts & tool suggestions
+
+DIY Pro:
+Price: $9.99 / month
+Stripe price env: STRIPE_DIY_PRO_PRICE_ID
+Features:
+- Advanced diagnostic tree
+- Unlimited saved cases
+- PDF repair plan export
+- Full parts & tool checklist
+- Similar solved case matching
+- Priority follow-up questions
+
+Garage Pro:
+Price: $29 / month
+Stripe price env: STRIPE_GARAGE_PRO_PRICE_ID
+Features:
+- Everything in DIY Pro
+- Multiple vehicles
+- Maintenance tracking
+- Advanced repair history
+- Cost tracking & build logs
+- Saved tool inventory
+- Advanced marketplace listings
+
+Shop Pro:
+Price: $79 / month
+Stripe price env: STRIPE_SHOP_PRO_PRICE_ID
+Features:
+- Everything in Garage Pro
+- Public shop profile
+- Service listings
+- Lead capture
+- Team / member access
+- Public credibility profile
+- Customer-facing diagnostic summaries
+
+Current subscription page copy says:
+“Live billing is being finalized. Upgrades on this build are sandbox only and do not charge a real card.”
+
+Replace that with real environment-aware billing status:
+- If live Stripe keys and live price IDs are configured, show: “Secure billing powered by Stripe. Manage or cancel anytime.”
+- If test keys are configured, show: “Stripe test mode is active. No real cards will be charged.”
+- If Stripe is not configured, show an admin/developer warning only, not a customer-facing broken message.
+
+Implementation requirements:
+
+1. Stripe checkout
+
+Add backend endpoint:
+
+POST /api/billing/create-checkout-session
+
+Payload:
+{
+  "plan": "diy_pro" | "garage_pro" | "shop_pro"
+}
+
+Behavior:
+- Requires authenticated user.
+- Looks up the correct Stripe Price ID from env.
+- Creates or reuses a Stripe customer for the current user.
+- Creates a Stripe Checkout subscription session.
+- Includes metadata:
+  userId
+  plan
+  app: "torqueshed"
+- success_url should return to /account/billing?checkout=success
+- cancel_url should return to /pricing or /account/billing?checkout=cancelled
+- Return session.url to the frontend.
+
+Frontend behavior:
+- Upgrade buttons must call this endpoint.
+- Redirect user to Stripe Checkout.
+- Disable button and show loading state while session is being created.
+- Show clear errors if Stripe config is missing.
+
+2. Stripe customer portal
+
+Add backend endpoint:
+
+POST /api/billing/create-portal-session
+
+Behavior:
+- Requires authenticated user.
+- Requires the user to have a Stripe customer ID.
+- Opens Stripe Customer Portal.
+- Return URL should be /account/billing.
+- Billing page should show “Manage Billing” for paid users.
+
+3. Stripe webhook
+
+Add backend endpoint:
+
+POST /api/stripe/webhook
+
+Important:
+- Must use raw request body for Stripe signature verification.
+- Verify using STRIPE_WEBHOOK_SECRET.
+- Handle these events:
+  - checkout.session.completed
+  - customer.subscription.created
+  - customer.subscription.updated
+  - customer.subscription.deleted
+  - invoice.payment_succeeded
+  - invoice.payment_failed
+
+Webhook behavior:
+- Match Stripe customer/subscription metadata back to the TorqueShed user.
+- Store subscription status in the database.
+- Store:
+  stripeCustomerId
+  stripeSubscriptionId
+  stripePriceId
+  plan
+  status
+  currentPeriodStart
+  currentPeriodEnd
+  cancelAtPeriodEnd
+- Active access should be granted only for:
+  active
+  trialing
+- past_due should keep read access but block premium actions with a billing warning.
+- canceled, unpaid, incomplete_expired should downgrade to Free entitlements.
+- Free users do not need a Stripe subscription record.
+
+4. Database schema
+
+Add or update database tables/models as needed.
+
+Required subscription fields:
+- userId
+- stripeCustomerId
+- stripeSubscriptionId
+- stripePriceId
+- plan
+- status
+- currentPeriodStart
+- currentPeriodEnd
+- cancelAtPeriodEnd
+- createdAt
+- updatedAt
+
+Required plan enum:
+free
+diy_pro
+garage_pro
+shop_pro
+
+Required helper:
+getUserPlan(userId)
+getUserEntitlements(userId)
+requirePlan(userId, minimumPlan)
+canUseFeature(userId, featureKey)
+
+Use one centralized entitlement map. Do not scatter plan logic randomly across components.
+
+Plan hierarchy:
+free = 0
+diy_pro = 1
+garage_pro = 2
+shop_pro = 3
+
+5. Entitlement system
+
+Create a single source of truth for feature access.
+
+Feature keys should include:
+
+basic_case_creation
+basic_torque_assist
+community_replies
+saved_cases_limit_3
+basic_parts_tools
+
+advanced_diagnostic_tree
+unlimited_saved_cases
+pdf_repair_export
+full_parts_tool_checklist
+similar_case_matching
+priority_follow_up_questions
+
+multiple_vehicles
+maintenance_tracking
+advanced_repair_history
+cost_tracking_build_logs
+saved_tool_inventory
+advanced_marketplace_listings
+
+public_shop_profile
+service_listings
+lead_capture
+team_member_access
+public_credibility_profile
+customer_facing_summaries
+
+Every promised subscription-page feature must either:
+- Actually work, or
+- Be gated with an upgrade prompt that takes the user to Stripe Checkout.
+
+No dead buttons.
+No fake “coming soon” for paid features.
+No sandbox-only upgrade behavior.
+
+6. Free plan saved case limit
+
+Free users may save up to 3 cases.
+
+Implement real enforcement:
+- Allow Free users to create and save up to 3 active saved cases.
+- If they attempt to save a 4th case, block the action and show an upgrade prompt for DIY Pro.
+- Paid users get unlimited saved cases.
+- Existing users with more than 3 cases should keep read access, but Free users should not be able to create additional saved cases until upgrading or deleting old ones.
+
+7. DIY Pro feature implementation
+
+Advanced diagnostic tree:
+- Create or upgrade the diagnostic workflow so DIY Pro and above users get a guided diagnostic decision tree.
+- It should ask symptom-specific follow-up questions.
+- It should produce probable causes, suggested tests, safety notes, estimated difficulty, needed tools, and next steps.
+- Free users only get a basic Torque Assist summary.
+
+PDF repair plan export:
+- Add a working “Export PDF” button on eligible case/repair plan pages.
+- The PDF should include:
+  - Case title
+  - Vehicle information
+  - Symptoms
+  - Diagnostic summary
+  - Probable causes
+  - Recommended test steps
+  - Parts list
+  - Tools list
+  - Safety warnings
+  - Estimated difficulty
+  - Timestamp
+  - TorqueShed branding
+- Free users should see the button locked with an upgrade prompt.
+
+Full parts & tool checklist:
+- DIY Pro and above should get expanded parts/tools with categories:
+  - Required tools
+  - Optional tools
+  - Replacement parts
+  - Consumables
+  - Safety equipment
+  - Estimated cost ranges
+- Free users get only basic suggestions.
+
+Similar solved case matching:
+- Implement a basic working matching system using existing saved cases.
+- Match by vehicle year/make/model, symptom keywords, codes, tags, and repair result.
+- Show similar solved cases with confidence/relevance score.
+- If no matches exist, show a useful empty state.
+- Free users see this locked.
+
+Priority follow-up questions:
+- Add a visible “Priority follow-up” indicator or enhanced queue behavior for DIY Pro and above.
+- At minimum, priority questions should be labeled and sorted above Free questions in community/case reply areas.
+
+8. Garage Pro feature implementation
+
+Multiple vehicles:
+- Free and DIY Pro can use one primary vehicle unless existing app behavior already allows more.
+- Garage Pro and Shop Pro can create/manage multiple vehicles.
+- Add vehicle CRUD if missing:
+  - year
+  - make
+  - model
+  - trim
+  - engine
+  - drivetrain
+  - VIN optional
+  - mileage
+  - notes
+
+Maintenance tracking:
+- Add maintenance records per vehicle:
+  - service type
+  - mileage
+  - date
+  - notes
+  - cost
+  - next due mileage/date
+- Add dashboard view for upcoming maintenance.
+
+Advanced repair history:
+- Allow linking cases to vehicles and repair records.
+- Track:
+  - diagnosis
+  - parts replaced
+  - labor hours
+  - cost
+  - outcome
+  - photos/attachments if the app already supports uploads
+  - resolved/unresolved status
+
+Cost tracking & build logs:
+- Add build log entries per vehicle:
+  - title
+  - category
+  - cost
+  - vendor/source
+  - install date
+  - notes
+- Add total cost summary per vehicle.
+
+Saved tool inventory:
+- Add tool inventory CRUD:
+  - tool name
+  - category
+  - brand
+  - model
+  - condition
+  - notes
+  - replacement value
+- Allow associating tools with repair plans/checklists.
+
+Advanced marketplace listings:
+- Add or upgrade marketplace listing functionality:
+  - title
+  - category: part, tool, service, vehicle, other
+  - price
+  - condition
+  - location
+  - description
+  - contact method
+  - photos if uploads exist
+  - active/sold/draft status
+- Free users can view basic listings if already supported.
+- Advanced listing creation/editing is Garage Pro and above.
+
+9. Shop Pro feature implementation
+
+Public shop profile:
+- Create public route:
+  /shops/:slug
+
+Shop profile fields:
+- shop name
+- slug
+- logo/image if upload support exists
+- description
+- phone
+- email
+- website
+- service area
+- address optional
+- specialties
+- certifications
+- years in business
+- hours
+- public visibility toggle
+
+Service listings:
+- Shop Pro users can create service listings:
+  - service name
+  - category
+  - description
+  - starting price
+  - estimated turnaround
+  - active/inactive
+- Display services on the public shop profile.
+
+Lead capture:
+- Add public lead form on shop profile:
+  - name
+  - email
+  - phone
+  - vehicle
+  - issue description
+  - preferred contact method
+- Store leads in database.
+- Show leads in Shop Pro dashboard.
+- If email integration does not exist, do not fake email sending. Store the lead and show an admin notification/dashboard badge.
+
+Team / member access:
+- Add basic team membership support for Shop Pro:
+  - owner
+  - admin
+  - technician
+  - viewer
+- Owner can invite/add team members by email.
+- Team members can access shop cases depending on role.
+- Do not allow Free/DIY/Garage users to add team members.
+
+Public credibility profile:
+- Display public credibility info:
+  - solved case count
+  - specialties
+  - certifications
+  - years active
+  - marketplace/service listings
+  - customer-facing summary count if available
+- Allow shop owner to edit public-facing credibility fields.
+
+Customer-facing diagnostic summaries:
+- Add a shareable customer summary for Shop Pro cases.
+- Route format:
+  /public/diagnostic-summary/:token
+- Summary should be read-only and safe for customers.
+- Include:
+  - shop name
+  - vehicle
+  - customer concern
+  - diagnostic findings
+  - recommended repairs
+  - urgency level
+  - estimate notes
+  - next steps
+- Do not expose internal notes unless explicitly marked customer-visible.
+- Add token generation and revoke/regenerate ability.
+
+10. Pricing/subscription page UI
+
+Update the subscription page so it accurately reflects the current user plan.
+
+For each plan card:
+- Free should show “Current” only if user is Free.
+- Paid plan should show:
+  - “Current” if active on that plan
+  - “Upgrade” if higher than current plan
+  - “Manage Billing” if already subscribed
+  - “Downgrade in Billing Portal” if lower than current paid tier
+- Buttons should not be fake.
+- Buttons must create Stripe Checkout sessions.
+- Billing portal should be available from Account/Billing.
+
+Add clear locked feature UI:
+- Use lock icon or clear premium badge.
+- Locked actions should explain the needed plan.
+- CTA should route to Stripe Checkout for the correct plan.
+
+11. Account billing page
+
+Create or update /account/billing.
+
+Must show:
+- Current plan
+- Subscription status
+- Renewal date
+- Cancel at period end status
+- Stripe customer status
+- Manage Billing button
+- Plan feature summary
+- Upgrade options
+- Payment issue warning if past_due or unpaid
+
+12. Security and production standards
+
+- Never expose STRIPE_SECRET_KEY to frontend.
+- Frontend only uses VITE_STRIPE_PUBLISHABLE_KEY if needed.
+- Use backend endpoints for Checkout and Portal session creation.
+- Validate authenticated user on all billing endpoints.
+- Verify Stripe webhook signatures.
+- Use raw body only on webhook endpoint.
+- Add server-side entitlement checks, not just frontend locks.
+- Prevent users from manually changing plan through client requests.
+- Do not trust client-supplied plan for entitlement changes.
+- Stripe webhook/database state is source of truth.
+
+13. Admin/developer diagnostics
+
+Add a small protected admin/developer billing health check route or server log output that verifies:
+- Stripe secret key present
+- Publishable key present
+- Webhook secret present
+- DIY Pro price ID present
+- Garage Pro price ID present
+- Shop Pro price ID present
+- App base URL present
+
+Do not expose secret values.
+Show only configured/missing.
+
+14. Testing and seed behavior
+
+Add practical test coverage or manual test checklist in the repo.
+
+Required test checklist:
+- Free user can create up to 3 saved cases.
+- Free user is blocked on 4th saved case.
+- Free user sees locked PDF export.
+- DIY Pro user can export PDF.
+- DIY Pro user can access advanced diagnostic tree.
+- Garage Pro user can add multiple vehicles.
+- Garage Pro user can create maintenance records and tool inventory.
+- Shop Pro user can create public shop profile.
+- Shop Pro user can create service listings.
+- Shop Pro public lead capture stores leads.
+- Shop Pro customer diagnostic summary link works.
+- Stripe Checkout session is created successfully.
+- Stripe Customer Portal session is created successfully.
+- Webhook updates subscription status.
+- Cancelled subscription downgrades entitlements.
+- past_due subscription blocks premium actions with warning.
+
+15. Migration and compatibility
+
+- Add database migrations safely.
+- Do not delete existing user data.
+- Do not break existing cases.
+- If a required field is missing on existing records, backfill safely with defaults.
+- Make all new features mobile-first and responsive.
+
+16. Deliverables
+
+At the end, provide:
+- Summary of files changed
+- Environment variables required
+- Stripe dashboard setup instructions
+- Webhook URL to configure
+- Manual test checklist
+- Any known limitations
+
+Expected Stripe dashboard setup:
+
+Create these Stripe products/prices if they do not already exist:
+
+Product: TorqueShed DIY Pro
+Recurring monthly price: $9.99
+Store price ID in STRIPE_DIY_PRO_PRICE_ID
+
+Product: TorqueShed Garage Pro
+Recurring monthly price: $29.00
+Store price ID in STRIPE_GARAGE_PRO_PRICE_ID
+
+Product: TorqueShed Shop Pro
+Recurring monthly price: $79.00
+Store price ID in STRIPE_SHOP_PRO_PRICE_ID
+
+Webhook endpoint:
+APP_BASE_URL/api/stripe/webhook
+
+Webhook events:
+checkout.session.completed
+customer.subscription.created
+customer.subscription.updated
+customer.subscription.deleted
+invoice.payment_succeeded
+invoice.payment_failed
+
+Final requirement:
+Do not leave the subscription page as a marketing shell. The subscription system must become the access-control backbone of TorqueShed. Every paid feature listed on the pricing page must either be implemented as working MVP functionality or properly gated behind Stripe-backed entitlements.
