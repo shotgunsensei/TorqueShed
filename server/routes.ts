@@ -2252,6 +2252,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Tool not found in your inventory." });
       }
 
+      const existing = await storage.getToolsUsedForCase(req.params.caseId);
+      if (existing.some((l) => l.toolId === toolId)) {
+        return res.status(409).json({ error: "This tool is already attached to this case." });
+      }
+
       const created = await storage.attachToolToCase(req.params.caseId, toolId, req.userId!);
       res.status(201).json({
         id: created.id,
