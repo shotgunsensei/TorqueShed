@@ -2317,7 +2317,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (threadOwnerId === userId) return { thread, ownerUserId: threadOwnerId };
     const role = await storage.getTeamRole(threadOwnerId, userId);
     if (role && (allowedTeamRoles as string[]).includes(role)) {
-      return { thread, ownerUserId: threadOwnerId };
+      // Mirror hasThreadAccess: team membership only counts when the case
+      // owner currently has the team_access feature.
+      if (await userHasFeature(threadOwnerId, "team_access")) {
+        return { thread, ownerUserId: threadOwnerId };
+      }
     }
     return null;
   }

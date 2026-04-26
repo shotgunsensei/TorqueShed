@@ -920,7 +920,7 @@ export type CreateShopLeadInput = z.infer<typeof createShopLeadSchema>;
 
 export const inviteTeamMemberSchema = z.object({
   username: z.string().min(1, "Username is required"),
-  role: z.enum(SHOP_TEAM_ROLES).default("technician"),
+  role: z.enum(["admin", "technician", "viewer"] as const).default("technician"),
 });
 export type InviteTeamMemberInput = z.infer<typeof inviteTeamMemberSchema>;
 
