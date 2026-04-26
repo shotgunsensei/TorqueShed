@@ -1412,6 +1412,26 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(shopLeads.createdAt));
   }
 
+  async listAccessibleShopLeads(userId: string): Promise<ShopLead[]> {
+    const teamOwners = await this.getOwnersForTeamMember(userId);
+    const ownerIds = Array.from(new Set([userId, ...teamOwners.map((t) => t.ownerUserId)]));
+    return db
+      .select()
+      .from(shopLeads)
+      .where(inArray(shopLeads.ownerUserId, ownerIds))
+      .orderBy(desc(shopLeads.createdAt));
+  }
+
+  async getAccessibleUnreadLeadCount(userId: string): Promise<number> {
+    const teamOwners = await this.getOwnersForTeamMember(userId);
+    const ownerIds = Array.from(new Set([userId, ...teamOwners.map((t) => t.ownerUserId)]));
+    const rows = await db
+      .select({ id: shopLeads.id })
+      .from(shopLeads)
+      .where(and(inArray(shopLeads.ownerUserId, ownerIds), eq(shopLeads.isRead, false)));
+    return rows.length;
+  }
+
   async getShopLead(id: string): Promise<ShopLead | undefined> {
     const [l] = await db.select().from(shopLeads).where(eq(shopLeads.id, id)).limit(1);
     return l || undefined;

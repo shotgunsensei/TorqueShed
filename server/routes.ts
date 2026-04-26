@@ -53,7 +53,7 @@ import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
-import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature } from "./entitlements";
+import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature, requireFeatureOrTeam } from "./entitlements";
 import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
@@ -2112,13 +2112,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // ========== Shop Pro: Leads ==========
+  // Resolve which owner IDs the requester can act on for a feature: requester themselves
+  // (only if they personally have the feature) plus any team owners that have the feature.
+  async function resolveAccessibleOwnerIdsForFeature(userId: string, feature: import("./entitlements").Feature): Promise<string[]> {
+    const ids = new Set<string>();
+    if (await userHasFeature(userId, feature)) ids.add(userId);
+    const owners = await storage.getOwnersForTeamMember(userId);
+    for (const o of owners) {
+      if (await userHasFeature(o.ownerUserId, feature)) ids.add(o.ownerUserId);
+    }
+    return Array.from(ids);
+  }
+
   app.get(
     "/api/shop-leads",
     requireAuth,
-    requireFeature("lead_capture"),
+    requireFeatureOrTeam("lead_capture"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const items = await storage.listShopLeads(req.userId!);
+        const ownerIds = await resolveAccessibleOwnerIdsForFeature(req.userId!, "lead_capture");
+        const all = await storage.listAccessibleShopLeads(req.userId!);
+        const items = all.filter((l) => ownerIds.includes(l.ownerUserId));
         res.json(items);
       } catch (error) {
         console.error("Error listing shop leads:", error);
@@ -2130,10 +2144,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/shop-leads/unread-count",
     requireAuth,
-    requireFeature("lead_capture"),
+    requireFeatureOrTeam("lead_capture"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const count = await storage.getUnreadLeadCount(req.userId!);
+        const ownerIds = await resolveAccessibleOwnerIdsForFeature(req.userId!, "lead_capture");
+        if (ownerIds.length === 0) return res.json({ count: 0 });
+        const all = await storage.listAccessibleShopLeads(req.userId!);
+        const count = all.filter((l) => ownerIds.includes(l.ownerUserId) && l.isRead === false).length;
         res.json({ count });
       } catch (error) {
         console.error("Error getting unread leads:", error);
@@ -2145,12 +2162,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch(
     "/api/shop-leads/:id",
     requireAuth,
-    requireFeature("lead_capture"),
+    requireFeatureOrTeam("lead_capture"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const existing = await storage.getShopLead(req.params.id);
         if (!existing) return res.status(404).json({ error: "Lead not found" });
-        if (existing.ownerUserId !== req.userId) return res.status(403).json({ error: "Not your lead" });
+        // The lead's owner must have the lead_capture feature; otherwise no one can act on it.
+        if (!(await userHasFeature(existing.ownerUserId, "lead_capture"))) {
+          return res.status(402).json({ error: "Lead owner does not have an active Shop Pro subscription." });
+        }
+        const isOwner = existing.ownerUserId === req.userId;
+        let allowed = isOwner;
+        if (!allowed) {
+          const role = await storage.getTeamRole(existing.ownerUserId, req.userId!);
+          if (role === "admin" || role === "technician") allowed = true;
+        }
+        if (!allowed) return res.status(403).json({ error: "You do not have access to this lead" });
         const isRead = req.body?.isRead === true || req.body?.isRead === false ? req.body.isRead : true;
         const updated = await storage.markLeadRead(req.params.id, isRead);
         res.json(updated);
@@ -2215,17 +2242,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // ========== Shop Pro: Customer Diagnostic Summaries ==========
+  function mapSummaryForOwner(row: Awaited<ReturnType<typeof storage.getCustomerSummaryByCase>>) {
+    if (!row) return null;
+    const { token, ...rest } = row as typeof row & { token: string };
+    return { ...rest, shareToken: token };
+  }
+
+  async function getCaseAccessOwnerForSummary(
+    caseId: string,
+    userId: string,
+    allowedTeamRoles: ("admin" | "technician" | "viewer")[] = ["admin", "technician", "viewer"],
+  ): Promise<{ thread: NonNullable<Awaited<ReturnType<typeof storage.getThread>>>; ownerUserId: string } | null> {
+    const thread = await storage.getThread(caseId);
+    if (!thread) return null;
+    const threadOwnerId = thread.userId;
+    if (!threadOwnerId) return null;
+    if (threadOwnerId === userId) return { thread, ownerUserId: threadOwnerId };
+    const role = await storage.getTeamRole(threadOwnerId, userId);
+    if (role && (allowedTeamRoles as string[]).includes(role)) {
+      return { thread, ownerUserId: threadOwnerId };
+    }
+    return null;
+  }
+
   app.get(
     "/api/cases/:caseId/customer-summary",
     requireAuth,
-    requireFeature("customer_diagnostic_summaries"),
+    requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const thread = await storage.getThread(req.params.caseId);
-        if (!thread) return res.status(404).json({ error: "Case not found" });
-        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can view this." });
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!);
+        if (!access) return res.status(403).json({ error: "You do not have access to this case." });
+        if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
+          return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
+        }
         const summary = await storage.getCustomerSummaryByCase(req.params.caseId);
-        res.json({ summary: summary ?? null });
+        res.json({ summary: mapSummaryForOwner(summary) });
       } catch (error) {
         console.error("Error fetching customer summary:", error);
         res.status(500).json({ error: "Failed to load summary" });
@@ -2236,16 +2288,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/cases/:caseId/customer-summary",
     requireAuth,
-    requireFeature("customer_diagnostic_summaries"),
+    requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const thread = await storage.getThread(req.params.caseId);
-        if (!thread) return res.status(404).json({ error: "Case not found" });
-        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can manage this." });
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["admin", "technician"]);
+        if (!access) return res.status(403).json({ error: "You do not have write access to this case." });
+        if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
+          return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
+        }
         const parsed = upsertCustomerSummarySchema.parse(req.body);
         const token = crypto.randomBytes(24).toString("hex");
-        const saved = await storage.upsertCustomerSummary(req.params.caseId, req.userId!, parsed, token);
-        res.json(saved);
+        const saved = await storage.upsertCustomerSummary(req.params.caseId, access.ownerUserId, parsed, token);
+        res.json(mapSummaryForOwner(saved));
       } catch (error) {
         if (error instanceof ZodError) {
           return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
@@ -2259,16 +2313,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/cases/:caseId/customer-summary/rotate",
     requireAuth,
-    requireFeature("customer_diagnostic_summaries"),
+    requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const thread = await storage.getThread(req.params.caseId);
-        if (!thread) return res.status(404).json({ error: "Case not found" });
-        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can manage this." });
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["admin", "technician"]);
+        if (!access) return res.status(403).json({ error: "You do not have write access to this case." });
+        if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
+          return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
+        }
         const newToken = crypto.randomBytes(24).toString("hex");
         const updated = await storage.rotateCustomerSummaryToken(req.params.caseId, newToken);
         if (!updated) return res.status(404).json({ error: "No summary to rotate" });
-        res.json(updated);
+        res.json(mapSummaryForOwner(updated));
       } catch (error) {
         console.error("Error rotating summary token:", error);
         res.status(500).json({ error: "Failed to rotate token" });
@@ -2279,12 +2335,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete(
     "/api/cases/:caseId/customer-summary",
     requireAuth,
-    requireFeature("customer_diagnostic_summaries"),
+    requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const thread = await storage.getThread(req.params.caseId);
-        if (!thread) return res.status(404).json({ error: "Case not found" });
-        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can manage this." });
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["admin", "technician"]);
+        if (!access) return res.status(403).json({ error: "You do not have write access to this case." });
+        if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
+          return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
+        }
         await storage.revokeCustomerSummary(req.params.caseId);
         res.json({ ok: true });
       } catch (error) {

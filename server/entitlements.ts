@@ -137,3 +137,32 @@ export function requireFeature(feature: Feature) {
     });
   };
 }
+
+export async function userOrTeamHasFeature(userId: string, feature: Feature): Promise<boolean> {
+  if (await userHasFeature(userId, feature)) return true;
+  const owners = await storage.getOwnersForTeamMember(userId);
+  for (const o of owners) {
+    if (await userHasFeature(o.ownerUserId, feature)) return true;
+  }
+  return false;
+}
+
+export function requireFeatureOrTeam(feature: Feature) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = (req as AuthenticatedRequest).userId;
+    if (!userId) return res.status(401).json({ error: "Authentication required" });
+    if (await userOrTeamHasFeature(userId, feature)) {
+      return next();
+    }
+    const required = minimumTierFor(feature);
+    const tier = await getUserTier(userId);
+    return res.status(402).json({
+      error: `This feature requires ${TIER_LABEL[required]} or higher.`,
+      upgradeRequired: true,
+      feature,
+      currentTier: tier,
+      requiredTier: required,
+      requiredTierLabel: TIER_LABEL[required],
+    });
+  };
+}

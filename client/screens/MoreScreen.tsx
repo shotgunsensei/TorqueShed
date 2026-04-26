@@ -1,5 +1,6 @@
 import React from "react";
 import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -26,6 +27,7 @@ interface MenuItem {
   screen?: keyof MoreStackParamList;
   tab?: string;
   toastMessage?: string;
+  badgeKey?: "leads";
 }
 
 const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
@@ -51,7 +53,7 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
     items: [
       { label: "Shop Profile", icon: "home", action: "stack", screen: "ShopProfile", description: "Your public-facing shop page" },
       { label: "Services", icon: "list", action: "stack", screen: "ShopServices", description: "Services you offer with pricing" },
-      { label: "Customer Leads", icon: "inbox", action: "stack", screen: "ShopLeads", description: "Inquiries from your shop page" },
+      { label: "Customer Leads", icon: "inbox", action: "stack", screen: "ShopLeads", description: "Inquiries from your shop page", badgeKey: "leads" },
       { label: "Team", icon: "users", action: "stack", screen: "ShopTeam", description: "Invite techs and advisors to your shop" },
     ],
   },
@@ -72,7 +74,16 @@ export default function MoreScreen() {
   const tabBarHeight = useSafeTabBarHeight();
   const headerHeight = useHeaderHeight();
   const toast = useToast();
-  const { tier } = useEntitlements();
+  const { tier, hasFeature } = useEntitlements();
+  const leadCaptureEnabled = hasFeature("lead_capture");
+  const { data: unreadLeads } = useQuery<{ count: number }>({
+    queryKey: ["/api/shop-leads/unread-count"],
+    enabled: leadCaptureEnabled,
+    refetchInterval: 60_000,
+  });
+  const badgeCounts: Partial<Record<NonNullable<MenuItem["badgeKey"]>, number>> = {
+    leads: unreadLeads?.count ?? 0,
+  };
 
   const userRole = getUserRoleDisplay(currentUser?.role);
 
@@ -134,26 +145,39 @@ export default function MoreScreen() {
         <View key={group.title} style={styles.group}>
           <ThemedText type="caption" style={[styles.groupTitle, { color: theme.textMuted }]}>{group.title.toUpperCase()}</ThemedText>
           <View style={styles.menuList}>
-            {group.items.map((item) => (
-              <Card
-                key={item.label}
-                onPress={() => handleMenuPress(item)}
-                testID={`menu-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-              >
-                <View style={styles.menuItem}>
-                  <View style={[styles.menuIcon, { backgroundColor: theme.primary + "15" }]}>
-                    <Feather name={item.icon} size={22} color={theme.primary} />
+            {group.items.map((item) => {
+              const badge = item.badgeKey ? badgeCounts[item.badgeKey] ?? 0 : 0;
+              return (
+                <Card
+                  key={item.label}
+                  onPress={() => handleMenuPress(item)}
+                  testID={`menu-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <View style={styles.menuItem}>
+                    <View style={[styles.menuIcon, { backgroundColor: theme.primary + "15" }]}>
+                      <Feather name={item.icon} size={22} color={theme.primary} />
+                    </View>
+                    <View style={styles.menuText}>
+                      <ThemedText type="h4">{item.label}</ThemedText>
+                      <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                        {item.description}
+                      </ThemedText>
+                    </View>
+                    {badge > 0 ? (
+                      <View
+                        style={[styles.badge, { backgroundColor: theme.primary }]}
+                        testID={`menu-badge-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <ThemedText type="caption" style={{ color: "#fff", fontWeight: "700" }}>
+                          {badge > 99 ? "99+" : String(badge)}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                    <Feather name="chevron-right" size={20} color={theme.textMuted} />
                   </View>
-                  <View style={styles.menuText}>
-                    <ThemedText type="h4">{item.label}</ThemedText>
-                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                      {item.description}
-                    </ThemedText>
-                  </View>
-                  <Feather name="chevron-right" size={20} color={theme.textMuted} />
-                </View>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </View>
         </View>
       ))}
@@ -211,5 +235,14 @@ const styles = StyleSheet.create({
   menuText: {
     flex: 1,
     marginLeft: Spacing.md,
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Spacing.sm,
   },
 });
