@@ -1202,9 +1202,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/threads/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const all = await storage.getAllThreads();
+      // Include the user's own cases plus any cases owned by Shop Pro accounts
+      // they're a team member of (when the owner actually has team_access).
+      const teamOwners = await storage.getOwnersForTeamMember(req.userId!);
+      const accessibleOwnerIds = new Set<string>([req.userId!]);
+      for (const o of teamOwners) {
+        if (await userHasFeature(o.ownerUserId, "team_access")) {
+          accessibleOwnerIds.add(o.ownerUserId);
+        }
+      }
       const mine = all
-        .filter((t) => t.userId === req.userId)
-        .map((t) => ({ id: t.id, title: t.title, status: t.status, hasSolution: t.hasSolution }));
+        .filter((t) => t.userId && accessibleOwnerIds.has(t.userId))
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          hasSolution: t.hasSolution,
+          isOwn: t.userId === req.userId,
+        }));
       res.json(mine);
     } catch (error) {
       console.error("Error fetching my threads:", error);
@@ -1310,7 +1325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     thread: { userId: string | null },
     userId: string,
     userRole: string | undefined,
-    allowedTeamRoles: ("admin" | "technician" | "viewer")[],
+    allowedTeamRoles: ("owner" | "admin" | "technician" | "viewer")[],
   ): Promise<boolean> {
     if (userRole === "admin") return true;
     if (thread.userId && thread.userId === userId) return true;
@@ -1351,7 +1366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin", "technician"]))) {
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["owner", "admin", "technician"]))) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -1382,7 +1397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin"]))) {
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["owner", "admin"]))) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -1431,7 +1446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin", "technician"]))) {
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["owner", "admin", "technician"]))) {
         return res.status(403).json({ error: "Only the case owner or shop team can change status" });
       }
 
@@ -1456,7 +1471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin", "technician"]))) {
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["owner", "admin", "technician"]))) {
         return res.status(403).json({ error: "Only the case owner or shop team can mark solved" });
       }
 
@@ -2293,7 +2308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function getCaseAccessOwnerForSummary(
     caseId: string,
     userId: string,
-    allowedTeamRoles: ("admin" | "technician" | "viewer")[] = ["admin", "technician", "viewer"],
+    allowedTeamRoles: ("owner" | "admin" | "technician" | "viewer")[] = ["owner", "admin", "technician", "viewer"],
   ): Promise<{ thread: NonNullable<Awaited<ReturnType<typeof storage.getThread>>>; ownerUserId: string } | null> {
     const thread = await storage.getThread(caseId);
     if (!thread) return null;
@@ -2333,7 +2348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["admin", "technician"]);
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["owner", "admin", "technician"]);
         if (!access) return res.status(403).json({ error: "You do not have write access to this case." });
         if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
           return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
@@ -2358,7 +2373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["admin", "technician"]);
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["owner", "admin", "technician"]);
         if (!access) return res.status(403).json({ error: "You do not have write access to this case." });
         if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
           return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
@@ -2380,7 +2395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireFeatureOrTeam("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
-        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["admin", "technician"]);
+        const access = await getCaseAccessOwnerForSummary(req.params.caseId, req.userId!, ["owner", "admin", "technician"]);
         if (!access) return res.status(403).json({ error: "You do not have write access to this case." });
         if (!(await userHasFeature(access.ownerUserId, "customer_diagnostic_summaries"))) {
           return res.status(402).json({ error: "Case owner does not have an active Shop Pro subscription." });
