@@ -293,13 +293,13 @@ type ThemePalette = ReturnType<typeof useTheme>["theme"];
 function urgencyStyle(level: string, theme: ThemePalette) {
   if (level === "high") return { backgroundColor: theme.error + "20", borderColor: theme.error };
   if (level === "low") return { backgroundColor: theme.success + "20", borderColor: theme.success };
-  return { backgroundColor: theme.warning + "20", borderColor: theme.warning };
+  return { backgroundColor: theme.accent + "20", borderColor: theme.accent };
 }
 
 function urgencyTextColor(level: string, theme: ThemePalette) {
   if (level === "high") return theme.error;
   if (level === "low") return theme.success;
-  return theme.warning;
+  return theme.accent;
 }
 
 const styles = StyleSheet.create({
