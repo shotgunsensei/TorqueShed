@@ -82,7 +82,8 @@ export default function CustomerSummaryCard({ caseId, isAuthor, onUpgrade }: Pro
     setCustomerConcern(summary?.customerConcern ?? "");
     setDiagnosticFindings(summary?.diagnosticFindings ?? "");
     setRecommendedRepairs(summary?.recommendedRepairs ?? "");
-    setUrgencyLevel((summary?.urgencyLevel as any) ?? "medium");
+    const u = summary?.urgencyLevel;
+    setUrgencyLevel(u === "low" || u === "medium" || u === "high" ? u : "medium");
     setEstimateNotes(summary?.estimateNotes ?? "");
     setNextSteps(summary?.nextSteps ?? "");
     setShowForm(true);

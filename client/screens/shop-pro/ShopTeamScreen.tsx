@@ -49,7 +49,7 @@ export default function ShopTeamScreen() {
   });
 
   const [username, setUsername] = useState("");
-  const [role, setRole] = useState("tech");
+  const [role, setRole] = useState("technician");
 
   const invite = useMutation({
     mutationFn: async () => {
@@ -61,7 +61,7 @@ export default function ShopTeamScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/shop-team"] });
       toast.show("Team member added", "success");
       setUsername("");
-      setRole("tech");
+      setRole("technician");
     },
     onError: (err: Error) => toast.show(err.message || "Failed to add member", "error"),
   });

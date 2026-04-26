@@ -69,6 +69,14 @@
   var token = window.location.pathname.split('/').filter(Boolean).pop();
   var root = document.getElementById('root');
 
+  function safeUrl(u) {
+    if (u == null) return '';
+    var s = String(u).trim();
+    if (!s) return '';
+    if (/^(https?:|mailto:|tel:)/i.test(s)) return esc(s);
+    if (/^\/[^\/]/.test(s)) return esc(s);
+    return '';
+  }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
       return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'})[c];
