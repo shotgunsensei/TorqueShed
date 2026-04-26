@@ -1303,13 +1303,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team-aware thread access: returns true if requester is the case author,
+  // a global admin, or a Shop Pro team member of the case author with one of
+  // the allowed roles AND the author has the team_access feature.
+  async function hasThreadAccess(
+    thread: { userId: string | null },
+    userId: string,
+    userRole: string | undefined,
+    allowedTeamRoles: ("admin" | "technician" | "viewer")[],
+  ): Promise<boolean> {
+    if (userRole === "admin") return true;
+    if (thread.userId && thread.userId === userId) return true;
+    if (!thread.userId) return false;
+    const role = await storage.getTeamRole(thread.userId, userId);
+    if (!role || !(allowedTeamRoles as string[]).includes(role)) return false;
+    return await userHasFeature(thread.userId, "team_access");
+  }
+
+  // Lightweight viewer-access endpoint so the UI can decide whether to show
+  // owner-restricted features (customer summary, team-only actions).
+  app.get("/api/threads/:id/viewer-access", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thread = await storage.getThread(req.params.id);
+      if (!thread) return res.status(404).json({ error: "Thread not found" });
+      const isAuthor = thread.userId === req.userId;
+      let teamRole: string | null = null;
+      if (!isAuthor && thread.userId) {
+        const r = await storage.getTeamRole(thread.userId, req.userId!);
+        teamRole = r ?? null;
+      }
+      const ownerHasTeamAccess = thread.userId ? await userHasFeature(thread.userId, "team_access") : false;
+      const ownerHasSummaryFeature = thread.userId ? await userHasFeature(thread.userId, "customer_diagnostic_summaries") : false;
+      const canManageSummary =
+        ownerHasSummaryFeature && (isAuthor || (teamRole === "admin" || teamRole === "technician") && ownerHasTeamAccess);
+      const canViewSummary =
+        ownerHasSummaryFeature && (isAuthor || (!!teamRole && ownerHasTeamAccess));
+      res.json({ isAuthor, teamRole, canManageSummary, canViewSummary });
+    } catch (error) {
+      console.error("Error getting viewer access:", error);
+      res.status(500).json({ error: "Failed to load viewer access" });
+    }
+  });
+
   app.patch("/api/threads/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const thread = await storage.getThread(req.params.id);
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (thread.userId !== req.userId && req.userRole !== "admin") {
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin", "technician"]))) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -1340,7 +1382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (thread.userId !== req.userId && req.userRole !== "admin") {
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin"]))) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -1389,8 +1431,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (thread.userId !== req.userId && req.userRole !== "admin") {
-        return res.status(403).json({ error: "Only the case owner can change status" });
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin", "technician"]))) {
+        return res.status(403).json({ error: "Only the case owner or shop team can change status" });
       }
 
       const { status } = updateThreadStatusSchema.parse(req.body);
@@ -1414,8 +1456,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!thread) {
         return res.status(404).json({ error: "Thread not found" });
       }
-      if (thread.userId !== req.userId && req.userRole !== "admin") {
-        return res.status(403).json({ error: "Only the case owner can mark solved" });
+      if (!(await hasThreadAccess(thread, req.userId!, req.userRole, ["admin", "technician"]))) {
+        return res.status(403).json({ error: "Only the case owner or shop team can mark solved" });
       }
 
       const parsed = markSolvedSchema.parse(req.body);

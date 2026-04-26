@@ -35,6 +35,13 @@ const URGENCY_OPTIONS: { value: "low" | "medium" | "high"; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
+interface ViewerAccess {
+  isAuthor: boolean;
+  teamRole: "admin" | "technician" | "viewer" | null;
+  canManageSummary: boolean;
+  canViewSummary: boolean;
+}
+
 interface Props {
   caseId: string;
   isAuthor: boolean;
@@ -46,11 +53,19 @@ export default function CustomerSummaryCard({ caseId, isAuthor, onUpgrade }: Pro
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasFeature } = useEntitlements();
-  const canUse = hasFeature("customer_diagnostic_summaries");
+  const viewerCanUseSelf = hasFeature("customer_diagnostic_summaries");
+
+  const { data: access } = useQuery<ViewerAccess>({
+    queryKey: [`/api/threads/${caseId}/viewer-access`],
+  });
+
+  const showLocked = isAuthor && !viewerCanUseSelf && !(access?.canManageSummary || access?.canViewSummary);
+  const showCard = !!(access?.canManageSummary || access?.canViewSummary) || (isAuthor && viewerCanUseSelf);
+  const canManage = !!access?.canManageSummary || (isAuthor && viewerCanUseSelf);
 
   const { data, isLoading } = useQuery<{ summary: CustomerSummary | null }>({
     queryKey: [`/api/cases/${caseId}/customer-summary`],
-    enabled: isAuthor && canUse,
+    enabled: showCard,
   });
 
   const summary = data?.summary ?? null;
@@ -63,9 +78,7 @@ export default function CustomerSummaryCard({ caseId, isAuthor, onUpgrade }: Pro
   const [estimateNotes, setEstimateNotes] = useState("");
   const [nextSteps, setNextSteps] = useState("");
 
-  if (!isAuthor) return null;
-
-  if (!canUse) {
+  if (showLocked) {
     return (
       <View style={{ marginBottom: Spacing.md }}>
         <LockedFeature
@@ -77,6 +90,8 @@ export default function CustomerSummaryCard({ caseId, isAuthor, onUpgrade }: Pro
       </View>
     );
   }
+
+  if (!showCard) return null;
 
   const openForm = () => {
     setCustomerConcern(summary?.customerConcern ?? "");
@@ -184,29 +199,33 @@ export default function CustomerSummaryCard({ caseId, isAuthor, onUpgrade }: Pro
             <ThemedText type="small" numberOfLines={1} style={{ marginLeft: 6, color: theme.primary, flex: 1 }}>{publicUrl}</ThemedText>
             <Feather name="copy" size={14} color={theme.textMuted} />
           </Pressable>
-          <View style={styles.actions}>
-            <Pressable onPress={openForm} style={[styles.action, { borderColor: theme.cardBorder }]} testID="button-edit-summary">
-              <Feather name="edit-2" size={14} color={theme.text} />
-              <ThemedText type="small" style={{ marginLeft: 6 }}>Edit</ThemedText>
-            </Pressable>
-            <Pressable onPress={() => rotate.mutate()} style={[styles.action, { borderColor: theme.cardBorder }]} testID="button-rotate-summary">
-              <Feather name="refresh-cw" size={14} color={theme.text} />
-              <ThemedText type="small" style={{ marginLeft: 6 }}>Rotate link</ThemedText>
-            </Pressable>
-            <Pressable onPress={confirmRevoke} style={[styles.action, { borderColor: theme.cardBorder }]} testID="button-revoke-summary">
-              <Feather name="x" size={14} color={theme.error} />
-              <ThemedText type="small" style={{ marginLeft: 6, color: theme.error }}>Disable</ThemedText>
-            </Pressable>
-          </View>
+          {canManage ? (
+            <View style={styles.actions}>
+              <Pressable onPress={openForm} style={[styles.action, { borderColor: theme.cardBorder }]} testID="button-edit-summary">
+                <Feather name="edit-2" size={14} color={theme.text} />
+                <ThemedText type="small" style={{ marginLeft: 6 }}>Edit</ThemedText>
+              </Pressable>
+              <Pressable onPress={() => rotate.mutate()} style={[styles.action, { borderColor: theme.cardBorder }]} testID="button-rotate-summary">
+                <Feather name="refresh-cw" size={14} color={theme.text} />
+                <ThemedText type="small" style={{ marginLeft: 6 }}>Rotate link</ThemedText>
+              </Pressable>
+              <Pressable onPress={confirmRevoke} style={[styles.action, { borderColor: theme.cardBorder }]} testID="button-revoke-summary">
+                <Feather name="x" size={14} color={theme.error} />
+                <ThemedText type="small" style={{ marginLeft: 6, color: theme.error }}>Disable</ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={{ marginTop: Spacing.md }}>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
             {summary?.isRevoked ? "The previous public link is disabled. Publish a new summary to share again." : "No summary yet."}
           </ThemedText>
-          <Button onPress={openForm} testID="button-create-summary">
-            {summary ? "Publish new summary" : "Create summary"}
-          </Button>
+          {canManage ? (
+            <Button onPress={openForm} testID="button-create-summary">
+              {summary ? "Publish new summary" : "Create summary"}
+            </Button>
+          ) : null}
         </View>
       )}
 
@@ -269,13 +288,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function urgencyStyle(level: string, theme: any) {
+type ThemePalette = ReturnType<typeof useTheme>["theme"];
+
+function urgencyStyle(level: string, theme: ThemePalette) {
   if (level === "high") return { backgroundColor: theme.error + "20", borderColor: theme.error };
   if (level === "low") return { backgroundColor: theme.success + "20", borderColor: theme.success };
   return { backgroundColor: theme.warning + "20", borderColor: theme.warning };
 }
 
-function urgencyTextColor(level: string, theme: any) {
+function urgencyTextColor(level: string, theme: ThemePalette) {
   if (level === "high") return theme.error;
   if (level === "low") return theme.success;
   return theme.warning;
