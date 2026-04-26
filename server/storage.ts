@@ -1530,18 +1530,22 @@ export class DatabaseStorage implements IStorage {
   ): Promise<CaseCustomerSummary> {
     const existing = await this.getCustomerSummaryByCase(caseId);
     if (existing) {
+      const updates: Record<string, unknown> = {
+        customerConcern: data.customerConcern ?? null,
+        diagnosticFindings: data.diagnosticFindings ?? null,
+        recommendedRepairs: data.recommendedRepairs ?? null,
+        urgencyLevel: data.urgencyLevel,
+        estimateNotes: data.estimateNotes ?? null,
+        nextSteps: data.nextSteps ?? null,
+        isRevoked: false,
+        updatedAt: new Date(),
+      };
+      if (existing.isRevoked) {
+        updates.token = newToken;
+      }
       const [updated] = await db
         .update(caseCustomerSummaries)
-        .set({
-          customerConcern: data.customerConcern ?? null,
-          diagnosticFindings: data.diagnosticFindings ?? null,
-          recommendedRepairs: data.recommendedRepairs ?? null,
-          urgencyLevel: data.urgencyLevel,
-          estimateNotes: data.estimateNotes ?? null,
-          nextSteps: data.nextSteps ?? null,
-          isRevoked: false,
-          updatedAt: new Date(),
-        })
+        .set(updates)
         .where(eq(caseCustomerSummaries.id, existing.id))
         .returning();
       return updated;

@@ -2218,6 +2218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/cases/:caseId/customer-summary",
     requireAuth,
+    requireFeature("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const thread = await storage.getThread(req.params.caseId);
@@ -2278,6 +2279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete(
     "/api/cases/:caseId/customer-summary",
     requireAuth,
+    requireFeature("customer_diagnostic_summaries"),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const thread = await storage.getThread(req.params.caseId);
