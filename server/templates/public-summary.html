@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Diagnostic Summary — TorqueShed</title>
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root {
+    --bg: #0D0F12;
+    --surface: #15181D;
+    --surface-2: #1B1F25;
+    --border: #2A2F38;
+    --text: #F4F5F7;
+    --muted: #9AA1AC;
+    --orange: #FF6B35;
+    --yellow: #F59E0B;
+    --green: #10B981;
+    --red: #F87171;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+  }
+  a { color: var(--orange); text-decoration: none; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 14px; }
+  .brand span { color: var(--orange); }
+  .pill { display: inline-flex; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 80px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 18px; }
+  h1 { margin: 0 0 6px; font-family: "Montserrat", sans-serif; font-size: 24px; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+  h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.06em; font-family: "Montserrat", sans-serif; }
+  p.body { margin: 0 0 12px; white-space: pre-wrap; }
+  .urgency { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+  .urgency.low { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.4); }
+  .urgency.medium { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.4); }
+  .urgency.high { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.4); }
+  .codes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .code { font-family: ui-monospace, SFMono-Regular, monospace; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--orange); }
+  .shop-card { display: flex; gap: 14px; align-items: center; }
+  .shop-logo { width: 56px; height: 56px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--orange); font-weight: 800; overflow: hidden; }
+  .shop-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .shop-name { font-weight: 700; font-size: 16px; }
+  .shop-contact { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .footer { margin-top: 24px; text-align: center; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Torque<span>Shed</span></div>
+    <div class="pill">Diagnostic Summary</div>
+  </div>
+  <div class="wrap" id="root">
+    <div class="empty">Loading…</div>
+  </div>
+<script>
+(function(){
+  var token = window.location.pathname.split('/').filter(Boolean).pop();
+  var root = document.getElementById('root');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'})[c];
+    });
+  }
+
+  function section(title, body) {
+    if (!body) return '';
+    return '<h2>' + esc(title) + '</h2><p class="body">' + esc(body) + '</p>';
+  }
+
+  fetch('/api/public/diagnostic-summary/' + encodeURIComponent(token))
+    .then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
+    .then(function(data){
+      var s = data.summary || {};
+      var c = data.case || null;
+      var shop = data.shop || null;
+      var u = (s.urgencyLevel || 'medium').toLowerCase();
+
+      var shopHtml = '';
+      if (shop) {
+        var initials = (shop.displayName || '?').split(' ').slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join('');
+        var logoSrc = safeUrl(shop.logoUrl);
+        var logo = logoSrc ? '<img src="'+logoSrc+'" alt="">' : esc(initials);
+        var contactBits = [];
+        if (shop.phone)   contactBits.push(esc(shop.phone));
+        if (shop.email)   contactBits.push('<a href="mailto:'+esc(shop.email)+'">'+esc(shop.email)+'</a>');
+        var sumWeb = safeUrl(shop.website);
+        if (sumWeb) contactBits.push('<a href="'+sumWeb+'" target="_blank" rel="noopener">website</a>');
+        var slugLink = shop.slug ? '<a href="/shops/' + esc(shop.slug) + '" style="font-size:13px;">View shop profile →</a>' : '';
+        shopHtml = '<div class="card"><div class="shop-card">' +
+          '<div class="shop-logo">' + logo + '</div>' +
+          '<div><div class="shop-name">' + esc(shop.displayName) + '</div>' +
+          (contactBits.length ? '<div class="shop-contact">' + contactBits.join(' · ') + '</div>' : '') +
+          (slugLink ? '<div style="margin-top:6px;">' + slugLink + '</div>' : '') +
+          '</div></div></div>';
+      }
+
+      var caseHtml = '';
+      if (c) {
+        var codes = (c.obdCodes || []).map(function(x){ return '<span class="code">' + esc(x) + '</span>'; }).join('');
+        caseHtml = '<div class="card">' +
+          '<h1>' + esc(c.title) + '</h1>' +
+          (c.vehicleName ? '<div class="meta">' + esc(c.vehicleName) + '</div>' : '') +
+          (codes ? '<div class="codes">' + codes + '</div>' : '') +
+          '</div>';
+      }
+
+      root.innerHTML =
+        shopHtml +
+        caseHtml +
+        '<div class="card">' +
+          '<div style="margin-bottom:14px;"><span class="urgency ' + u + '">' + u.toUpperCase() + ' urgency</span></div>' +
+          section('Customer Concern', s.customerConcern) +
+          section('Diagnostic Findings', s.diagnosticFindings) +
+          section('Recommended Repairs', s.recommendedRepairs) +
+          section('Estimate Notes', s.estimateNotes) +
+          section('Next Steps', s.nextSteps) +
+        '</div>' +
+        '<div class="footer">Shared securely via TorqueShed · ' + (s.updatedAt ? new Date(s.updatedAt).toLocaleString() : '') + '</div>';
+    })
+    .catch(function(){
+      root.innerHTML = '<div class="empty">This summary is no longer available.</div>';
+    });
+})();
+</script>
+</body>
+</html>

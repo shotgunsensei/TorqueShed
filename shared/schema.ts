@@ -408,6 +408,90 @@ export const sellerProfiles = pgTable("seller_profiles", {
   location: varchar("location", { length: 100 }),
   ratingAverage: integer("rating_average").default(0),
   isVerified: boolean("is_verified").default(false),
+  // Shop Pro public profile fields
+  slug: varchar("slug", { length: 60 }).unique(),
+  logoUrl: text("logo_url"),
+  description: text("description"),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 200 }),
+  website: text("website"),
+  serviceArea: varchar("service_area", { length: 200 }),
+  address: text("address"),
+  specialties: json("specialties").$type<string[]>().default([]),
+  certifications: json("certifications").$type<string[]>().default([]),
+  yearsInBusiness: integer("years_in_business"),
+  hours: json("hours").$type<Record<string, string>>().default({}),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const SHOP_SERVICE_CATEGORIES = [
+  "diagnostic",
+  "repair",
+  "maintenance",
+  "performance",
+  "fabrication",
+  "inspection",
+  "other",
+] as const;
+export type ShopServiceCategory = typeof SHOP_SERVICE_CATEGORIES[number];
+
+export const shopServices = pgTable("shop_services", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  ownerUserId: varchar("owner_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 200 }).notNull(),
+  category: varchar("category", { length: 30 }).notNull().default("repair"),
+  description: text("description"),
+  startingPrice: varchar("starting_price", { length: 50 }),
+  eta: varchar("eta", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const SHOP_LEAD_CONTACT_METHODS = ["email", "phone", "text"] as const;
+export type ShopLeadContactMethod = typeof SHOP_LEAD_CONTACT_METHODS[number];
+
+export const shopLeads = pgTable("shop_leads", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  ownerUserId: varchar("owner_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  customerName: varchar("customer_name", { length: 200 }).notNull(),
+  email: varchar("email", { length: 200 }),
+  phone: varchar("phone", { length: 30 }),
+  vehicle: varchar("vehicle", { length: 200 }),
+  issue: text("issue").notNull(),
+  preferredContact: varchar("preferred_contact", { length: 20 }).notNull().default("email"),
+  serviceId: varchar("service_id", { length: 36 }).references(() => shopServices.id, { onDelete: "set null" }),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const SHOP_TEAM_ROLES = ["owner", "admin", "technician", "viewer"] as const;
+export type ShopTeamRole = typeof SHOP_TEAM_ROLES[number];
+
+export const shopTeamMembers = pgTable("shop_team_members", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  ownerUserId: varchar("owner_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  memberUserId: varchar("member_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("technician"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const URGENCY_LEVELS_PUBLIC = ["low", "medium", "high"] as const;
+
+export const caseCustomerSummaries = pgTable("case_customer_summaries", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id", { length: 36 }).notNull().references(() => threads.id, { onDelete: "cascade" }).unique(),
+  ownerUserId: varchar("owner_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  isRevoked: boolean("is_revoked").default(false),
+  customerConcern: text("customer_concern"),
+  diagnosticFindings: text("diagnostic_findings"),
+  recommendedRepairs: text("recommended_repairs"),
+  urgencyLevel: varchar("urgency_level", { length: 20 }).default("medium"),
+  estimateNotes: text("estimate_notes"),
+  nextSteps: text("next_steps"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -781,3 +865,71 @@ export const insertToolSchema = z.object({
 
 export const updateToolSchema = insertToolSchema.partial();
 export type InsertTool = z.infer<typeof insertToolSchema>;
+
+// ========== Shop Pro schemas ==========
+
+export type ShopService = typeof shopServices.$inferSelect;
+export type ShopLead = typeof shopLeads.$inferSelect;
+export type ShopTeamMember = typeof shopTeamMembers.$inferSelect;
+export type CaseCustomerSummary = typeof caseCustomerSummaries.$inferSelect;
+
+const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])?$/;
+
+export const updateShopProfileSchema = z.object({
+  displayName: z.string().min(1).max(100).optional(),
+  sellerType: z.enum(SELLER_TYPES).optional(),
+  bio: z.string().max(2000).nullable().optional(),
+  location: z.string().max(100).nullable().optional(),
+  slug: z.string().regex(slugRegex, "Slug must be 2–60 chars, lowercase letters, digits, hyphens").nullable().optional(),
+  logoUrl: z.string().url().nullable().optional().or(z.literal("")),
+  description: z.string().max(4000).nullable().optional(),
+  phone: z.string().max(30).nullable().optional(),
+  email: z.string().email().nullable().optional().or(z.literal("")),
+  website: z.string().url().nullable().optional().or(z.literal("")),
+  serviceArea: z.string().max(200).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+  specialties: z.array(z.string().max(60)).max(20).optional(),
+  certifications: z.array(z.string().max(120)).max(20).optional(),
+  yearsInBusiness: z.number().int().min(0).max(200).nullable().optional(),
+  hours: z.record(z.string(), z.string().max(60)).optional(),
+  isPublic: z.boolean().optional(),
+});
+export type UpdateShopProfileInput = z.infer<typeof updateShopProfileSchema>;
+
+export const insertShopServiceSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  category: z.enum(SHOP_SERVICE_CATEGORIES).default("repair"),
+  description: z.string().max(2000).nullable().optional(),
+  startingPrice: z.string().max(50).nullable().optional(),
+  eta: z.string().max(100).nullable().optional(),
+  isActive: z.boolean().optional().default(true),
+});
+export const updateShopServiceSchema = insertShopServiceSchema.partial();
+export type InsertShopService = z.infer<typeof insertShopServiceSchema>;
+
+export const createShopLeadSchema = z.object({
+  customerName: z.string().min(1, "Name is required").max(200),
+  email: z.string().email("Valid email required").nullable().optional().or(z.literal("")),
+  phone: z.string().max(30).nullable().optional(),
+  vehicle: z.string().max(200).nullable().optional(),
+  issue: z.string().min(5, "Please describe the issue").max(4000),
+  preferredContact: z.enum(SHOP_LEAD_CONTACT_METHODS).default("email"),
+  serviceId: z.string().nullable().optional(),
+});
+export type CreateShopLeadInput = z.infer<typeof createShopLeadSchema>;
+
+export const inviteTeamMemberSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  role: z.enum(SHOP_TEAM_ROLES).default("technician"),
+});
+export type InviteTeamMemberInput = z.infer<typeof inviteTeamMemberSchema>;
+
+export const upsertCustomerSummarySchema = z.object({
+  customerConcern: z.string().max(2000).nullable().optional(),
+  diagnosticFindings: z.string().max(4000).nullable().optional(),
+  recommendedRepairs: z.string().max(4000).nullable().optional(),
+  urgencyLevel: z.enum(URGENCY_LEVELS_PUBLIC).default("medium"),
+  estimateNotes: z.string().max(2000).nullable().optional(),
+  nextSteps: z.string().max(2000).nullable().optional(),
+});
+export type UpsertCustomerSummaryInput = z.infer<typeof upsertCustomerSummarySchema>;

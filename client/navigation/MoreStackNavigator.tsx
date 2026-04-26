@@ -10,6 +10,10 @@ import SubscriptionScreen from "@/screens/SubscriptionScreen";
 import SellerDashboardScreen from "@/screens/SellerDashboardScreen";
 import MyListingsScreen from "@/screens/MyListingsScreen";
 import ToolInventoryScreen from "@/screens/ToolInventoryScreen";
+import ShopProfileEditorScreen from "@/screens/shop-pro/ShopProfileEditorScreen";
+import ShopServicesScreen from "@/screens/shop-pro/ShopServicesScreen";
+import ShopLeadsScreen from "@/screens/shop-pro/ShopLeadsScreen";
+import ShopTeamScreen from "@/screens/shop-pro/ShopTeamScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -27,6 +31,10 @@ export type MoreStackParamList = {
   SellerDashboard: undefined;
   MyListings: undefined;
   ToolInventory: undefined;
+  ShopProfile: undefined;
+  ShopServices: undefined;
+  ShopLeads: undefined;
+  ShopTeam: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -97,6 +105,26 @@ export default function MoreStackNavigator() {
         name="ToolInventory"
         component={ToolInventoryScreen}
         options={{ headerTitle: "Tool Inventory" }}
+      />
+      <Stack.Screen
+        name="ShopProfile"
+        component={ShopProfileEditorScreen}
+        options={{ headerTitle: "Shop Profile" }}
+      />
+      <Stack.Screen
+        name="ShopServices"
+        component={ShopServicesScreen}
+        options={{ headerTitle: "Services" }}
+      />
+      <Stack.Screen
+        name="ShopLeads"
+        component={ShopLeadsScreen}
+        options={{ headerTitle: "Customer Leads" }}
+      />
+      <Stack.Screen
+        name="ShopTeam"
+        component={ShopTeamScreen}
+        options={{ headerTitle: "Team" }}
       />
     </Stack.Navigator>
   );

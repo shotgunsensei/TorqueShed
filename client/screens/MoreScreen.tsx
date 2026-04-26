@@ -47,6 +47,15 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
     ],
   },
   {
+    title: "Shop Pro",
+    items: [
+      { label: "Shop Profile", icon: "home", action: "stack", screen: "ShopProfile", description: "Your public-facing shop page" },
+      { label: "Services", icon: "list", action: "stack", screen: "ShopServices", description: "Services you offer with pricing" },
+      { label: "Customer Leads", icon: "inbox", action: "stack", screen: "ShopLeads", description: "Inquiries from your shop page" },
+      { label: "Team", icon: "users", action: "stack", screen: "ShopTeam", description: "Invite techs and advisors to your shop" },
+    ],
+  },
+  {
     title: "Account",
     items: [
       { label: "Subscription", icon: "star", action: "stack", screen: "Subscription", description: "Plans, billing, and premium features" },

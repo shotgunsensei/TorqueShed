@@ -27,6 +27,7 @@ import { Button } from "@/components/Button";
 import PartsAndToolsCard from "@/components/PartsAndToolsCard";
 import EscalateCaseCard from "@/components/EscalateCaseCard";
 import RepairPlanCard from "@/components/RepairPlanCard";
+import CustomerSummaryCard from "@/components/CustomerSummaryCard";
 import SimilarCasesCard from "@/components/SimilarCasesCard";
 import CaseToolsUsedCard from "@/components/CaseToolsUsedCard";
 import { useTheme } from "@/hooks/useTheme";
@@ -868,6 +869,11 @@ export default function ThreadDetailScreen() {
           onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
         />
         <EscalateCaseCard caseId={threadId} />
+        <CustomerSummaryCard
+          caseId={threadId}
+          isAuthor={isThreadAuthor}
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+        />
 
         <ThemedText type="h4" style={styles.repliesHeader}>
           Replies ({replies.length})

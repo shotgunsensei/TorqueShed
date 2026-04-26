@@ -16,6 +16,19 @@ import {
   repairPlanExports,
   tools,
   caseToolsUsed,
+  shopServices,
+  shopLeads,
+  shopTeamMembers,
+  caseCustomerSummaries,
+  type ShopService,
+  type InsertShopService,
+  type ShopLead,
+  type CreateShopLeadInput,
+  type ShopTeamMember,
+  type ShopTeamRole,
+  type CaseCustomerSummary,
+  type UpdateShopProfileInput,
+  type UpsertCustomerSummaryInput,
   type Tool,
   type InsertTool,
   type CaseToolUsed,
@@ -1279,6 +1292,324 @@ export class DatabaseStorage implements IStorage {
     });
 
     return items;
+  }
+
+  // ========== Shop Pro: Profile ==========
+  async getShopProfileBySlug(slug: string): Promise<SellerProfile | undefined> {
+    const [sp] = await db.select().from(sellerProfiles).where(eq(sellerProfiles.slug, slug)).limit(1);
+    return sp || undefined;
+  }
+
+  async isSlugAvailable(slug: string, excludeUserId?: string): Promise<boolean> {
+    const existing = await this.getShopProfileBySlug(slug);
+    if (!existing) return true;
+    if (excludeUserId && existing.userId === excludeUserId) return true;
+    return false;
+  }
+
+  async upsertShopFields(userId: string, data: UpdateShopProfileInput): Promise<SellerProfile> {
+    const existing = await this.getSellerProfile(userId);
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v === undefined) continue;
+      if (typeof v === "string" && v === "" && (k === "logoUrl" || k === "email" || k === "website")) {
+        cleaned[k] = null;
+      } else {
+        cleaned[k] = v;
+      }
+    }
+    if (existing) {
+      const [updated] = await db
+        .update(sellerProfiles)
+        .set({ ...cleaned, updatedAt: new Date() })
+        .where(eq(sellerProfiles.userId, userId))
+        .returning();
+      return updated;
+    }
+    const displayName = (cleaned.displayName as string) || "My Shop";
+    const sellerType = (cleaned.sellerType as string) || "shop";
+    const [created] = await db
+      .insert(sellerProfiles)
+      .values({ userId, displayName, sellerType, ...cleaned })
+      .returning();
+    return created;
+  }
+
+  // ========== Shop Pro: Services ==========
+  async listShopServices(ownerUserId: string): Promise<ShopService[]> {
+    return db
+      .select()
+      .from(shopServices)
+      .where(eq(shopServices.ownerUserId, ownerUserId))
+      .orderBy(desc(shopServices.updatedAt));
+  }
+
+  async listPublicShopServices(ownerUserId: string): Promise<ShopService[]> {
+    return db
+      .select()
+      .from(shopServices)
+      .where(and(eq(shopServices.ownerUserId, ownerUserId), eq(shopServices.isActive, true)))
+      .orderBy(desc(shopServices.updatedAt));
+  }
+
+  async getShopService(id: string): Promise<ShopService | undefined> {
+    const [s] = await db.select().from(shopServices).where(eq(shopServices.id, id)).limit(1);
+    return s || undefined;
+  }
+
+  async createShopService(ownerUserId: string, data: InsertShopService): Promise<ShopService> {
+    const [created] = await db
+      .insert(shopServices)
+      .values({
+        ownerUserId,
+        name: data.name,
+        category: data.category ?? "repair",
+        description: data.description ?? null,
+        startingPrice: data.startingPrice ?? null,
+        eta: data.eta ?? null,
+        isActive: data.isActive ?? true,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateShopService(id: string, updates: Partial<InsertShopService>): Promise<ShopService> {
+    const [updated] = await db
+      .update(shopServices)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(shopServices.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteShopService(id: string): Promise<void> {
+    await db.delete(shopServices).where(eq(shopServices.id, id));
+  }
+
+  // ========== Shop Pro: Leads ==========
+  async createShopLead(ownerUserId: string, data: CreateShopLeadInput): Promise<ShopLead> {
+    const [created] = await db
+      .insert(shopLeads)
+      .values({
+        ownerUserId,
+        customerName: data.customerName,
+        email: data.email && data.email !== "" ? data.email : null,
+        phone: data.phone ?? null,
+        vehicle: data.vehicle ?? null,
+        issue: data.issue,
+        preferredContact: data.preferredContact ?? "email",
+        serviceId: data.serviceId ?? null,
+      })
+      .returning();
+    return created;
+  }
+
+  async listShopLeads(ownerUserId: string): Promise<ShopLead[]> {
+    return db
+      .select()
+      .from(shopLeads)
+      .where(eq(shopLeads.ownerUserId, ownerUserId))
+      .orderBy(desc(shopLeads.createdAt));
+  }
+
+  async getShopLead(id: string): Promise<ShopLead | undefined> {
+    const [l] = await db.select().from(shopLeads).where(eq(shopLeads.id, id)).limit(1);
+    return l || undefined;
+  }
+
+  async markLeadRead(id: string, isRead: boolean): Promise<ShopLead> {
+    const [updated] = await db
+      .update(shopLeads)
+      .set({ isRead })
+      .where(eq(shopLeads.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getUnreadLeadCount(ownerUserId: string): Promise<number> {
+    const rows = await db
+      .select({ id: shopLeads.id })
+      .from(shopLeads)
+      .where(and(eq(shopLeads.ownerUserId, ownerUserId), eq(shopLeads.isRead, false)));
+    return rows.length;
+  }
+
+  // ========== Shop Pro: Team ==========
+  async listTeamMembers(ownerUserId: string): Promise<(ShopTeamMember & { username: string })[]> {
+    const rows = await db
+      .select({
+        id: shopTeamMembers.id,
+        ownerUserId: shopTeamMembers.ownerUserId,
+        memberUserId: shopTeamMembers.memberUserId,
+        role: shopTeamMembers.role,
+        createdAt: shopTeamMembers.createdAt,
+        username: users.username,
+      })
+      .from(shopTeamMembers)
+      .leftJoin(users, eq(users.id, shopTeamMembers.memberUserId))
+      .where(eq(shopTeamMembers.ownerUserId, ownerUserId))
+      .orderBy(desc(shopTeamMembers.createdAt));
+    return rows.map((r) => ({
+      id: r.id,
+      ownerUserId: r.ownerUserId,
+      memberUserId: r.memberUserId,
+      role: r.role,
+      createdAt: r.createdAt,
+      username: r.username ?? "(unknown)",
+    }));
+  }
+
+  async addTeamMember(ownerUserId: string, memberUserId: string, role: ShopTeamRole): Promise<ShopTeamMember> {
+    const existing = await db
+      .select()
+      .from(shopTeamMembers)
+      .where(and(eq(shopTeamMembers.ownerUserId, ownerUserId), eq(shopTeamMembers.memberUserId, memberUserId)))
+      .limit(1);
+    if (existing[0]) {
+      const [updated] = await db
+        .update(shopTeamMembers)
+        .set({ role })
+        .where(eq(shopTeamMembers.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(shopTeamMembers)
+      .values({ ownerUserId, memberUserId, role })
+      .returning();
+    return created;
+  }
+
+  async removeTeamMember(ownerUserId: string, memberId: string): Promise<void> {
+    await db
+      .delete(shopTeamMembers)
+      .where(and(eq(shopTeamMembers.id, memberId), eq(shopTeamMembers.ownerUserId, ownerUserId)));
+  }
+
+  async getTeamRole(ownerUserId: string, memberUserId: string): Promise<ShopTeamRole | null> {
+    const [row] = await db
+      .select({ role: shopTeamMembers.role })
+      .from(shopTeamMembers)
+      .where(and(eq(shopTeamMembers.ownerUserId, ownerUserId), eq(shopTeamMembers.memberUserId, memberUserId)))
+      .limit(1);
+    return (row?.role as ShopTeamRole | undefined) ?? null;
+  }
+
+  async getOwnersForTeamMember(memberUserId: string): Promise<{ ownerUserId: string; role: ShopTeamRole }[]> {
+    const rows = await db
+      .select({ ownerUserId: shopTeamMembers.ownerUserId, role: shopTeamMembers.role })
+      .from(shopTeamMembers)
+      .where(eq(shopTeamMembers.memberUserId, memberUserId));
+    return rows.map((r) => ({ ownerUserId: r.ownerUserId, role: r.role as ShopTeamRole }));
+  }
+
+  // ========== Shop Pro: Customer Summaries ==========
+  async getCustomerSummaryByCase(caseId: string): Promise<CaseCustomerSummary | undefined> {
+    const [s] = await db
+      .select()
+      .from(caseCustomerSummaries)
+      .where(eq(caseCustomerSummaries.caseId, caseId))
+      .limit(1);
+    return s || undefined;
+  }
+
+  async getCustomerSummaryByToken(token: string): Promise<CaseCustomerSummary | undefined> {
+    const [s] = await db
+      .select()
+      .from(caseCustomerSummaries)
+      .where(eq(caseCustomerSummaries.token, token))
+      .limit(1);
+    return s || undefined;
+  }
+
+  async upsertCustomerSummary(
+    caseId: string,
+    ownerUserId: string,
+    data: UpsertCustomerSummaryInput,
+    newToken: string,
+  ): Promise<CaseCustomerSummary> {
+    const existing = await this.getCustomerSummaryByCase(caseId);
+    if (existing) {
+      const [updated] = await db
+        .update(caseCustomerSummaries)
+        .set({
+          customerConcern: data.customerConcern ?? null,
+          diagnosticFindings: data.diagnosticFindings ?? null,
+          recommendedRepairs: data.recommendedRepairs ?? null,
+          urgencyLevel: data.urgencyLevel,
+          estimateNotes: data.estimateNotes ?? null,
+          nextSteps: data.nextSteps ?? null,
+          isRevoked: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(caseCustomerSummaries.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(caseCustomerSummaries)
+      .values({
+        caseId,
+        ownerUserId,
+        token: newToken,
+        customerConcern: data.customerConcern ?? null,
+        diagnosticFindings: data.diagnosticFindings ?? null,
+        recommendedRepairs: data.recommendedRepairs ?? null,
+        urgencyLevel: data.urgencyLevel,
+        estimateNotes: data.estimateNotes ?? null,
+        nextSteps: data.nextSteps ?? null,
+        isRevoked: false,
+      })
+      .returning();
+    return created;
+  }
+
+  async revokeCustomerSummary(caseId: string): Promise<void> {
+    await db
+      .update(caseCustomerSummaries)
+      .set({ isRevoked: true, updatedAt: new Date() })
+      .where(eq(caseCustomerSummaries.caseId, caseId));
+  }
+
+  async rotateCustomerSummaryToken(caseId: string, newToken: string): Promise<CaseCustomerSummary | undefined> {
+    const [updated] = await db
+      .update(caseCustomerSummaries)
+      .set({ token: newToken, isRevoked: false, updatedAt: new Date() })
+      .where(eq(caseCustomerSummaries.caseId, caseId))
+      .returning();
+    return updated;
+  }
+
+  // ========== Shop Pro: Credibility ==========
+  async getShopCredibility(ownerUserId: string): Promise<{
+    solvedCases: number;
+    activeListings: number;
+    services: number;
+    threads: number;
+    yearsWrenching: number | null;
+  }> {
+    const solvedRows = await db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(and(eq(threads.userId, ownerUserId), eq(threads.hasSolution, true)));
+    const allThreads = await db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(eq(threads.userId, ownerUserId));
+    const listings = await this.getActiveListingsByUser(ownerUserId);
+    const services = await this.listPublicShopServices(ownerUserId);
+    const [u] = await db
+      .select({ yearsWrenching: users.yearsWrenching })
+      .from(users)
+      .where(eq(users.id, ownerUserId))
+      .limit(1);
+    return {
+      solvedCases: solvedRows.length,
+      activeListings: listings.length,
+      services: services.length,
+      threads: allThreads.length,
+      yearsWrenching: u?.yearsWrenching ?? null,
+    };
   }
 }
 

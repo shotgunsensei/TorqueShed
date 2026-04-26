@@ -1,5 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
+import crypto from "node:crypto";
+import path from "node:path";
 import bcrypt from "bcrypt";
 import { ZodError } from "zod";
 import { storage, type ProfileUpdate } from "./storage";
@@ -31,8 +33,16 @@ import {
   insertSubscriptionSchema,
   insertSellerProfileSchema,
   escalateCaseSchema,
+  type SellerProfile,
+  type ShopService,
   insertToolSchema,
   updateToolSchema,
+  updateShopProfileSchema,
+  insertShopServiceSchema,
+  updateShopServiceSchema,
+  createShopLeadSchema,
+  inviteTeamMemberSchema,
+  upsertCustomerSummarySchema,
   SUBSCRIPTION_TIERS,
   EXPERT_SERVICE_LEVELS,
   type SubscriptionTier,
@@ -1954,7 +1964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ========== Seller Profile ==========
+  // ========== Seller / Shop Profile ==========
   app.get("/api/seller-profile/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const profile = await storage.getSellerProfile(req.userId!);
@@ -1983,6 +1993,304 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to save seller profile" });
     }
   });
+
+  // ========== Shop Pro: Profile ==========
+  app.get(
+    "/api/shop-profile/me",
+    requireAuth,
+    requireFeature("shop_profile"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const profile = await storage.getSellerProfile(req.userId!);
+        const credibility = await storage.getShopCredibility(req.userId!);
+        res.json({ profile: profile ?? null, credibility });
+      } catch (error) {
+        console.error("Error fetching shop profile:", error);
+        res.status(500).json({ error: "Failed to load shop profile" });
+      }
+    },
+  );
+
+  app.put(
+    "/api/shop-profile/me",
+    requireAuth,
+    requireFeature("shop_profile"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const parsed = updateShopProfileSchema.parse(req.body);
+        if (parsed.slug) {
+          const available = await storage.isSlugAvailable(parsed.slug, req.userId!);
+          if (!available) {
+            return res.status(409).json({ error: "That slug is already taken." });
+          }
+        }
+        const saved = await storage.upsertShopFields(req.userId!, parsed);
+        res.json(saved);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+        }
+        console.error("Error saving shop profile:", error);
+        res.status(500).json({ error: "Failed to save shop profile" });
+      }
+    },
+  );
+
+  // ========== Shop Pro: Services ==========
+  app.get(
+    "/api/shop-services",
+    requireAuth,
+    requireFeature("service_listings"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const items = await storage.listShopServices(req.userId!);
+        res.json(items);
+      } catch (error) {
+        console.error("Error listing shop services:", error);
+        res.status(500).json({ error: "Failed to load services" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/shop-services",
+    requireAuth,
+    requireFeature("service_listings"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const parsed = insertShopServiceSchema.parse(req.body);
+        const created = await storage.createShopService(req.userId!, parsed);
+        res.status(201).json(created);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+        }
+        console.error("Error creating shop service:", error);
+        res.status(500).json({ error: "Failed to create service" });
+      }
+    },
+  );
+
+  app.patch(
+    "/api/shop-services/:id",
+    requireAuth,
+    requireFeature("service_listings"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const existing = await storage.getShopService(req.params.id);
+        if (!existing) return res.status(404).json({ error: "Service not found" });
+        if (existing.ownerUserId !== req.userId) return res.status(403).json({ error: "Not your service" });
+        const parsed = updateShopServiceSchema.parse(req.body);
+        const updated = await storage.updateShopService(req.params.id, parsed);
+        res.json(updated);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+        }
+        console.error("Error updating shop service:", error);
+        res.status(500).json({ error: "Failed to update service" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/shop-services/:id",
+    requireAuth,
+    requireFeature("service_listings"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const existing = await storage.getShopService(req.params.id);
+        if (!existing) return res.status(404).json({ error: "Service not found" });
+        if (existing.ownerUserId !== req.userId) return res.status(403).json({ error: "Not your service" });
+        await storage.deleteShopService(req.params.id);
+        res.json({ ok: true });
+      } catch (error) {
+        console.error("Error deleting shop service:", error);
+        res.status(500).json({ error: "Failed to delete service" });
+      }
+    },
+  );
+
+  // ========== Shop Pro: Leads ==========
+  app.get(
+    "/api/shop-leads",
+    requireAuth,
+    requireFeature("lead_capture"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const items = await storage.listShopLeads(req.userId!);
+        res.json(items);
+      } catch (error) {
+        console.error("Error listing shop leads:", error);
+        res.status(500).json({ error: "Failed to load leads" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/shop-leads/unread-count",
+    requireAuth,
+    requireFeature("lead_capture"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const count = await storage.getUnreadLeadCount(req.userId!);
+        res.json({ count });
+      } catch (error) {
+        console.error("Error getting unread leads:", error);
+        res.status(500).json({ error: "Failed" });
+      }
+    },
+  );
+
+  app.patch(
+    "/api/shop-leads/:id",
+    requireAuth,
+    requireFeature("lead_capture"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const existing = await storage.getShopLead(req.params.id);
+        if (!existing) return res.status(404).json({ error: "Lead not found" });
+        if (existing.ownerUserId !== req.userId) return res.status(403).json({ error: "Not your lead" });
+        const isRead = req.body?.isRead === true || req.body?.isRead === false ? req.body.isRead : true;
+        const updated = await storage.markLeadRead(req.params.id, isRead);
+        res.json(updated);
+      } catch (error) {
+        console.error("Error updating lead:", error);
+        res.status(500).json({ error: "Failed to update lead" });
+      }
+    },
+  );
+
+  // ========== Shop Pro: Team ==========
+  app.get(
+    "/api/shop-team",
+    requireAuth,
+    requireFeature("team_access"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const members = await storage.listTeamMembers(req.userId!);
+        res.json(members);
+      } catch (error) {
+        console.error("Error listing team:", error);
+        res.status(500).json({ error: "Failed to load team" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/shop-team",
+    requireAuth,
+    requireFeature("team_access"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const parsed = inviteTeamMemberSchema.parse(req.body);
+        const member = await storage.getUserByUsername(parsed.username.trim());
+        if (!member) return res.status(404).json({ error: "User not found" });
+        if (member.id === req.userId) return res.status(400).json({ error: "You cannot add yourself." });
+        const created = await storage.addTeamMember(req.userId!, member.id, parsed.role);
+        res.status(201).json({ ...created, username: member.username });
+      } catch (error) {
+        if (error instanceof ZodError) {
+          return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+        }
+        console.error("Error adding team member:", error);
+        res.status(500).json({ error: "Failed to add team member" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/shop-team/:id",
+    requireAuth,
+    requireFeature("team_access"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        await storage.removeTeamMember(req.userId!, req.params.id);
+        res.json({ ok: true });
+      } catch (error) {
+        console.error("Error removing team member:", error);
+        res.status(500).json({ error: "Failed to remove team member" });
+      }
+    },
+  );
+
+  // ========== Shop Pro: Customer Diagnostic Summaries ==========
+  app.get(
+    "/api/cases/:caseId/customer-summary",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const thread = await storage.getThread(req.params.caseId);
+        if (!thread) return res.status(404).json({ error: "Case not found" });
+        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can view this." });
+        const summary = await storage.getCustomerSummaryByCase(req.params.caseId);
+        res.json({ summary: summary ?? null });
+      } catch (error) {
+        console.error("Error fetching customer summary:", error);
+        res.status(500).json({ error: "Failed to load summary" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/cases/:caseId/customer-summary",
+    requireAuth,
+    requireFeature("customer_diagnostic_summaries"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const thread = await storage.getThread(req.params.caseId);
+        if (!thread) return res.status(404).json({ error: "Case not found" });
+        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can manage this." });
+        const parsed = upsertCustomerSummarySchema.parse(req.body);
+        const token = crypto.randomBytes(24).toString("hex");
+        const saved = await storage.upsertCustomerSummary(req.params.caseId, req.userId!, parsed, token);
+        res.json(saved);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+        }
+        console.error("Error saving customer summary:", error);
+        res.status(500).json({ error: "Failed to save summary" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/cases/:caseId/customer-summary/rotate",
+    requireAuth,
+    requireFeature("customer_diagnostic_summaries"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const thread = await storage.getThread(req.params.caseId);
+        if (!thread) return res.status(404).json({ error: "Case not found" });
+        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can manage this." });
+        const newToken = crypto.randomBytes(24).toString("hex");
+        const updated = await storage.rotateCustomerSummaryToken(req.params.caseId, newToken);
+        if (!updated) return res.status(404).json({ error: "No summary to rotate" });
+        res.json(updated);
+      } catch (error) {
+        console.error("Error rotating summary token:", error);
+        res.status(500).json({ error: "Failed to rotate token" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/cases/:caseId/customer-summary",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const thread = await storage.getThread(req.params.caseId);
+        if (!thread) return res.status(404).json({ error: "Case not found" });
+        if (thread.userId !== req.userId) return res.status(403).json({ error: "Only the case author can manage this." });
+        await storage.revokeCustomerSummary(req.params.caseId);
+        res.json({ ok: true });
+      } catch (error) {
+        console.error("Error revoking summary:", error);
+        res.status(500).json({ error: "Failed to revoke summary" });
+      }
+    },
+  );
 
   app.get("/api/seller-dashboard", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -2471,6 +2779,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching my listings:", error);
       res.status(500).json({ error: "Failed to load listings" });
     }
+  });
+
+  // ========== Public Shop Pro pages ==========
+  function publicShopPayload(profile: SellerProfile, services: ShopService[], credibility: Awaited<ReturnType<typeof storage.getShopCredibility>>) {
+    return {
+      shop: {
+        slug: profile.slug,
+        displayName: profile.displayName,
+        description: profile.description ?? null,
+        logoUrl: profile.logoUrl ?? null,
+        location: profile.location ?? null,
+        serviceArea: profile.serviceArea ?? null,
+        address: profile.address ?? null,
+        phone: profile.phone ?? null,
+        email: profile.email ?? null,
+        website: profile.website ?? null,
+        specialties: profile.specialties ?? [],
+        certifications: profile.certifications ?? [],
+        yearsInBusiness: profile.yearsInBusiness ?? null,
+        hours: profile.hours ?? {},
+        isVerified: profile.isVerified ?? false,
+      },
+      services: services.map((s) => ({
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        description: s.description,
+        startingPrice: s.startingPrice,
+        eta: s.eta,
+      })),
+      credibility,
+    };
+  }
+
+  app.get("/api/public/shops/:slug", async (req: Request, res: Response) => {
+    try {
+      const profile = await storage.getShopProfileBySlug(req.params.slug);
+      if (!profile || !profile.isPublic) return res.status(404).json({ error: "Shop not found" });
+      const services = await storage.listPublicShopServices(profile.userId);
+      const credibility = await storage.getShopCredibility(profile.userId);
+      res.json(publicShopPayload(profile, services, credibility));
+    } catch (error) {
+      console.error("Error fetching public shop:", error);
+      res.status(500).json({ error: "Failed to load shop" });
+    }
+  });
+
+  app.post("/api/public/shops/:slug/leads", async (req: Request, res: Response) => {
+    try {
+      const profile = await storage.getShopProfileBySlug(req.params.slug);
+      if (!profile || !profile.isPublic) return res.status(404).json({ error: "Shop not found" });
+      const tier = await getUserTier(profile.userId);
+      if (!tierHasFeature(tier, "lead_capture")) {
+        return res.status(404).json({ error: "Shop not accepting leads" });
+      }
+      const parsed = createShopLeadSchema.parse(req.body);
+      if (parsed.serviceId) {
+        const svc = await storage.getShopService(parsed.serviceId);
+        if (!svc || svc.ownerUserId !== profile.userId) {
+          return res.status(400).json({ error: "Invalid service" });
+        }
+      }
+      const created = await storage.createShopLead(profile.userId, parsed);
+      res.status(201).json({ ok: true, id: created.id });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error creating public lead:", error);
+      res.status(500).json({ error: "Failed to submit lead" });
+    }
+  });
+
+  app.get("/api/public/diagnostic-summary/:token", async (req: Request, res: Response) => {
+    try {
+      const summary = await storage.getCustomerSummaryByToken(req.params.token);
+      if (!summary || summary.isRevoked) return res.status(404).json({ error: "Summary not available" });
+      const thread = await storage.getThread(summary.caseId);
+      const profile = await storage.getSellerProfile(summary.ownerUserId);
+      res.json({
+        summary: {
+          customerConcern: summary.customerConcern,
+          diagnosticFindings: summary.diagnosticFindings,
+          recommendedRepairs: summary.recommendedRepairs,
+          urgencyLevel: summary.urgencyLevel,
+          estimateNotes: summary.estimateNotes,
+          nextSteps: summary.nextSteps,
+          updatedAt: summary.updatedAt,
+        },
+        case: thread
+          ? {
+              title: thread.title,
+              vehicleName: thread.vehicleName,
+              obdCodes: thread.obdCodes ?? [],
+            }
+          : null,
+        shop: profile
+          ? {
+              displayName: profile.displayName,
+              slug: profile.slug,
+              logoUrl: profile.logoUrl,
+              phone: profile.phone,
+              email: profile.email,
+              website: profile.website,
+            }
+          : null,
+      });
+    } catch (error) {
+      console.error("Error fetching public summary:", error);
+      res.status(500).json({ error: "Failed to load summary" });
+    }
+  });
+
+  // Server-rendered HTML routes (shareable links)
+  app.get("/shops/:slug", async (_req: Request, res: Response) => {
+    res.sendFile(path.resolve(process.cwd(), "server", "templates", "public-shop.html"));
+  });
+  app.get("/public/diagnostic-summary/:token", async (_req: Request, res: Response) => {
+    res.sendFile(path.resolve(process.cwd(), "server", "templates", "public-summary.html"));
   });
 
   const httpServer = createServer(app);
