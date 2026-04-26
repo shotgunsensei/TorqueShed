@@ -62,7 +62,7 @@ import {
   type RepairPlanExportType,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, or, isNull, gt, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull, isNotNull, gt, inArray } from "drizzle-orm";
 
 export interface ProfileUpdate {
   bio?: string;
@@ -685,6 +685,54 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(threads.isPinned), desc(threads.lastActivityAt));
 
     return allThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; vehicleName: string | null })[];
+  }
+
+  async getSolvedThreads(): Promise<(Thread & { vehicleName: string | null })[]> {
+    const rows = await db
+      .select({
+        id: threads.id,
+        garageId: threads.garageId,
+        userId: threads.userId,
+        title: threads.title,
+        content: threads.content,
+        hasSolution: threads.hasSolution,
+        isPinned: threads.isPinned,
+        replyCount: threads.replyCount,
+        vehicleId: threads.vehicleId,
+        symptoms: threads.symptoms,
+        obdCodes: threads.obdCodes,
+        severity: threads.severity,
+        drivability: threads.drivability,
+        recentChanges: threads.recentChanges,
+        status: threads.status,
+        systemCategory: threads.systemCategory,
+        urgency: threads.urgency,
+        budget: threads.budget,
+        toolsAvailable: threads.toolsAvailable,
+        whenItHappens: threads.whenItHappens,
+        partsReplaced: threads.partsReplaced,
+        rootCause: threads.rootCause,
+        finalFix: threads.finalFix,
+        partsUsed: threads.partsUsed,
+        toolsUsed: threads.toolsUsed,
+        solvedCost: threads.solvedCost,
+        laborMinutes: threads.laborMinutes,
+        verificationNotes: threads.verificationNotes,
+        lastActivityAt: threads.lastActivityAt,
+        createdAt: threads.createdAt,
+        updatedAt: threads.updatedAt,
+        vehicleName: sql<string | null>`(SELECT CONCAT(${vehicles.year}, ' ', ${vehicles.make}, ' ', ${vehicles.model}) FROM ${vehicles} WHERE ${vehicles.id} = ${threads.vehicleId})`,
+      })
+      .from(threads)
+      .where(
+        or(
+          eq(threads.hasSolution, true),
+          eq(threads.status, "solved"),
+          isNotNull(threads.finalFix),
+        ),
+      )
+      .orderBy(desc(threads.lastActivityAt));
+    return rows as (Thread & { vehicleName: string | null })[];
   }
 
   async getThread(id: string): Promise<(Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; vehicleName: string | null }) | undefined> {

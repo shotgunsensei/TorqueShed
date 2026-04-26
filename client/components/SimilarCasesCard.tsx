@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
@@ -10,6 +10,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { LockedFeature } from "@/components/LockedFeature";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 interface SimilarCase {
@@ -29,17 +30,80 @@ interface SimilarResponse {
   hasFeature: boolean;
 }
 
-interface Props {
-  caseId: string;
-  onUpgrade: () => void;
+interface PreviewInput {
+  vehicleId?: string | null;
+  vehicleName?: string | null;
+  obdCodes?: string[];
+  symptoms?: string[];
+  systemCategory?: string | null;
 }
 
-export function SimilarCasesCard({ caseId, onUpgrade }: Props) {
+type Props =
+  | {
+      caseId: string;
+      onUpgrade: () => void;
+      preview?: undefined;
+    }
+  | {
+      caseId?: undefined;
+      preview: PreviewInput;
+      onUpgrade: () => void;
+    };
+
+export function SimilarCasesCard(props: Props) {
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { onUpgrade } = props;
+
+  const previewKey = useMemo(() => {
+    if (!("preview" in props) || !props.preview) return null;
+    const p = props.preview;
+    return JSON.stringify({
+      vehicleId: p.vehicleId ?? null,
+      vehicleName: p.vehicleName ?? null,
+      obdCodes: [...(p.obdCodes ?? [])].map((c) => c.toUpperCase()).sort(),
+      symptoms: [...(p.symptoms ?? [])].sort(),
+      systemCategory: p.systemCategory ?? null,
+    });
+  }, [props]);
+
+  const hasPreviewSignal = useMemo(() => {
+    if (!("preview" in props) || !props.preview) return false;
+    const p = props.preview;
+    return Boolean(
+      (p.vehicleId && p.vehicleId.length > 0) ||
+        (p.vehicleName && p.vehicleName.length > 0) ||
+        (p.obdCodes && p.obdCodes.length > 0) ||
+        (p.symptoms && p.symptoms.length > 0) ||
+        (p.systemCategory && p.systemCategory.length > 0),
+    );
+  }, [props]);
+
+  const isPreviewMode = "preview" in props && Boolean(props.preview);
+  const caseId = "caseId" in props ? props.caseId : undefined;
+
+  const queryKey = isPreviewMode
+    ? ["/api/cases/similar", previewKey]
+    : [`/api/cases/${caseId}/similar`];
 
   const { data, isLoading, isError } = useQuery<SimilarResponse>({
-    queryKey: [`/api/cases/${caseId}/similar`],
+    queryKey,
+    enabled: isPreviewMode ? hasPreviewSignal : Boolean(caseId),
+    queryFn: async () => {
+      if (isPreviewMode) {
+        const params = new URLSearchParams();
+        const p = (props as { preview: PreviewInput }).preview;
+        if (p.vehicleId) params.set("vehicleId", p.vehicleId);
+        if (p.vehicleName) params.set("vehicleName", p.vehicleName);
+        if (p.systemCategory) params.set("systemCategory", p.systemCategory);
+        if (p.obdCodes && p.obdCodes.length > 0) params.set("obdCodes", p.obdCodes.join(","));
+        if (p.symptoms && p.symptoms.length > 0) params.set("symptoms", p.symptoms.join(","));
+        const res = await apiRequest("GET", `/api/cases/similar?${params.toString()}`);
+        return (await res.json()) as SimilarResponse;
+      }
+      const res = await apiRequest("GET", `/api/cases/${caseId}/similar`);
+      return (await res.json()) as SimilarResponse;
+    },
   });
 
   if (isLoading) {

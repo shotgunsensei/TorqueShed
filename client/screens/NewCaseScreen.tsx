@@ -20,6 +20,7 @@ import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { ThemedText } from "@/components/ThemedText";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SimilarCasesCard } from "@/components/SimilarCasesCard";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
@@ -707,11 +708,20 @@ export default function NewCaseScreen() {
               <Text style={{ color: theme.text, flex: 1 }}>Run TorqueAssist for full diagnostic tree</Text>
             </View>
           </View>
-          <View style={[styles.previewItem, { marginTop: Spacing.md, opacity: 0.7 }]}>
-            <Feather name="users" size={12} color={theme.textMuted} />
-            <Text style={{ color: theme.textMuted, flex: 1 }}>Similar solved cases (coming soon)</Text>
-          </View>
         </View>
+
+        <SimilarCasesCard
+          preview={{
+            vehicleId: vehicleId ?? undefined,
+            vehicleName: selectedVehicle
+              ? `${selectedVehicle.year ?? ""} ${selectedVehicle.make ?? ""} ${selectedVehicle.model ?? ""}`.trim() || undefined
+              : undefined,
+            obdCodes,
+            symptoms,
+            systemCategory,
+          }}
+          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+        />
       </View>
     );
   };

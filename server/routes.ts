@@ -53,6 +53,7 @@ import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
+import { buildSimilarCasesResult } from "./similar-cases";
 import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature, requireFeatureOrTeam } from "./entitlements";
 import PDFDocument from "pdfkit";
 
@@ -2734,6 +2735,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== Similar Solved Cases ==========
+  const parseListParam = (raw: unknown): string[] => {
+    if (Array.isArray(raw)) {
+      return raw.flatMap((v) => parseListParam(v));
+    }
+    if (typeof raw === "string") {
+      return raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    return [];
+  };
+
+  app.get("/api/cases/similar", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const tier = await getUserTier(req.userId!);
+      const hasFull = tierHasFeature(tier, "similar_solved_matching");
+
+      const obdCodes = parseListParam(req.query.obdCodes);
+      const symptoms = parseListParam(req.query.symptoms);
+      const systemCategory =
+        typeof req.query.systemCategory === "string" && req.query.systemCategory.trim()
+          ? req.query.systemCategory.trim()
+          : null;
+      const excludeId =
+        typeof req.query.excludeId === "string" && req.query.excludeId.trim()
+          ? req.query.excludeId.trim()
+          : null;
+
+      let vehicleName: string | null =
+        typeof req.query.vehicleName === "string" && req.query.vehicleName.trim()
+          ? req.query.vehicleName.trim()
+          : null;
+
+      if (!vehicleName && typeof req.query.vehicleId === "string" && req.query.vehicleId.trim()) {
+        const vehicle = await storage.getVehicle(req.query.vehicleId.trim());
+        if (vehicle && vehicle.userId === req.userId) {
+          vehicleName = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ").trim() || null;
+        }
+      }
+
+      // Need at least something to match against
+      if (!vehicleName && obdCodes.length === 0 && symptoms.length === 0 && !systemCategory) {
+        return res.json({ cases: [], hiddenCount: 0, totalAvailable: 0, hasFeature: hasFull });
+      }
+
+      const candidates = await storage.getSolvedThreads();
+      const result = buildSimilarCasesResult(
+        { vehicleName, obdCodes, symptoms, systemCategory, excludeId },
+        candidates,
+        hasFull,
+      );
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching similar cases (preview):", error);
+      res.status(500).json({ error: "Failed to load similar cases" });
+    }
+  });
+
   app.get("/api/cases/:caseId/similar", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const thread = await storage.getThread(req.params.caseId);
@@ -2742,78 +2802,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tier = await getUserTier(req.userId!);
       const hasFull = tierHasFeature(tier, "similar_solved_matching");
 
-      const all = await storage.getAllThreads();
-      const baseDtcs = (thread.obdCodes ?? []).map((c) => c.toUpperCase().trim()).filter(Boolean);
-      const parseVehicle = (name: string | null | undefined) => {
-        const tokens = (name ?? "").toLowerCase().split(/\s+/).filter(Boolean);
-        const yearIdx = tokens.findIndex((t) => /^(19|20)\d{2}$/.test(t));
-        const afterYear = yearIdx >= 0 ? tokens.slice(yearIdx + 1) : tokens;
-        const make = afterYear[0] ?? "";
-        const model = afterYear[1] ?? "";
-        return { make, model };
-      };
-      const baseVehicle = parseVehicle(thread.vehicleName);
-      const baseSymptoms = (thread.symptoms ?? []).join(" ").toLowerCase();
-
-      const scored = all
-        .filter((t) => t.id !== thread.id && (t.hasSolution || t.status === "solved"))
-        .map((t) => {
-          let score = 0;
-          const reasons: string[] = [];
-
-          const tVehicle = parseVehicle(t.vehicleName);
-          const sameMake = baseVehicle.make && tVehicle.make && baseVehicle.make === tVehicle.make;
-          const sameModel = baseVehicle.model && tVehicle.model && baseVehicle.model === tVehicle.model;
-          if (sameMake && sameModel) {
-            score += 25;
-            reasons.push(`Same make + model (${baseVehicle.make} ${baseVehicle.model})`);
-          } else if (sameMake) {
-            score += 10;
-            reasons.push(`Same make (${baseVehicle.make})`);
-          }
-          const tDtcs = (t.obdCodes ?? []).map((c) => c.toUpperCase().trim());
-          const dtcOverlap = baseDtcs.filter((c) => tDtcs.includes(c));
-          if (dtcOverlap.length > 0) {
-            score += 25 * dtcOverlap.length;
-            reasons.push(`DTC match: ${dtcOverlap.join(", ")}`);
-          }
-          if (thread.systemCategory && t.systemCategory === thread.systemCategory) {
-            score += 5;
-            reasons.push("Same system");
-          }
-          const tSymptoms = (t.symptoms ?? []).join(" ").toLowerCase();
-          if (baseSymptoms && tSymptoms) {
-            const baseWords = Array.from(new Set(baseSymptoms.split(/\W+/).filter((w) => w.length > 4)));
-            const overlap = baseWords.filter((w) => tSymptoms.includes(w));
-            if (overlap.length > 0) {
-              score += overlap.length * 2;
-              reasons.push(`Symptom overlap (${overlap.length})`);
-            }
-          }
-
-          return { thread: t, score, reasons };
-        })
-        .filter((s) => s.score > 0)
-        .sort((a, b) => b.score - a.score);
-
-      const top = scored.slice(0, 5);
-      const visible = hasFull ? top : top.slice(0, 1);
-      const hidden = top.length - visible.length;
-
-      res.json({
-        cases: visible.map((s) => ({
-          id: s.thread.id,
-          title: s.thread.title,
-          vehicleName: s.thread.vehicleName,
-          systemCategory: s.thread.systemCategory,
-          obdCodes: s.thread.obdCodes ?? [],
-          score: s.score,
-          matchReasons: s.reasons,
-        })),
-        hiddenCount: hidden,
-        totalAvailable: top.length,
-        hasFeature: hasFull,
-      });
+      const candidates = await storage.getSolvedThreads();
+      const result = buildSimilarCasesResult(
+        {
+          vehicleName: thread.vehicleName,
+          obdCodes: thread.obdCodes ?? [],
+          symptoms: thread.symptoms ?? [],
+          systemCategory: thread.systemCategory,
+          excludeId: thread.id,
+        },
+        candidates,
+        hasFull,
+      );
+      res.json(result);
     } catch (error) {
       console.error("Error fetching similar cases:", error);
       res.status(500).json({ error: "Failed to load similar cases" });

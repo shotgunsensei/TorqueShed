@@ -850,16 +850,18 @@ export default function ThreadDetailScreen() {
           </View>
         </Card>
 
+        {!thread.hasSolution && thread.status !== "solved" ? (
+          <SimilarCasesCard
+            caseId={threadId}
+            onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+          />
+        ) : null}
         <PartsAndToolsCard
           caseId={threadId}
           onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
           onBrowseMarketplace={() => navigation.navigate("Main", { screen: "MarketTab", params: { screen: "Market", params: { segment: "swap" } } })}
         />
         <RepairPlanCard
-          caseId={threadId}
-          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
-        />
-        <SimilarCasesCard
           caseId={threadId}
           onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
         />
