@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Alert, Modal, Platform } from "react-native";
+import { Image } from "expo-image";
+import { resolveImageUri } from "@/utils/objectStorageExpo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
@@ -40,6 +42,7 @@ interface Listing {
   localPickup: boolean;
   willShip: boolean;
   imageUrl: string | null;
+  extraImageUrls: string[] | null;
   createdAt: string;
   userName: string;
   userSwapCount: number;
@@ -217,12 +220,47 @@ export default function ListingDetailScreen() {
           paddingHorizontal: Spacing.lg,
         }}
       >
-        <View style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}>
-          <Feather name="image" size={48} color={theme.textSecondary} />
-          <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
-            No image available
-          </ThemedText>
-        </View>
+        {listing.imageUrl ? (
+          <Image
+            source={{ uri: resolveImageUri(listing.imageUrl) || undefined }}
+            style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}
+            contentFit="cover"
+            transition={200}
+            testID="image-listing-cover"
+          />
+        ) : (
+          <View style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="image" size={48} color={theme.textSecondary} />
+            <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+              No image available
+            </ThemedText>
+          </View>
+        )}
+
+        {Array.isArray(listing.extraImageUrls) && listing.extraImageUrls.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: Spacing.sm }}
+            contentContainerStyle={{ gap: Spacing.sm, paddingVertical: Spacing.xs }}
+            testID="row-extra-images"
+          >
+            {listing.extraImageUrls.map((u, idx) => {
+              const uri = resolveImageUri(u);
+              if (!uri) return null;
+              return (
+                <Image
+                  key={`${idx}-${u}`}
+                  source={{ uri }}
+                  style={styles.extraImageThumb}
+                  contentFit="cover"
+                  transition={200}
+                  testID={`image-listing-extra-${idx}`}
+                />
+              );
+            })}
+          </ScrollView>
+        ) : null}
 
         <View style={styles.header}>
           <ThemedText type="h2">{listing.title}</ThemedText>
@@ -407,6 +445,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: Spacing.lg,
+  },
+  extraImageThumb: {
+    width: 84,
+    height: 84,
+    borderRadius: BorderRadius.md,
   },
   header: {
     marginBottom: Spacing.lg,

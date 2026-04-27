@@ -71,12 +71,12 @@ export type UploadKind = "image" | "video";
 export class ObjectStorageService {
   getPublicObjectSearchPaths(): string[] {
     const raw = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
-    const paths = Array.from(
-      new Set(
+    const paths: string[] = Array.from(
+      new Set<string>(
         raw
           .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+          .map((s: string) => s.trim())
+          .filter((s: string) => Boolean(s)),
       ),
     );
     if (paths.length === 0) {

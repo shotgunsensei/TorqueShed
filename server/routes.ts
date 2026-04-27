@@ -1649,6 +1649,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const objectStorageService = new ObjectStorageService();
+      const normalizeImage = (raw: string | null | undefined): string | null => {
+        if (!raw || typeof raw !== "string" || !raw.trim()) return null;
+        try {
+          return objectStorageService.normalizeObjectEntityPath(raw);
+        } catch {
+          return raw;
+        }
+      };
+
+      const normalizedImageUrl = normalizeImage(req.body.imageUrl);
+      const rawExtras: string[] = hasAdvanced && Array.isArray(req.body.extraImageUrls)
+        ? req.body.extraImageUrls.filter((u: unknown) => typeof u === "string" && u.trim().length > 0).slice(0, 8)
+        : [];
+      const normalizedExtras: string[] = [];
+      for (const raw of rawExtras) {
+        const norm = normalizeImage(raw);
+        if (norm) normalizedExtras.push(norm);
+      }
+
       const parsed = insertSwapShopListingSchema.parse({
         title: req.body.title?.trim(),
         description: req.body.description || null,
@@ -1657,8 +1677,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: req.body.location || null,
         localPickup: req.body.localPickup !== false,
         willShip: req.body.willShip === true,
-        imageUrl: req.body.imageUrl || null,
-        extraImageUrls: hasAdvanced && Array.isArray(req.body.extraImageUrls) ? req.body.extraImageUrls.filter((u: unknown) => typeof u === "string" && u.trim().length > 0) : [],
+        imageUrl: normalizedImageUrl,
+        extraImageUrls: normalizedExtras,
         contactMethod: hasAdvanced ? (req.body.contactMethod || null) : null,
         isDraft: hasAdvanced ? req.body.isDraft === true : false,
         category: req.body.category || "parts",
@@ -1691,6 +1711,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasAdvanced = tierHasFeature(tier, "advanced_listing_options");
 
       const parsed = updateSwapShopListingSchema.parse(req.body);
+      const objectStorageService = new ObjectStorageService();
+      const normalizeImage = (raw: string | null | undefined): string | null => {
+        if (!raw || typeof raw !== "string" || !raw.trim()) return null;
+        try {
+          return objectStorageService.normalizeObjectEntityPath(raw);
+        } catch {
+          return raw;
+        }
+      };
+
       const updates: Record<string, unknown> = {};
       if (parsed.title !== undefined) updates.title = parsed.title;
       if (parsed.description !== undefined) updates.description = parsed.description;
@@ -1699,7 +1729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parsed.location !== undefined) updates.location = parsed.location;
       if (parsed.localPickup !== undefined) updates.localPickup = parsed.localPickup;
       if (parsed.willShip !== undefined) updates.willShip = parsed.willShip;
-      if (parsed.imageUrl !== undefined) updates.imageUrl = parsed.imageUrl;
+      if (parsed.imageUrl !== undefined) updates.imageUrl = normalizeImage(parsed.imageUrl);
       if (parsed.isActive !== undefined) updates.isActive = parsed.isActive;
       if (parsed.category !== undefined) updates.category = parsed.category;
       if (parsed.attachedCaseId !== undefined) {
@@ -1712,7 +1742,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.attachedCaseId = parsed.attachedCaseId;
       }
       if (hasAdvanced) {
-        if (parsed.extraImageUrls !== undefined) updates.extraImageUrls = parsed.extraImageUrls.filter((u) => typeof u === "string" && u.trim().length > 0);
+        if (parsed.extraImageUrls !== undefined) {
+          const filtered = parsed.extraImageUrls.filter((u) => typeof u === "string" && u.trim().length > 0).slice(0, 8);
+          const normalized: string[] = [];
+          for (const raw of filtered) {
+            const norm = normalizeImage(raw);
+            if (norm) normalized.push(norm);
+          }
+          updates.extraImageUrls = normalized;
+        }
         if (parsed.contactMethod !== undefined) updates.contactMethod = parsed.contactMethod;
         if (parsed.isDraft !== undefined) updates.isDraft = parsed.isDraft;
       }
@@ -3162,10 +3200,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Server-rendered HTML routes (shareable links)
-  app.get("/shops/:slug", async (_req: Request, res: Response) => {
-    res.sendFile(path.resolve(process.cwd(), "server", "templates", "public-shop.html"));
-  });
   app.get("/public/diagnostic-summary/:token", async (_req: Request, res: Response) => {
     res.sendFile(path.resolve(process.cwd(), "server", "templates", "public-summary.html"));
   });

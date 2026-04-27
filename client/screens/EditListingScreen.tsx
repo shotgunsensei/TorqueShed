@@ -14,6 +14,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { ThemedText } from "@/components/ThemedText";
 import { LockedFeature } from "@/components/LockedFeature";
+import { PhotoPickerGrid } from "@/components/PhotoPickerGrid";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useEntitlements } from "@/lib/entitlements";
@@ -72,8 +73,8 @@ export default function EditListingScreen() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [extraImageUrlsText, setExtraImageUrlsText] = useState("");
+  const [coverImages, setCoverImages] = useState<string[]>([]);
+  const [extraImages, setExtraImages] = useState<string[]>([]);
   const [contactMethodIndex, setContactMethodIndex] = useState(0);
   const [isDraft, setIsDraft] = useState(false);
   const [conditionIndex, setConditionIndex] = useState(2);
@@ -93,7 +94,7 @@ export default function EditListingScreen() {
       setDescription(listing.description || "");
       setPrice(listing.price?.replace(/^\$/, "") || "");
       setLocation(listing.location || "");
-      setImageUrl(listing.imageUrl || "");
+      setCoverImages(listing.imageUrl ? [listing.imageUrl] : []);
       const condIdx = CONDITIONS.indexOf(listing.condition);
       setConditionIndex(condIdx >= 0 ? condIdx : 2);
       const catIdx = CATEGORIES.findIndex((c) => c.value === (listing as any).category);
@@ -101,7 +102,7 @@ export default function EditListingScreen() {
       setLocalPickup(listing.localPickup);
       setWillShip(listing.willShip);
       if (listing.extraImageUrls && Array.isArray(listing.extraImageUrls)) {
-        setExtraImageUrlsText(listing.extraImageUrls.join("\n"));
+        setExtraImages(listing.extraImageUrls);
       }
       const cmIdx = CONTACT_METHODS.findIndex((m) => m.value === listing.contactMethod);
       setContactMethodIndex(cmIdx >= 0 ? cmIdx : 0);
@@ -115,7 +116,6 @@ export default function EditListingScreen() {
     if (!title.trim()) newErrors.title = "Title is required";
     if (!price.trim()) newErrors.price = "Price is required";
     else if (isNaN(Number(price.replace(/[,$]/g, "")))) newErrors.price = "Enter a valid number";
-    if (imageUrl.trim() && !imageUrl.trim().startsWith("http")) newErrors.imageUrl = "Enter a valid URL starting with http";
     if (!localPickup && !willShip) newErrors.shipping = "Select at least one shipping option";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -123,25 +123,19 @@ export default function EditListingScreen() {
 
   const updateListingMutation = useMutation({
     mutationFn: async () => {
-      const extraImageUrls = canAdvancedListing
-        ? extraImageUrlsText
-            .split(/[\n,]/)
-            .map((u) => u.trim())
-            .filter((u) => u.length > 0)
-        : undefined;
       return apiRequest("PATCH", `/api/swap-shop/${listingId}`, {
         title: title.trim(),
         description: description.trim() || null,
         price: price.trim(),
         condition: CONDITIONS[conditionIndex],
         location: location.trim() || null,
-        imageUrl: imageUrl.trim() || null,
+        imageUrl: coverImages[0] || null,
         localPickup,
         willShip,
         category: CATEGORIES[categoryIndex].value,
         ...(canAdvancedListing
           ? {
-              extraImageUrls,
+              extraImageUrls: extraImages,
               contactMethod: CONTACT_METHODS[contactMethodIndex].value,
               isDraft,
             }
@@ -238,19 +232,14 @@ export default function EditListingScreen() {
           testID="input-edit-location"
         />
 
-        <View>
-          <Input
-            label="Image URL (optional)"
-            placeholder="https://example.com/photo.jpg"
-            value={imageUrl}
-            onChangeText={(u) => { setImageUrl(u); setErrors((e) => ({ ...e, imageUrl: "" })); }}
-            leftIcon="image"
-            autoCapitalize="none"
-            keyboardType="url"
-            testID="input-edit-image"
-          />
-          {errors.imageUrl ? <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>{errors.imageUrl}</ThemedText> : null}
-        </View>
+        <PhotoPickerGrid
+          label="Cover photo"
+          helperText="Take a photo or choose one from your library."
+          values={coverImages}
+          onChange={setCoverImages}
+          max={1}
+          testID="picker-edit-cover-image"
+        />
 
         <View style={styles.conditionSection}>
           <ThemedText type="body" style={styles.conditionLabel}>
@@ -332,17 +321,13 @@ export default function EditListingScreen() {
           </View>
           {canAdvancedListing ? (
             <View style={{ gap: Spacing.lg, marginTop: Spacing.sm }}>
-              <Input
-                label="Extra image URLs"
-                placeholder="One URL per line or comma-separated"
-                value={extraImageUrlsText}
-                onChangeText={setExtraImageUrlsText}
-                multiline
-                numberOfLines={3}
-                style={{ minHeight: 80, textAlignVertical: "top" }}
-                autoCapitalize="none"
-                keyboardType="url"
-                testID="input-edit-extra-images"
+              <PhotoPickerGrid
+                label="Extra photos"
+                helperText="Up to 5 additional photos. Buyers see these in the gallery."
+                values={extraImages}
+                onChange={setExtraImages}
+                max={5}
+                testID="picker-edit-extra-images"
               />
               <View style={{ gap: Spacing.sm }}>
                 <ThemedText type="body">Preferred contact method</ThemedText>
