@@ -73,15 +73,37 @@ const TIER_FEATURES: Record<Tier, Feature[]> = {
   ],
 };
 
+export const TIER_LABEL: Record<Tier, string> = {
+  free: "Free",
+  diy_pro: "DIY Pro",
+  garage_pro: "Garage Pro",
+  shop_pro: "Shop Pro",
+};
+
+export const TIER_ORDER: Tier[] = ["free", "diy_pro", "garage_pro", "shop_pro"];
+
+export function tierIndex(tier: Tier): number {
+  return TIER_ORDER.indexOf(tier);
+}
+
+export const FREE_SAVED_THREAD_LIMIT = 3;
+
+export type StripeMode = "live" | "test" | "missing_config";
+export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "incomplete";
+
 export interface SubscriptionInfo {
   tier: Tier;
-  status: string;
+  status: SubscriptionStatus;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
-  hasStripeCustomer: boolean;
   hasStripeSubscription: boolean;
   stripeConfigured: boolean;
+  stripeMode: StripeMode;
+  hasStripeCustomer: boolean;
+  isBillingDelinquent: boolean;
+  webhookConfigured: boolean;
   prices: Record<Tier, { monthly: number; label: string }>;
+  tierPriceIds: Record<Exclude<Tier, "free">, string | null>;
 }
 
 export function useEntitlements() {
@@ -97,8 +119,12 @@ export function useEntitlements() {
     tier,
     isPaid: tier !== "free",
     stripeConfigured: query.data?.stripeConfigured ?? false,
+    stripeMode: query.data?.stripeMode ?? "missing_config",
+    isBillingDelinquent: query.data?.isBillingDelinquent ?? false,
+    hasStripeCustomer: query.data?.hasStripeCustomer ?? false,
     isLoading: query.isLoading,
     hasFeature: (key: Feature) => features.includes(key),
     subscription: query.data,
+    refetch: query.refetch,
   };
 }

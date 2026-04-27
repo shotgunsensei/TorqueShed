@@ -7,6 +7,7 @@ import MoreScreen from "@/screens/MoreScreen";
 import PartsScreen from "@/screens/PartsScreen";
 import TrendingScreen from "@/screens/TrendingScreen";
 import SubscriptionScreen from "@/screens/SubscriptionScreen";
+import BillingScreen from "@/screens/BillingScreen";
 import SellerDashboardScreen from "@/screens/SellerDashboardScreen";
 import MyListingsScreen from "@/screens/MyListingsScreen";
 import ToolInventoryScreen from "@/screens/ToolInventoryScreen";
@@ -28,6 +29,7 @@ export type MoreStackParamList = {
   TorqueAssist: undefined;
   ToolAndGear: undefined;
   Subscription: undefined;
+  Billing: undefined;
   SellerDashboard: undefined;
   MyListings: undefined;
   ToolInventory: undefined;
@@ -90,6 +92,11 @@ export default function MoreStackNavigator() {
         name="Subscription"
         component={SubscriptionScreen}
         options={{ headerTitle: "Subscription" }}
+      />
+      <Stack.Screen
+        name="Billing"
+        component={BillingScreen}
+        options={{ headerTitle: "Billing" }}
       />
       <Stack.Screen
         name="SellerDashboard"

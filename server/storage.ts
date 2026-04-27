@@ -20,6 +20,7 @@ import {
   shopLeads,
   shopTeamMembers,
   caseCustomerSummaries,
+  savedThreads,
   type ShopService,
   type InsertShopService,
   type ShopLead,
@@ -1093,6 +1094,78 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async setStripeCustomerId(userId: string, stripeCustomerId: string): Promise<Subscription> {
+    const existing = await this.getSubscription(userId);
+    if (existing) {
+      const [updated] = await db
+        .update(subscriptions)
+        .set({ stripeCustomerId, updatedAt: new Date() })
+        .where(eq(subscriptions.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(subscriptions)
+      .values({ userId, tier: "free", status: "active", stripeCustomerId })
+      .returning();
+    return created;
+  }
+
+  async getSubscriptionByStripeCustomerId(stripeCustomerId: string): Promise<Subscription | undefined> {
+    const [sub] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.stripeCustomerId, stripeCustomerId))
+      .limit(1);
+    return sub || undefined;
+  }
+
+  async updateSubscriptionFromStripe(
+    userId: string,
+    data: {
+      tier: SubscriptionTier;
+      status: SubscriptionStatus;
+      stripeCustomerId: string;
+      stripeSubscriptionId: string | null;
+      stripePriceId: string | null;
+      cancelAtPeriodEnd: boolean;
+      currentPeriodEnd: Date | null;
+    },
+  ): Promise<Subscription> {
+    const existing = await this.getSubscription(userId);
+    const payload = { ...data, updatedAt: new Date() };
+    if (existing) {
+      const [updated] = await db
+        .update(subscriptions)
+        .set(payload)
+        .where(eq(subscriptions.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(subscriptions)
+      .values({ userId, ...payload })
+      .returning();
+    return created;
+  }
+
+  async countSavedThreadsForUser(userId: string): Promise<number> {
+    const rows = await db
+      .select({ id: savedThreads.threadId })
+      .from(savedThreads)
+      .where(eq(savedThreads.userId, userId));
+    return rows.length;
+  }
+
+  async isThreadSavedByUser(userId: string, threadId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: savedThreads.threadId })
+      .from(savedThreads)
+      .where(and(eq(savedThreads.userId, userId), eq(savedThreads.threadId, threadId)))
+      .limit(1);
+    return Boolean(row);
+  }
+
   // ========== Seller Profiles ==========
   async getSellerProfile(userId: string): Promise<SellerProfile | undefined> {
     const [sp] = await db.select().from(sellerProfiles).where(eq(sellerProfiles.userId, userId)).limit(1);
@@ -1163,6 +1236,39 @@ export class DatabaseStorage implements IStorage {
       .from(expertReviews)
       .where(eq(expertReviews.caseId, caseId))
       .orderBy(desc(expertReviews.createdAt));
+  }
+
+  async getExpertReview(id: string): Promise<ExpertReview | undefined> {
+    const [row] = await db.select().from(expertReviews).where(eq(expertReviews.id, id));
+    return row;
+  }
+
+  async setExpertReviewStripeSession(id: string, stripeSessionId: string): Promise<void> {
+    await db
+      .update(expertReviews)
+      .set({ stripeSessionId, updatedAt: new Date() })
+      .where(eq(expertReviews.id, id));
+  }
+
+  async markExpertReviewPaid(
+    id: string,
+    stripePaymentIntentId: string | null,
+  ): Promise<void> {
+    await db
+      .update(expertReviews)
+      .set({
+        paymentStatus: "paid",
+        stripePaymentIntentId,
+        updatedAt: new Date(),
+      })
+      .where(eq(expertReviews.id, id));
+  }
+
+  async markExpertReviewFailed(id: string): Promise<void> {
+    await db
+      .update(expertReviews)
+      .set({ paymentStatus: "failed", updatedAt: new Date() })
+      .where(eq(expertReviews.id, id));
   }
 
   // ========== Repair Plan Exports ==========

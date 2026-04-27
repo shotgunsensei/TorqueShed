@@ -92,12 +92,24 @@ const TIER_LABEL: Record<SubscriptionTier, string> = {
   shop_pro: "Shop Pro",
 };
 
+// Statuses that keep premium access. `past_due` keeps read access for paid
+// features so the user isn't locked out of their own data while they fix the
+// payment method, but write actions should warn (handled in the UI via
+// `isBillingDelinquent`).
+const ACCESS_GRANTING_STATUSES = new Set(["active", "trialing", "past_due"]);
+
 export async function getUserTier(userId: string | undefined | null): Promise<SubscriptionTier> {
   if (!userId) return "free";
   const sub = await storage.getSubscription(userId);
   if (!sub) return "free";
-  if (sub.status !== "active" && sub.status !== "trialing") return "free";
+  if (!ACCESS_GRANTING_STATUSES.has(sub.status)) return "free";
   return (sub.tier as SubscriptionTier) ?? "free";
+}
+
+export async function isUserBillingDelinquent(userId: string | undefined | null): Promise<boolean> {
+  if (!userId) return false;
+  const sub = await storage.getSubscription(userId);
+  return sub?.status === "past_due";
 }
 
 export function tierHasFeature(tier: SubscriptionTier, feature: Feature): boolean {
@@ -117,24 +129,40 @@ export function tierLabel(tier: SubscriptionTier): string {
   return TIER_LABEL[tier];
 }
 
+function isWriteMethod(method: string): boolean {
+  return method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+}
+
+function billingPastDueResponse(res: Response, feature: Feature) {
+  return res.status(402).json({
+    error: "Your last payment failed. Update your billing to continue using premium features.",
+    billingPastDue: true,
+    feature,
+  });
+}
+
 export function requireFeature(feature: Feature) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ error: "Authentication required" });
     const tier = await getUserTier(userId);
-    if (tierHasFeature(tier, feature)) {
-      (req as AuthenticatedRequest & { _tier?: SubscriptionTier })._tier = tier;
-      return next();
+    if (!tierHasFeature(tier, feature)) {
+      const required = minimumTierFor(feature);
+      return res.status(402).json({
+        error: `This feature requires ${TIER_LABEL[required]} or higher.`,
+        upgradeRequired: true,
+        feature,
+        currentTier: tier,
+        requiredTier: required,
+        requiredTierLabel: TIER_LABEL[required],
+      });
     }
-    const required = minimumTierFor(feature);
-    return res.status(402).json({
-      error: `This feature requires ${TIER_LABEL[required]} or higher.`,
-      upgradeRequired: true,
-      feature,
-      currentTier: tier,
-      requiredTier: required,
-      requiredTierLabel: TIER_LABEL[required],
-    });
+    // Past-due users keep read access but premium write actions are paused.
+    if (isWriteMethod(req.method) && (await isUserBillingDelinquent(userId))) {
+      return billingPastDueResponse(res, feature);
+    }
+    (req as AuthenticatedRequest & { _tier?: SubscriptionTier })._tier = tier;
+    return next();
   };
 }
 
@@ -151,18 +179,21 @@ export function requireFeatureOrTeam(feature: Feature) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ error: "Authentication required" });
-    if (await userOrTeamHasFeature(userId, feature)) {
-      return next();
+    if (!(await userOrTeamHasFeature(userId, feature))) {
+      const required = minimumTierFor(feature);
+      const tier = await getUserTier(userId);
+      return res.status(402).json({
+        error: `This feature requires ${TIER_LABEL[required]} or higher.`,
+        upgradeRequired: true,
+        feature,
+        currentTier: tier,
+        requiredTier: required,
+        requiredTierLabel: TIER_LABEL[required],
+      });
     }
-    const required = minimumTierFor(feature);
-    const tier = await getUserTier(userId);
-    return res.status(402).json({
-      error: `This feature requires ${TIER_LABEL[required]} or higher.`,
-      upgradeRequired: true,
-      feature,
-      currentTier: tier,
-      requiredTier: required,
-      requiredTierLabel: TIER_LABEL[required],
-    });
+    if (isWriteMethod(req.method) && (await isUserBillingDelinquent(userId))) {
+      return billingPastDueResponse(res, feature);
+    }
+    return next();
   };
 }

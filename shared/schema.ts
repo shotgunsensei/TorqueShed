@@ -395,6 +395,8 @@ export const subscriptions = pgTable("subscriptions", {
   status: varchar("status", { length: 20 }).notNull().default("active"),
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
+  stripePriceId: varchar("stripe_price_id", { length: 100 }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   currentPeriodEnd: timestamp("current_period_end"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -521,6 +523,8 @@ export const expertReviews = pgTable("expert_reviews", {
   userNotes: text("user_notes"),
   expertNotes: text("expert_notes"),
   priceCents: integer("price_cents").notNull(),
+  stripeSessionId: varchar("stripe_session_id", { length: 200 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 200 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

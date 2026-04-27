@@ -55,7 +55,7 @@ import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapSho
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
 import { buildSimilarCasesResult } from "./similar-cases";
-import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature, requireFeatureOrTeam } from "./entitlements";
+import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature, requireFeatureOrTeam, isUserBillingDelinquent } from "./entitlements";
 import {
   createSubscriptionCheckoutSession,
   createBillingPortalSession,
@@ -64,6 +64,8 @@ import {
   isPaidTier,
 } from "./stripeBilling";
 import { isStripeConfigured } from "./stripeClient";
+import { getStripeClient, getTierForPriceId, getPriceIdForTier, getBillingConfigStatus, probeStripe, PAID_TIERS, type PaidTier } from "./stripe";
+import type Stripe from "stripe";
 import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
@@ -1842,8 +1844,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const thread = await storage.getThread(req.params.threadId);
       if (!thread) return res.status(404).json({ error: "Thread not found" });
 
+      const userId = req.userId!;
+      const tier = await getUserTier(userId);
+      if (!tierHasFeature(tier, "unlimited_saved_cases")) {
+        const alreadySaved = await storage.isThreadSavedByUser(userId, req.params.threadId);
+        if (!alreadySaved) {
+          const count = await storage.countSavedThreadsForUser(userId);
+          if (count >= FREE_SAVED_THREAD_LIMIT) {
+            const required = minimumTierFor("unlimited_saved_cases");
+            return res.status(402).json({
+              error: `Free accounts can save up to ${FREE_SAVED_THREAD_LIMIT} cases. Upgrade to ${tierLabel(required)} for unlimited saves.`,
+              upgradeRequired: true,
+              feature: "unlimited_saved_cases",
+              currentTier: tier,
+              requiredTier: required,
+              requiredTierLabel: tierLabel(required),
+              limit: FREE_SAVED_THREAD_LIMIT,
+              currentCount: count,
+            });
+          }
+        }
+      }
+
       await db.insert(savedThreads).values({
-        userId: req.userId!,
+        userId,
         threadId: req.params.threadId,
       }).onConflictDoNothing();
 
@@ -2074,13 +2098,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ========== Subscriptions ==========
+  // ========== Subscriptions & Billing ==========
+  // Display-only price metadata. Real prices live in Stripe; these are for the
+  // marketing labels on the subscription screen.
   const TIER_PRICE_MAP: Record<SubscriptionTier, { monthly: number; label: string }> = {
     free: { monthly: 0, label: "Free" },
     diy_pro: { monthly: 999, label: "DIY Pro" },
     garage_pro: { monthly: 2900, label: "Garage Pro" },
     shop_pro: { monthly: 7900, label: "Shop Pro" },
   };
+  const FREE_SAVED_THREAD_LIMIT = 3;
+
+  function pickReturnBaseUrl(req: Request): string {
+    const explicit = process.env.STRIPE_BILLING_RETURN_URL?.trim();
+    if (explicit) return explicit.replace(/\/+$/, "");
+    const origin = req.header("origin");
+    if (origin && /^https?:\/\//.test(origin)) return origin.replace(/\/+$/, "");
+    const proto = req.header("x-forwarded-proto") || req.protocol || "https";
+    const host = req.header("x-forwarded-host") || req.get("host");
+    return `${proto}://${host}`;
+  }
+
+  async function buildSubscriptionResponse(userId: string) {
+    const sub = await storage.getSubscription(userId);
+    const billing = getBillingConfigStatus();
+    const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
+    const status = sub?.status ?? "active";
+    const stripeConfigured = billing.allPricesConfigured;
+    let stripeMode: "live" | "test" | "missing_config" = "missing_config";
+    if (stripeConfigured) {
+      try {
+        const probe = await probeStripe();
+        stripeMode = probe.reachable ? (probe.mode === "unknown" ? "test" : probe.mode) : "missing_config";
+      } catch {
+        stripeMode = "missing_config";
+      }
+    }
+    const isBillingDelinquent = status === "past_due";
+    return {
+      tier,
+      status,
+      currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+      cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      stripeConfigured,
+      stripeMode,
+      hasStripeCustomer: Boolean(sub?.stripeCustomerId),
+      isBillingDelinquent,
+      webhookConfigured: billing.webhookSecretConfigured,
+      prices: TIER_PRICE_MAP,
+      tierPriceIds: billing.priceIds,
+    };
+  }
 
   function getReturnBaseUrl(req: Request): string {
     const explicit = process.env.EXPO_PUBLIC_DOMAIN || process.env.PUBLIC_BASE_URL;
@@ -2096,18 +2164,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/subscription", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const data = await buildSubscriptionResponse(req.userId!);
       const sub = await storage.getSubscription(req.userId!);
-      const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
-      const stripeConfigured = isStripeConfigured();
       res.json({
-        tier,
-        status: sub?.status ?? "active",
-        currentPeriodEnd: sub?.currentPeriodEnd ?? null,
-        cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
-        hasStripeCustomer: Boolean(sub?.stripeCustomerId),
+        ...data,
         hasStripeSubscription: Boolean(sub?.stripeSubscriptionId),
-        stripeConfigured,
-        prices: TIER_PRICE_MAP,
       });
     } catch (error) {
       console.error("Error fetching subscription:", error);
@@ -2115,12 +2176,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Legacy upgrade endpoint kept for "Downgrade to Free" only. Paid upgrades
+  // now flow through /api/billing/create-checkout-session.
   app.post("/api/subscription/upgrade", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const parsed = insertSubscriptionSchema.parse(req.body);
+      const parsedTier = parsed.tier;
       const stripeConfigured = isStripeConfigured();
 
-      if (parsed.tier === "free") {
+      if (parsedTier === "free") {
         // Downgrade — instruct the user to cancel via the portal if they have a paid sub.
         const existing = await storage.getSubscription(req.userId!);
         if (existing?.stripeSubscriptionId && stripeConfigured) {
@@ -2145,14 +2209,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (!isPaidTier(parsed.tier)) {
+      if (!isPaidTier(parsedTier)) {
         return res.status(400).json({ error: "Unknown tier" });
       }
 
       const baseUrl = getReturnBaseUrl(req);
       const session = await createSubscriptionCheckoutSession({
         userId: req.userId!,
-        tier: parsed.tier,
+        tier: parsedTier,
         successUrl: `${baseUrl}/?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${baseUrl}/?stripe=canceled`,
       });
@@ -2161,7 +2225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: "checkout",
         checkoutUrl: session.url,
         sessionId: session.sessionId,
-        tier: parsed.tier,
+        tier: parsedTier,
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -2169,6 +2233,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const message = error instanceof Error ? error.message : "Failed to upgrade subscription";
       console.error("Error upgrading subscription:", error);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  async function ensureStripeCustomerForUser(userId: string): Promise<string> {
+    const existing = await storage.getSubscription(userId);
+    if (existing?.stripeCustomerId) return existing.stripeCustomerId;
+    const user = await storage.getUser(userId);
+    if (!user) throw new Error("User not found");
+    const stripe = await getStripeClient();
+    const customer = await stripe.customers.create({
+      name: user.username,
+      metadata: { userId, username: user.username },
+    });
+    await storage.setStripeCustomerId(userId, customer.id);
+    return customer.id;
+  }
+
+  app.post("/api/billing/create-checkout-session", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const tier = req.body?.tier as PaidTier | undefined;
+      if (!tier || !PAID_TIERS.includes(tier)) {
+        return res.status(400).json({ error: "Valid paid tier required (diy_pro, garage_pro, shop_pro)." });
+      }
+      const priceId = getPriceIdForTier(tier);
+      if (!priceId) {
+        return res.status(503).json({
+          error: `Stripe price not configured for ${tierLabel(tier)}. Set ${tier === "diy_pro" ? "STRIPE_PRICE_DIY_PRO" : tier === "garage_pro" ? "STRIPE_PRICE_GARAGE_PRO" : "STRIPE_PRICE_SHOP_PRO"} on the server.`,
+          missingConfig: true,
+        });
+      }
+
+      // Prevent duplicate subscriptions: if the user already has an active or
+      // trialing Stripe subscription, route plan changes through the Customer
+      // Portal instead of creating a parallel subscription.
+      const existingSub = await storage.getSubscription(req.userId!);
+      const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
+      if (
+        existingSub?.stripeSubscriptionId &&
+        existingSub.tier !== "free" &&
+        ACTIVE_STATUSES.has(existingSub.status ?? "")
+      ) {
+        const customerId = await ensureStripeCustomerForUser(req.userId!);
+        const stripe = await getStripeClient();
+        const baseUrl = pickReturnBaseUrl(req);
+        const portal = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: `${baseUrl}/?billing=portal_return`,
+        });
+        return res.json({
+          url: portal.url,
+          mode: "portal",
+          reason: "has_active_subscription",
+          message: "You already have an active subscription. Use the billing portal to switch plans.",
+        });
+      }
+
+      const customerId = await ensureStripeCustomerForUser(req.userId!);
+      const stripe = await getStripeClient();
+      const baseUrl = pickReturnBaseUrl(req);
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer: customerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}/?billing=success&tier=${tier}`,
+        cancel_url: `${baseUrl}/?billing=cancelled`,
+        allow_promotion_codes: false,
+        metadata: { userId: req.userId!, tier },
+        subscription_data: {
+          metadata: { userId: req.userId!, tier },
+        },
+      });
+      if (!session.url) {
+        return res.status(502).json({ error: "Stripe did not return a checkout URL." });
+      }
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error) {
+      console.error("Error creating Stripe checkout session:", error);
+      const message = error instanceof Error ? error.message : "Failed to start checkout";
       res.status(500).json({ error: message });
     }
   });
@@ -2205,6 +2348,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing subscription:", error);
       res.status(500).json({ error: "Failed to sync subscription" });
+    }
+  });
+
+  app.post("/api/billing/create-portal-session", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const sub = await storage.getSubscription(req.userId!);
+      if (!sub?.stripeCustomerId) {
+        return res.status(400).json({
+          error: "No Stripe customer on file. Subscribe to a paid plan first.",
+        });
+      }
+      const stripe = await getStripeClient();
+      const baseUrl = pickReturnBaseUrl(req);
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: sub.stripeCustomerId,
+        return_url: `${baseUrl}/?billing=portal_return`,
+      });
+      res.json({ url: portal.url });
+    } catch (error) {
+      console.error("Error creating Stripe portal session:", error);
+      const message = error instanceof Error ? error.message : "Failed to open billing portal";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // ---- Stripe webhook ----
+  // Uses the raw body buffer captured by the express.json `verify` callback in
+  // server/index.ts (`req.rawBody`). Idempotent: webhooks may be redelivered.
+  app.post("/api/stripe/webhook", async (req: Request, res: Response) => {
+    const signature = req.header("stripe-signature");
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+    if (!signature || !webhookSecret) {
+      return res.status(400).json({ error: "Webhook signature or secret missing." });
+    }
+    const rawBody = req.rawBody;
+    if (!rawBody || !(rawBody instanceof Buffer)) {
+      return res.status(400).json({ error: "Raw body unavailable for signature verification." });
+    }
+
+    let event: Stripe.Event;
+    try {
+      const stripe = await getStripeClient();
+      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    } catch (err) {
+      console.error("Stripe webhook signature verification failed:", err);
+      const message = err instanceof Error ? err.message : "Invalid signature";
+      return res.status(400).json({ error: `Webhook signature verification failed: ${message}` });
+    }
+
+    try {
+      await handleStripeEvent(event);
+      res.json({ received: true });
+    } catch (err) {
+      console.error(`Failed handling Stripe event ${event.id} (${event.type}):`, err);
+      res.status(500).json({ error: "Failed to process webhook event." });
+    }
+  });
+
+  async function handleStripeEvent(event: Stripe.Event) {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const userId = session.metadata?.userId;
+        const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+
+        // Branch on the kind of checkout we created. Subscription checkouts
+        // hold a `subscription` field; one-time expert escalations use
+        // metadata.kind === 'expert_escalation'.
+        if (session.metadata?.kind === "expert_escalation") {
+          const reviewId = session.metadata?.reviewId;
+          if (reviewId) {
+            const paymentIntentId = typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : session.payment_intent?.id ?? null;
+            await storage.markExpertReviewPaid(reviewId, paymentIntentId);
+          }
+          return;
+        }
+
+        const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+        if (!customerId || !subscriptionId) return;
+        if (userId) {
+          await storage.setStripeCustomerId(userId, customerId);
+        }
+        const stripe = await getStripeClient();
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        await applyStripeSubscriptionToDb(sub, userId);
+        return;
+      }
+      case "checkout.session.async_payment_failed":
+      case "checkout.session.expired": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.metadata?.kind === "expert_escalation") {
+          const reviewId = session.metadata?.reviewId;
+          if (reviewId) await storage.markExpertReviewFailed(reviewId);
+        }
+        return;
+      }
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        await applyStripeSubscriptionToDb(sub);
+        return;
+      }
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = typeof (invoice as unknown as { subscription?: string | Stripe.Subscription }).subscription === "string"
+          ? ((invoice as unknown as { subscription?: string }).subscription as string)
+          : (invoice as unknown as { subscription?: Stripe.Subscription }).subscription?.id;
+        if (!subscriptionId) return;
+        const stripe = await getStripeClient();
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        await applyStripeSubscriptionToDb(sub);
+        return;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+        if (!customerId) return;
+        const existing = await storage.getSubscriptionByStripeCustomerId(customerId);
+        if (!existing) return;
+        await storage.updateSubscriptionFromStripe(existing.userId, {
+          tier: existing.tier as SubscriptionTier,
+          status: "past_due",
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: existing.stripeSubscriptionId ?? null,
+          stripePriceId: existing.stripePriceId ?? null,
+          cancelAtPeriodEnd: existing.cancelAtPeriodEnd ?? false,
+          currentPeriodEnd: existing.currentPeriodEnd ?? null,
+        });
+        return;
+      }
+      default:
+        // Ignore unrelated events.
+        return;
+    }
+  }
+
+  async function applyStripeSubscriptionToDb(sub: Stripe.Subscription, fallbackUserId?: string) {
+    const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+    let userId = sub.metadata?.userId || fallbackUserId;
+    if (!userId) {
+      const existing = await storage.getSubscriptionByStripeCustomerId(customerId);
+      if (existing) userId = existing.userId;
+    }
+    if (!userId) {
+      console.warn(`Stripe subscription ${sub.id} has no userId metadata and no matching customer record; ignoring.`);
+      return;
+    }
+
+    const item = sub.items.data[0];
+    const priceId = item?.price?.id ?? null;
+    const tierFromPrice = priceId ? getTierForPriceId(priceId) : null;
+    const wasCanceled = sub.status === "canceled" || sub.status === "incomplete_expired" || sub.status === "unpaid";
+    const tier: SubscriptionTier = wasCanceled ? "free" : (tierFromPrice ?? "free");
+
+    const statusMap: Record<string, "active" | "trialing" | "past_due" | "canceled" | "incomplete"> = {
+      active: "active",
+      trialing: "trialing",
+      past_due: "past_due",
+      unpaid: "past_due",
+      canceled: "canceled",
+      incomplete: "incomplete",
+      incomplete_expired: "canceled",
+      paused: "canceled",
+    };
+    const status = statusMap[sub.status] ?? "incomplete";
+
+    const periodEndRaw = (item as unknown as { current_period_end?: number })?.current_period_end
+      ?? (sub as unknown as { current_period_end?: number }).current_period_end
+      ?? null;
+    const currentPeriodEnd = periodEndRaw ? new Date(periodEndRaw * 1000) : null;
+
+    await storage.updateSubscriptionFromStripe(userId, {
+      tier,
+      status,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: sub.id,
+      stripePriceId: priceId,
+      cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+      currentPeriodEnd,
+    });
+  }
+
+  // Admin-only health: confirms presence of every Stripe env var. Never echoes
+  // the actual values.
+  app.get("/api/admin/billing-health", requireAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const cfg = getBillingConfigStatus();
+      const probe = await probeStripe();
+      res.json({
+        stripeReachable: probe.reachable,
+        stripeMode: probe.mode,
+        webhookSecretConfigured: cfg.webhookSecretConfigured,
+        priceIdsPresent: {
+          diy_pro: Boolean(cfg.priceIds.diy_pro),
+          garage_pro: Boolean(cfg.priceIds.garage_pro),
+          shop_pro: Boolean(cfg.priceIds.shop_pro),
+        },
+        portalReturnUrlConfigured: Boolean(cfg.portalReturnUrl),
+        error: probe.error ?? null,
+      });
+    } catch (error) {
+      console.error("Error checking billing health:", error);
+      res.status(500).json({ error: "Failed to load billing health" });
     }
   });
 
@@ -2628,19 +2977,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     live_remote: 9900,
   };
 
+  const EXPERT_SERVICE_NAMES: Record<string, string> = {
+    quick_review: "Quick Review (Expert)",
+    full_diagnostic: "Full Diagnostic (Expert)",
+    live_remote: "Live Remote Session (Expert)",
+  };
+
   app.post("/api/cases/:caseId/escalate", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      // Block delinquent users from creating new paid escalations.
+      if (await isUserBillingDelinquent(req.userId!)) {
+        return res.status(402).json({
+          error: "Your most recent payment failed. Update your billing to request a new expert review.",
+          billingPastDue: true,
+        });
+      }
+
       const thread = await storage.getThread(req.params.caseId);
       if (!thread) return res.status(404).json({ error: "Case not found" });
 
       const parsed = escalateCaseSchema.parse(req.body);
       const priceCents = EXPERT_PRICE_CENTS[parsed.serviceLevel];
 
-      // STRIPE INTEGRATION POINT:
-      // When STRIPE_SECRET_KEY is set, this endpoint should create a one-time
-      // Payment Intent for `priceCents`, hold the expert review record in
-      // payment_status: "pending" until the webhook flips it to "paid".
-
+      // Create the review row in pending state. The webhook flips it to "paid"
+      // once Stripe confirms the one-time charge via checkout.session.completed.
       const review = await storage.createExpertReview(
         req.params.caseId,
         req.userId!,
@@ -2648,7 +3008,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parsed.userNotes?.trim() || null,
         priceCents,
       );
-      res.json(review);
+
+      // Try to start a Stripe Checkout (mode: 'payment') for the one-time
+      // charge. If Stripe isn't configured, surface that to the client so it
+      // can show an honest "billing not configured" message instead of pretending.
+      try {
+        const stripe = await getStripeClient();
+        const customerId = await ensureStripeCustomerForUser(req.userId!);
+        const baseUrl = pickReturnBaseUrl(req);
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer: customerId,
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "usd",
+                unit_amount: priceCents,
+                product_data: {
+                  name: EXPERT_SERVICE_NAMES[parsed.serviceLevel] ?? "Expert Review",
+                  description: `Case ${req.params.caseId.slice(0, 8)} · ${parsed.serviceLevel}`,
+                },
+              },
+            },
+          ],
+          success_url: `${baseUrl}/?escalation=success&reviewId=${review.id}`,
+          cancel_url: `${baseUrl}/?escalation=cancelled&reviewId=${review.id}`,
+          metadata: {
+            kind: "expert_escalation",
+            reviewId: review.id,
+            caseId: req.params.caseId,
+            userId: req.userId!,
+            serviceLevel: parsed.serviceLevel,
+          },
+          payment_intent_data: {
+            metadata: {
+              kind: "expert_escalation",
+              reviewId: review.id,
+              caseId: req.params.caseId,
+              userId: req.userId!,
+            },
+          },
+        });
+        if (session.url) {
+          await storage.setExpertReviewStripeSession(review.id, session.id);
+          return res.json({ review, checkoutUrl: session.url });
+        }
+        return res.status(502).json({ error: "Stripe did not return a checkout URL." });
+      } catch (stripeErr) {
+        const message = stripeErr instanceof Error ? stripeErr.message : String(stripeErr);
+        // Roll back: leave the review in pending; it has no Stripe session attached.
+        return res.status(503).json({
+          error: "Live billing is not configured for expert escalations yet.",
+          missingConfig: true,
+          detail: message,
+          reviewId: review.id,
+        });
+      }
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });

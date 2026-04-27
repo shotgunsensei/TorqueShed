@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Modal, TextInput } from "react-native";
+import { View, StyleSheet, Pressable, Modal, TextInput, Platform, Linking } from "react-native";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
@@ -46,13 +47,18 @@ export default function EscalateCaseCard({ caseId }: Props) {
         serviceLevel,
         userNotes: userNotes || undefined,
       });
-      return res.json();
+      return res.json() as Promise<{ review: ExpertReview; checkoutUrl?: string }>;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/cases/${caseId}/escalations`] });
-      toast.show("Expert review requested. We'll notify you when it's assigned.", "success");
       setOpen(null);
       setNotes("");
+      if (data?.checkoutUrl) {
+        toast.show("Opening secure Stripe checkout…", "success");
+        await openCheckoutUrl(data.checkoutUrl);
+      } else {
+        toast.show("Expert review requested.", "success");
+      }
     },
     onError: (e: Error) => toast.show(e.message || "Failed to escalate", "error"),
   });
@@ -130,7 +136,7 @@ export default function EscalateCaseCard({ caseId }: Props) {
                   <ThemedText type="body" style={{ color: theme.textMuted }}>Cancel</ThemedText>
                 </Pressable>
                 <ThemedText type="caption" style={{ color: theme.textMuted, textAlign: "center", marginTop: Spacing.xs }}>
-                  No card is charged in this build. Live billing coming soon.
+                  Secure payment via Stripe. You'll only be charged if the expert accepts your request.
                 </ThemedText>
               </>
             ) : null}
@@ -139,6 +145,22 @@ export default function EscalateCaseCard({ caseId }: Props) {
       </Modal>
     </Card>
   );
+}
+
+async function openCheckoutUrl(url: string) {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined") {
+      window.location.assign(url);
+      return;
+    }
+  }
+  try {
+    await WebBrowser.openBrowserAsync(url, {
+      presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+    });
+  } catch {
+    await Linking.openURL(url);
+  }
 }
 
 const styles = StyleSheet.create({
