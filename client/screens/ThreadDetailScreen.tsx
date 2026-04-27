@@ -37,6 +37,7 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import { useEntitlements, FREE_SAVED_THREAD_LIMIT } from "@/lib/entitlements";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -182,6 +183,10 @@ export default function ThreadDetailScreen() {
   });
 
   const isSaved = savedThreadIds.includes(threadId);
+  const { hasFeature } = useEntitlements();
+  const hasUnlimitedSaves = hasFeature("unlimited_saved_cases");
+  const savedCount = savedThreadIds.length;
+  const atSaveCap = !hasUnlimitedSaves && !isSaved && savedCount >= FREE_SAVED_THREAD_LIMIT;
 
   const toggleSaveMutation = useMutation({
     mutationFn: async () => {
@@ -200,6 +205,28 @@ export default function ThreadDetailScreen() {
       toast.show("Failed to update saved threads", "error");
     },
   });
+
+  const goToSubscriptionForSave = () => {
+    navigation.navigate("Main", {
+      screen: "MoreTab",
+      params: {
+        screen: "Subscription",
+        params: {
+          reason: `You've used all ${FREE_SAVED_THREAD_LIMIT} free saved cases. Upgrade to DIY Pro for unlimited saves and to keep this case for later.`,
+          feature: "unlimited_saved_cases",
+        },
+      },
+    });
+  };
+
+  const handleSavePress = () => {
+    if (atSaveCap) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      goToSubscriptionForSave();
+      return;
+    }
+    toggleSaveMutation.mutate();
+  };
 
   const sortedReplies = useMemo(() => {
     const solutionReply = replies.find((r) => r.isSolution);
@@ -852,15 +879,47 @@ export default function ThreadDetailScreen() {
           <View style={styles.threadActions}>
             {currentUser ? (
               <Pressable
-                onPress={() => toggleSaveMutation.mutate()}
+                onPress={handleSavePress}
                 disabled={toggleSaveMutation.isPending}
-                style={[styles.bookmarkButton, { borderColor: isSaved ? theme.primary : theme.border }]}
+                style={[
+                  styles.bookmarkButton,
+                  {
+                    borderColor: atSaveCap
+                      ? theme.cardBorder
+                      : isSaved
+                        ? theme.primary
+                        : theme.border,
+                  },
+                ]}
                 testID="button-bookmark-thread"
               >
-                <Feather name={isSaved ? "bookmark" : "bookmark"} size={14} color={isSaved ? theme.primary : theme.textSecondary} />
-                <ThemedText type="caption" style={{ color: isSaved ? theme.primary : theme.textSecondary, marginLeft: 4 }}>
-                  {isSaved ? "Saved" : "Save"}
+                <Feather
+                  name={atSaveCap ? "lock" : "bookmark"}
+                  size={14}
+                  color={atSaveCap ? theme.textSecondary : isSaved ? theme.primary : theme.textSecondary}
+                />
+                <ThemedText
+                  type="caption"
+                  style={{
+                    color: atSaveCap ? theme.textSecondary : isSaved ? theme.primary : theme.textSecondary,
+                    marginLeft: 4,
+                  }}
+                >
+                  {atSaveCap ? "Save" : isSaved ? "Saved" : "Save"}
                 </ThemedText>
+                {atSaveCap ? (
+                  <View
+                    style={[styles.bookmarkProPill, { backgroundColor: theme.primary + "22" }]}
+                    testID="pill-save-pro"
+                  >
+                    <ThemedText
+                      type="caption"
+                      style={{ color: theme.primary, fontWeight: "700", fontSize: 10 }}
+                    >
+                      PRO
+                    </ThemedText>
+                  </View>
+                ) : null}
               </Pressable>
             ) : null}
             {isThreadAuthor ? (
@@ -1129,6 +1188,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
+  },
+  bookmarkProPill: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: BorderRadius.full,
   },
   deleteThreadButton: {
     flexDirection: "row",

@@ -28,7 +28,7 @@ export type MoreStackParamList = {
   MoreMenu: undefined;
   TorqueAssist: undefined;
   ToolAndGear: undefined;
-  Subscription: undefined;
+  Subscription: { reason?: string; feature?: string } | undefined;
   Billing: undefined;
   SellerDashboard: undefined;
   MyListings: undefined;

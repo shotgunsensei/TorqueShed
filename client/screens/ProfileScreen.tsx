@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getUserRoleDisplay } from "@/components/UserAvatar";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import { useEntitlements, FREE_SAVED_THREAD_LIMIT } from "@/lib/entitlements";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const FOCUS_AREAS = [
@@ -117,6 +118,8 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const navigation = useNavigation<NavigationProp>();
+  const { hasFeature, isPaid } = useEntitlements();
+  const hasUnlimitedSaves = hasFeature("unlimited_saved_cases");
 
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
@@ -442,12 +445,100 @@ export default function ProfileScreen() {
         </Pressable>
       ) : null}
 
-      {(savedItems?.threads?.length ?? 0) > 0 || (savedItems?.listings?.length ?? 0) > 0 ? (
+      {(savedItems?.threads?.length ?? 0) > 0 || (savedItems?.listings?.length ?? 0) > 0 || !isPaid ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Feather name="bookmark" size={16} color={theme.primary} />
             <ThemedText type="h4" style={styles.sectionTitle}>Saved Items</ThemedText>
+            {!hasUnlimitedSaves ? (
+              <View
+                style={[
+                  styles.savedCounterPill,
+                  {
+                    backgroundColor:
+                      (savedItems?.threads?.length ?? 0) >= FREE_SAVED_THREAD_LIMIT
+                        ? theme.primary + "22"
+                        : theme.backgroundTertiary,
+                  },
+                ]}
+                testID="text-saved-counter"
+              >
+                <Feather
+                  name={
+                    (savedItems?.threads?.length ?? 0) >= FREE_SAVED_THREAD_LIMIT
+                      ? "lock"
+                      : "bookmark"
+                  }
+                  size={11}
+                  color={
+                    (savedItems?.threads?.length ?? 0) >= FREE_SAVED_THREAD_LIMIT
+                      ? theme.primary
+                      : theme.textSecondary
+                  }
+                />
+                <ThemedText
+                  type="caption"
+                  style={{
+                    color:
+                      (savedItems?.threads?.length ?? 0) >= FREE_SAVED_THREAD_LIMIT
+                        ? theme.primary
+                        : theme.textSecondary,
+                    marginLeft: 4,
+                    fontWeight: "600",
+                  }}
+                >
+                  {`${savedItems?.threads?.length ?? 0} of ${FREE_SAVED_THREAD_LIMIT} saved`}
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
+          {!hasUnlimitedSaves &&
+          (savedItems?.threads?.length ?? 0) >= FREE_SAVED_THREAD_LIMIT ? (
+            <Pressable
+              style={[
+                styles.savedUpgradePrompt,
+                { borderColor: theme.primary, backgroundColor: theme.primary + "10" },
+              ]}
+              onPress={() =>
+                navigation.navigate("Main", {
+                  screen: "MoreTab",
+                  params: {
+                    screen: "Subscription",
+                    params: {
+                      reason: `You've reached the ${FREE_SAVED_THREAD_LIMIT}-case free save limit. Upgrade to DIY Pro to save unlimited cases.`,
+                      feature: "unlimited_saved_cases",
+                    },
+                  },
+                })
+              }
+              testID="button-saved-upgrade-prompt"
+            >
+              <Feather name="zap" size={14} color={theme.primary} />
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText
+                  type="small"
+                  style={{ color: theme.primary, fontWeight: "700" }}
+                >
+                  You've hit the free save limit
+                </ThemedText>
+                <ThemedText
+                  type="caption"
+                  style={{ color: theme.textSecondary, marginTop: 2 }}
+                >
+                  Upgrade to DIY Pro for unlimited saved cases.
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={16} color={theme.primary} />
+            </Pressable>
+          ) : null}
+          {(savedItems?.threads?.length ?? 0) === 0 &&
+          (savedItems?.listings?.length ?? 0) === 0 ? (
+            <Text style={[styles.savedEmptyHint, { color: theme.textMuted }]}>
+              {!hasUnlimitedSaves
+                ? `Save up to ${FREE_SAVED_THREAD_LIMIT} cases to revisit them later.`
+                : "Save cases and listings to revisit them later."}
+            </Text>
+          ) : null}
           {savedItems?.threads?.map((t) => (
             <Pressable
               key={t.threadId}
@@ -893,6 +984,27 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     flex: 1,
+  },
+  savedCounterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  savedUpgradePrompt: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    marginBottom: Spacing.md,
+  },
+  savedEmptyHint: {
+    fontSize: 12,
+    fontStyle: "italic",
+    paddingVertical: Spacing.sm,
   },
   vehiclesScroller: {
     gap: Spacing.sm,

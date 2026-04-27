@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Platform, Linking } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/query-client";
 import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
 
 type Nav = NativeStackNavigationProp<MoreStackParamList>;
+type SubscriptionRouteProp = RouteProp<MoreStackParamList, "Subscription">;
 
 interface TierCard {
   tier: Tier;
@@ -111,6 +112,8 @@ export default function SubscriptionScreen() {
   const headerHeight = useHeaderHeight();
   const toast = useToast();
   const navigation = useNavigation<Nav>();
+  const route = useRoute<SubscriptionRouteProp>();
+  const upgradeReason = route.params?.reason;
   const queryClient = useQueryClient();
   const { tier: currentTier, isLoading, subscription, isBillingDelinquent, stripeMode, hasStripeCustomer } = useEntitlements();
   const stripeConfigured = subscription?.stripeConfigured ?? false;
@@ -243,6 +246,15 @@ export default function SubscriptionScreen() {
           title="Payment past due"
           body="We couldn't charge your card. You still have read access, but new premium actions are paused until billing is back in good standing."
           action={{ label: "Manage Billing", onPress: () => navigation.navigate("Billing") }}
+        />
+      ) : null}
+
+      {upgradeReason ? (
+        <BillingBanner
+          tone="info"
+          icon="zap"
+          title="Upgrade to keep going"
+          body={upgradeReason}
         />
       ) : null}
 
