@@ -55,6 +55,14 @@ import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
 import { buildSimilarCasesResult } from "./similar-cases";
 import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature, requireFeatureOrTeam } from "./entitlements";
+import {
+  createSubscriptionCheckoutSession,
+  createBillingPortalSession,
+  syncLocalSubscriptionForCustomer,
+  TIER_MONTHLY_AMOUNT_CENTS,
+  isPaidTier,
+} from "./stripeBilling";
+import { isStripeConfigured } from "./stripeClient";
 import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
@@ -1975,15 +1983,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     shop_pro: { monthly: 7900, label: "Shop Pro" },
   };
 
+  function getReturnBaseUrl(req: Request): string {
+    const explicit = process.env.EXPO_PUBLIC_DOMAIN || process.env.PUBLIC_BASE_URL;
+    if (explicit) {
+      return explicit.startsWith("http") ? explicit : `https://${explicit}`;
+    }
+    const forwardedProto = req.header("x-forwarded-proto");
+    const protocol = forwardedProto || req.protocol || "https";
+    const forwardedHost = req.header("x-forwarded-host");
+    const host = forwardedHost || req.get("host") || "localhost";
+    return `${protocol}://${host}`;
+  }
+
   app.get("/api/subscription", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const sub = await storage.getSubscription(req.userId!);
       const tier = (sub?.tier as SubscriptionTier | undefined) ?? "free";
-      const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+      const stripeConfigured = isStripeConfigured();
       res.json({
         tier,
         status: sub?.status ?? "active",
         currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+        hasStripeCustomer: Boolean(sub?.stripeCustomerId),
+        hasStripeSubscription: Boolean(sub?.stripeSubscriptionId),
         stripeConfigured,
         prices: TIER_PRICE_MAP,
       });
@@ -1996,29 +2019,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/subscription/upgrade", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const parsed = insertSubscriptionSchema.parse(req.body);
-      const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+      const stripeConfigured = isStripeConfigured();
 
-      // STRIPE INTEGRATION POINT:
-      // When STRIPE_SECRET_KEY is set, this endpoint should:
-      //   1. Create or retrieve a Stripe customer
-      //   2. Create a Checkout Session (mode: "subscription") with the matching price ID
-      //   3. Return { checkoutUrl } so the client can redirect
-      // For now we accept upgrades only when Stripe is not configured (sandbox mode).
-      if (stripeConfigured && parsed.tier !== "free") {
+      if (parsed.tier === "free") {
+        // Downgrade — instruct the user to cancel via the portal if they have a paid sub.
+        const existing = await storage.getSubscription(req.userId!);
+        if (existing?.stripeSubscriptionId && stripeConfigured) {
+          const portal = await createBillingPortalSession({
+            userId: req.userId!,
+            returnUrl: `${getReturnBaseUrl(req)}/`,
+          });
+          return res.json({
+            mode: "portal",
+            portalUrl: portal.url,
+            message: "Open the customer portal to cancel your subscription.",
+          });
+        }
+        const sub = await storage.upsertSubscription(req.userId!, "free", "active");
+        return res.json({ mode: "downgrade", tier: sub.tier, status: sub.status });
+      }
+
+      if (!stripeConfigured) {
         return res.status(503).json({
-          error: "Live billing not yet wired up. Set up Stripe price IDs to enable paid upgrades.",
-          stripeConfigured: true,
+          error: "Stripe is not connected on this environment. Connect Stripe to enable paid upgrades.",
+          stripeConfigured: false,
         });
       }
 
-      const sub = await storage.upsertSubscription(req.userId!, parsed.tier, "active");
-      res.json({ tier: sub.tier, status: sub.status, sandbox: !stripeConfigured });
+      if (!isPaidTier(parsed.tier)) {
+        return res.status(400).json({ error: "Unknown tier" });
+      }
+
+      const baseUrl = getReturnBaseUrl(req);
+      const session = await createSubscriptionCheckoutSession({
+        userId: req.userId!,
+        tier: parsed.tier,
+        successUrl: `${baseUrl}/?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${baseUrl}/?stripe=canceled`,
+      });
+
+      res.json({
+        mode: "checkout",
+        checkoutUrl: session.url,
+        sessionId: session.sessionId,
+        tier: parsed.tier,
+      });
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
       }
+      const message = error instanceof Error ? error.message : "Failed to upgrade subscription";
       console.error("Error upgrading subscription:", error);
-      res.status(500).json({ error: "Failed to upgrade subscription" });
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post("/api/subscription/portal", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!isStripeConfigured()) {
+        return res.status(503).json({ error: "Stripe is not connected on this environment." });
+      }
+      const portal = await createBillingPortalSession({
+        userId: req.userId!,
+        returnUrl: `${getReturnBaseUrl(req)}/`,
+      });
+      res.json({ url: portal.url });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open billing portal";
+      console.error("Error creating portal session:", error);
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post("/api/subscription/sync", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const sub = await storage.getSubscription(req.userId!);
+      if (sub?.stripeCustomerId) {
+        await syncLocalSubscriptionForCustomer(sub.stripeCustomerId);
+      }
+      const refreshed = await storage.getSubscription(req.userId!);
+      res.json({
+        tier: refreshed?.tier ?? "free",
+        status: refreshed?.status ?? "active",
+        currentPeriodEnd: refreshed?.currentPeriodEnd ?? null,
+      });
+    } catch (error) {
+      console.error("Error syncing subscription:", error);
+      res.status(500).json({ error: "Failed to sync subscription" });
     }
   });
 

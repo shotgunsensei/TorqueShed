@@ -1,8 +1,9 @@
 import React from "react";
-import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Platform, Linking } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
@@ -80,25 +81,90 @@ const TIERS: TierCard[] = [
   },
 ];
 
+async function openExternalUrl(url: string) {
+  try {
+    if (Platform.OS === "web") {
+      // On web, open in a new tab so users return to the app naturally.
+      if (typeof window !== "undefined") {
+        window.open(url, "_blank");
+        return;
+      }
+    }
+    await WebBrowser.openBrowserAsync(url);
+  } catch {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export default function SubscriptionScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { tier: currentTier, isLoading } = useEntitlements();
+  const { tier: currentTier, isLoading, subscription } = useEntitlements();
+  const stripeConfigured = subscription?.stripeConfigured ?? false;
+  const hasStripeSubscription = subscription?.hasStripeSubscription ?? false;
+  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+  const periodEndDate = subscription?.currentPeriodEnd
+    ? new Date(subscription.currentPeriodEnd)
+    : null;
 
   const upgradeMutation = useMutation({
     mutationFn: async (tier: Tier) => {
       const res = await apiRequest("POST", "/api/subscription/upgrade", { tier });
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data, variables) => {
+      if (data?.mode === "checkout" && data?.checkoutUrl) {
+        toast.show("Opening secure Stripe checkout…", "success");
+        await openExternalUrl(data.checkoutUrl);
+        // Refresh after the user returns to pick up new subscription state.
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+        }, 1500);
+        return;
+      }
+      if (data?.mode === "portal" && data?.portalUrl) {
+        toast.show("Opening billing portal to manage your plan…", "success");
+        await openExternalUrl(data.portalUrl);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+        }, 1500);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      const msg = data?.sandbox ? "Plan updated (sandbox mode)" : "Plan updated";
+      const msg =
+        variables === "free"
+          ? "Switched to the Free plan"
+          : data?.sandbox
+          ? "Plan updated (sandbox mode)"
+          : "Plan updated";
       toast.show(msg, "success");
     },
     onError: (error: Error) => {
       toast.show(error.message || "Failed to update plan", "error");
+    },
+  });
+
+  const portalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/portal", {});
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      if (data?.url) {
+        await openExternalUrl(data.url);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+        }, 1500);
+      }
+    },
+    onError: (error: Error) => {
+      toast.show(error.message || "Failed to open billing portal", "error");
     },
   });
 
@@ -123,6 +189,33 @@ export default function SubscriptionScreen() {
       <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
         Free covers casework. Upgrade only when you need premium diagnostics, exports, or shop tools.
       </ThemedText>
+
+      {hasStripeSubscription ? (
+        <>
+          {periodEndDate ? (
+            <ThemedText
+              type="caption"
+              style={[styles.renewalNote, { color: cancelAtPeriodEnd ? theme.primary : theme.textSecondary }]}
+              testID="text-renewal-note"
+            >
+              {cancelAtPeriodEnd
+                ? `Cancels on ${periodEndDate.toLocaleDateString()}`
+                : `Renews on ${periodEndDate.toLocaleDateString()}`}
+            </ThemedText>
+          ) : null}
+          <Pressable
+            style={[styles.manageBtn, { backgroundColor: theme.backgroundTertiary, borderColor: theme.border }]}
+            onPress={() => portalMutation.mutate()}
+            disabled={portalMutation.isPending}
+            testID="button-manage-billing"
+          >
+            <Feather name="credit-card" size={16} color={theme.text} style={{ marginRight: Spacing.sm }} />
+            <ThemedText type="body" style={{ color: theme.text, fontWeight: "600" }}>
+              {portalMutation.isPending ? "Opening…" : "Manage billing & invoices"}
+            </ThemedText>
+          </Pressable>
+        </>
+      ) : null}
 
       <View style={styles.tierList}>
         {TIERS.map((t) => {
@@ -155,7 +248,11 @@ export default function SubscriptionScreen() {
                   testID={`upgrade-${t.tier}`}
                 >
                   <ThemedText type="body" style={{ color: t.tier === "free" ? theme.text : "#0D0F12", fontWeight: "600" }}>
-                    {t.tier === "free" ? "Downgrade" : `Upgrade to ${t.name}`}
+                    {t.tier === "free"
+                      ? hasStripeSubscription
+                        ? "Cancel via portal"
+                        : "Downgrade"
+                      : `Upgrade to ${t.name}`}
                   </ThemedText>
                 </Pressable>
               ) : null}
@@ -165,7 +262,9 @@ export default function SubscriptionScreen() {
       </View>
 
       <ThemedText type="caption" style={[styles.disclaimer, { color: theme.textMuted }]}>
-        Live billing is being finalized. Upgrades on this build are sandbox only and do not charge a real card.
+        {stripeConfigured
+          ? "Secure payments by Stripe. You can cancel anytime from the billing portal."
+          : "Stripe is not connected on this environment. Plan changes are sandbox only and do not charge a real card."}
       </ThemedText>
     </ScrollView>
   );
@@ -181,6 +280,17 @@ const styles = StyleSheet.create({
   tierHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   currentPill: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xxs, borderRadius: BorderRadius.full },
   featureRow: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs },
+  renewalNote: { textAlign: "center", marginBottom: Spacing.sm },
+  manageBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.lg,
+  },
   upgradeBtn: {
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,

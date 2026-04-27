@@ -31,7 +31,7 @@ The backend is an Express.js server developed with TypeScript, running on port 5
 - **Saved Items**: Functionality for users to bookmark threads and listings.
 - **Content Moderation**: Reporting system for user-generated content, with an admin review interface.
 - **Shop Pro**: Features for businesses including public profiles, service listings, lead capture, and team management.
-- **Monetization**: Implemented through premium diagnostic features, parts & tools panels, expert reviews, repair plan exports, and seller dashboard limits, primarily using a placeholder Stripe integration.
+- **Monetization**: Premium tiers (DIY Pro $9.99/mo, Garage Pro $29/mo, Shop Pro $79/mo) gate diagnostic depth, parts & tools panels, repair plan exports, multi-vehicle features, and shop dashboards. Live Stripe billing is wired via the Replit Stripe connector: `server/stripeClient.ts` (cred lookup), `server/stripeBilling.ts` (Checkout, Portal, tier→price resolution by `metadata.tier`, webhook reconcile), `server/webhookHandlers.ts` + `/api/stripe/webhook` route in `server/index.ts` (raw-body, registered before `express.json()`), and `stripe-replit-sync` for managed webhook + Stripe→Postgres mirror. Run `npx tsx scripts/seed-stripe-tiers.ts` to (re)create the three priced products tagged with `metadata.tier`.
 
 ### Database Schema
 The database schema, managed by Drizzle ORM, includes tables for `users`, `garages`, `vehicles`, `threads`, `swapShopListings`, `products`, `reports`, `diagnosticSessions`, `subscriptions`, and specialized tables for `Shop Pro` features like `shopServices`, `shopLeads`, `shopTeamMembers`, and `caseCustomerSummaries`. `swapShopListings` is extended to support categories and case-specific recommendations.

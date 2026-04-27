@@ -77,6 +77,9 @@ export interface SubscriptionInfo {
   tier: Tier;
   status: string;
   currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  hasStripeCustomer: boolean;
+  hasStripeSubscription: boolean;
   stripeConfigured: boolean;
   prices: Record<Tier, { monthly: number; label: string }>;
 }

@@ -11,6 +11,9 @@ import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { ZodError } from "zod";
+import { WebhookHandlers } from "./webhookHandlers";
+import { getStripeSync, isStripeConfigured } from "./stripeClient";
+import { reconcileWebhookPayload, syncAllLocalSubscriptions } from "./stripeBilling";
 
 const app = express();
 const log = console.log;
@@ -141,6 +144,46 @@ function setupCors(app: express.Application) {
 
     next();
   });
+}
+
+function setupStripeWebhook(app: express.Application) {
+  // CRITICAL: this route must be registered BEFORE express.json() so the body
+  // arrives as a raw Buffer for Stripe signature verification.
+  app.post(
+    "/api/stripe/webhook",
+    express.raw({ type: "application/json" }),
+    async (req: Request, res: Response) => {
+      const signature = req.headers["stripe-signature"];
+      if (!signature) {
+        return res.status(400).json({ error: "Missing stripe-signature header" });
+      }
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+
+      try {
+        if (!Buffer.isBuffer(req.body)) {
+          console.error(
+            "STRIPE WEBHOOK ERROR: req.body is not a Buffer. " +
+              "express.json() likely ran before this route. " +
+              "Ensure setupStripeWebhook() is called BEFORE setupBodyParsing()."
+          );
+          return res.status(500).json({ error: "Webhook processing error" });
+        }
+
+        const buf = req.body as Buffer;
+        await WebhookHandlers.processWebhook(buf, sig);
+        // After the stripe schema is updated, propagate the change to our local
+        // subscriptions table so getUserTier() reflects the new state.
+        await reconcileWebhookPayload(buf);
+
+        res.status(200).json({ received: true });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "unknown";
+        console.error("Stripe webhook error:", message);
+        res.status(400).json({ error: "Webhook processing error" });
+      }
+    },
+  );
+  log("Stripe webhook route registered at /api/stripe/webhook");
 }
 
 function setupBodyParsing(app: express.Application) {
@@ -661,6 +704,61 @@ async function seedAccount(
   }
 }
 
+async function initStripe(): Promise<void> {
+  if (!isStripeConfigured()) {
+    log("Stripe integration not connected — skipping Stripe init (sandbox mode)");
+    return;
+  }
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    log("DATABASE_URL not set — skipping Stripe init");
+    return;
+  }
+  try {
+    log("Initializing Stripe schema (stripe-replit-sync)...");
+    const { runMigrations } = await import("stripe-replit-sync");
+    await runMigrations({ databaseUrl });
+    log("Stripe schema ready");
+
+    const stripeSync = await getStripeSync();
+
+    const baseDomain =
+      process.env.PUBLIC_BASE_URL ||
+      (process.env.REPLIT_DOMAINS ? process.env.REPLIT_DOMAINS.split(",")[0].trim() : null) ||
+      process.env.REPLIT_DEV_DOMAIN ||
+      null;
+    if (baseDomain) {
+      const webhookUrl = baseDomain.startsWith("http")
+        ? `${baseDomain}/api/stripe/webhook`
+        : `https://${baseDomain}/api/stripe/webhook`;
+      try {
+        const webhook = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
+        log(`Stripe managed webhook configured: ${webhook?.url ?? webhookUrl}`);
+      } catch (err) {
+        console.error("Failed to set up Stripe managed webhook:", err);
+      }
+    } else {
+      log("No public domain detected — skipping managed webhook setup");
+    }
+
+    // Backfill stripe schema, then sync our local subscriptions table
+    stripeSync
+      .syncBackfill()
+      .then(async () => {
+        log("Stripe data backfill complete");
+        try {
+          const n = await syncAllLocalSubscriptions();
+          if (n > 0) log(`Reconciled ${n} local subscription rows from Stripe`);
+        } catch (err) {
+          console.error("Failed to reconcile local subscriptions after backfill:", err);
+        }
+      })
+      .catch((err: unknown) => console.error("Stripe backfill failed:", err));
+  } catch (err) {
+    console.error("Failed to initialize Stripe:", err);
+  }
+}
+
 (async () => {
   // Security middleware (must be first)
   setupSecurity(app);
@@ -668,6 +766,9 @@ async function seedAccount(
 
   // CORS (before body parsing)
   setupCors(app);
+
+  // Stripe webhook MUST be registered before express.json() — needs raw body
+  setupStripeWebhook(app);
 
   // Body parsing with size limits
   setupBodyParsing(app);
@@ -690,6 +791,9 @@ async function seedAccount(
   // Seed accounts
   await seedAccount(process.env.REVIEWER_USERNAME, process.env.REVIEWER_PASSWORD, "user", "Reviewer");
   await seedAccount(process.env.ADMIN_USERNAME, process.env.ADMIN_PASSWORD, "admin", "Admin");
+
+  // Initialize Stripe schema, managed webhook, and backfill (fire and forget)
+  void initStripe();
 
   // Error handler (must be last)
   setupErrorHandler(app);
