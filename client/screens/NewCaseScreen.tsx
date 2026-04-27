@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Button } from "@/components/Button";
+import { MediaPickerRow } from "@/components/MediaPickerRow";
 import { Input } from "@/components/Input";
 import { ThemedText } from "@/components/ThemedText";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -146,6 +147,8 @@ export default function NewCaseScreen() {
   const [budget, setBudget] = useState("");
   const [tools, setTools] = useState<string[]>([]);
   const [mileage, setMileage] = useState("");
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [videoUrls, setVideoUrls] = useState<string[]>([]);
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["/api/vehicles"],
@@ -193,6 +196,8 @@ export default function NewCaseScreen() {
         whenItHappens: whenItHappens.trim() || undefined,
         partsReplaced: partsReplaced.trim() || undefined,
         mileage: mileage.trim() ? Number(mileage.trim()) : undefined,
+        photoUrls: photoUrls.length ? photoUrls : undefined,
+        videoUrls: videoUrls.length ? videoUrls : undefined,
         status: "open",
       };
       return apiRequest("POST", `/api/garages/${targetGarage.id}/threads`, body);
@@ -597,13 +602,13 @@ export default function NewCaseScreen() {
         leftIcon="message-circle"
       />
 
-      <Pressable
-        onPress={() => toast.show("Photo uploads are coming soon", "info")}
-        style={[styles.placeholderRow, { borderColor: theme.cardBorder }]}
-      >
-        <Feather name="camera" size={16} color={theme.textMuted} />
-        <Text style={{ color: theme.textMuted }}>Add photos (coming soon)</Text>
-      </Pressable>
+      <MediaPickerRow
+        photoPaths={photoUrls}
+        videoPaths={videoUrls}
+        onChangePhotos={setPhotoUrls}
+        onChangeVideos={setVideoUrls}
+        testIDPrefix="newcase-media"
+      />
     </View>
   );
 

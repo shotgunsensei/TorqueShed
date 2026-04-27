@@ -24,6 +24,8 @@ import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
+import { MediaPickerRow } from "@/components/MediaPickerRow";
+import { CaseMediaGallery } from "@/components/CaseMediaGallery";
 import PartsAndToolsCard from "@/components/PartsAndToolsCard";
 import EscalateCaseCard from "@/components/EscalateCaseCard";
 import RepairPlanCard from "@/components/RepairPlanCard";
@@ -79,6 +81,8 @@ interface Thread {
   solvedCost: string | null;
   laborMinutes: number | null;
   verificationNotes: string | null;
+  photoUrls: string[] | null;
+  videoUrls: string[] | null;
 }
 
 type ReplyType =
@@ -110,6 +114,8 @@ interface ThreadReply {
   replyType: ReplyType | null;
   replierTier?: string | null;
   isPriority?: boolean;
+  photoUrls: string[] | null;
+  videoUrls: string[] | null;
 }
 
 const SEVERITY_LABELS = ["Minor", "Low", "Moderate", "High", "Critical"];
@@ -148,6 +154,8 @@ export default function ThreadDetailScreen() {
   const [replyText, setReplyText] = useState("");
   const [isComposing, setIsComposing] = useState(false);
   const [replyType, setReplyType] = useState<ReplyType>("comment");
+  const [replyPhotoUrls, setReplyPhotoUrls] = useState<string[]>([]);
+  const [replyVideoUrls, setReplyVideoUrls] = useState<string[]>([]);
   const inputRef = useRef<TextInput>(null);
 
   const [showFinalFix, setShowFinalFix] = useState(false);
@@ -207,6 +215,8 @@ export default function ThreadDetailScreen() {
       return apiRequest("POST", `/api/threads/${threadId}/replies`, {
         content: replyText.trim(),
         replyType,
+        photoUrls: replyPhotoUrls.length ? replyPhotoUrls : undefined,
+        videoUrls: replyVideoUrls.length ? replyVideoUrls : undefined,
       });
     },
     onSuccess: () => {
@@ -216,6 +226,8 @@ export default function ThreadDetailScreen() {
       toast.show("Reply posted", "success");
       setReplyText("");
       setReplyType("comment");
+      setReplyPhotoUrls([]);
+      setReplyVideoUrls([]);
       inputRef.current?.blur();
     },
     onError: (error: Error) => {
@@ -462,6 +474,11 @@ export default function ThreadDetailScreen() {
             <ThemedText type="body" style={styles.replyContent}>
               {item.content}
             </ThemedText>
+            <CaseMediaGallery
+              photoUrls={item.photoUrls}
+              videoUrls={item.videoUrls}
+              testIDPrefix={`reply-media-${item.id}`}
+            />
             {renderSolutionMeta(item)}
           </View>
         </View>
@@ -483,6 +500,11 @@ export default function ThreadDetailScreen() {
         <ThemedText type="body" style={styles.replyContent}>
           {item.content}
         </ThemedText>
+        <CaseMediaGallery
+          photoUrls={item.photoUrls}
+          videoUrls={item.videoUrls}
+          testIDPrefix={`reply-media-${item.id}`}
+        />
         {isThreadAuthor && !thread?.hasSolution ? (
           <Pressable
             style={[styles.solutionButton, { borderColor: theme.success }]}
@@ -781,6 +803,12 @@ export default function ThreadDetailScreen() {
           <ThemedText type="body" style={styles.threadContent}>
             {thread.content}
           </ThemedText>
+          <CaseMediaGallery
+            photoUrls={thread.photoUrls}
+            videoUrls={thread.videoUrls}
+            testIDPrefix="thread-media"
+            thumbSize={140}
+          />
           {isThreadAuthor && !thread.hasSolution ? (
             <View style={styles.statusChanger}>
               <ThemedText type="caption" style={{ color: theme.textMuted, marginBottom: Spacing.xs }}>
@@ -969,6 +997,13 @@ export default function ThreadDetailScreen() {
               );
             })}
           </View>
+          <MediaPickerRow
+            photoPaths={replyPhotoUrls}
+            videoPaths={replyVideoUrls}
+            onChangePhotos={setReplyPhotoUrls}
+            onChangeVideos={setReplyVideoUrls}
+            testIDPrefix="reply-media"
+          />
           <View style={styles.inputRow}>
             <TextInput
               ref={inputRef}

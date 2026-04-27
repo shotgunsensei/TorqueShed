@@ -254,6 +254,8 @@ export const threads = pgTable("threads", {
   solvedCost: varchar("solved_cost", { length: 50 }),
   laborMinutes: integer("labor_minutes"),
   verificationNotes: text("verification_notes"),
+  photoUrls: json("photo_urls").$type<string[]>().default([]),
+  videoUrls: json("video_urls").$type<string[]>().default([]),
   lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -291,6 +293,8 @@ export const threadReplies = pgTable("thread_replies", {
   solutionCost: varchar("solution_cost", { length: 50 }),
   solutionTools: json("solution_tools").$type<string[]>(),
   solutionParts: json("solution_parts").$type<string[]>(),
+  photoUrls: json("photo_urls").$type<string[]>().default([]),
+  videoUrls: json("video_urls").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -674,12 +678,16 @@ export const insertThreadSchema = z.object({
   toolsAvailable: z.string().nullable().optional(),
   whenItHappens: z.string().nullable().optional(),
   partsReplaced: z.string().nullable().optional(),
+  photoUrls: z.array(z.string()).max(10).nullable().optional(),
+  videoUrls: z.array(z.string()).max(3).nullable().optional(),
 });
 
 export const insertThreadReplySchema = z.object({
   threadId: z.string().min(1, "Thread ID is required"),
   content: z.string().min(1, "Content is required"),
   replyType: z.enum(REPLY_TYPES).optional(),
+  photoUrls: z.array(z.string()).max(10).nullable().optional(),
+  videoUrls: z.array(z.string()).max(3).nullable().optional(),
 });
 
 export const updateThreadStatusSchema = z.object({

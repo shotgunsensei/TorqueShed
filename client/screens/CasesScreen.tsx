@@ -8,6 +8,7 @@ import {
   RefreshControl,
   TextInput,
   ScrollView,
+  Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -17,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { StatusBadge } from "@/components/StatusBadge";
+import { resolveMediaUrl } from "@/components/MediaPickerRow";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
@@ -52,6 +54,8 @@ interface CaseRow {
   createdAt: string | null;
   userName: string;
   vehicleName: string | null;
+  photoUrls: string[] | null;
+  videoUrls: string[] | null;
 }
 
 interface GarageInfo {
@@ -168,6 +172,29 @@ function CaseCard({
         <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
           {item.title}
         </Text>
+
+        {(item.photoUrls && item.photoUrls.length > 0) || (item.videoUrls && item.videoUrls.length > 0) ? (
+          <View style={styles.thumbStrip}>
+            {(item.photoUrls ?? []).slice(0, 3).map((p, i) => (
+              <Image
+                key={`tp-${i}`}
+                source={{ uri: resolveMediaUrl(p) }}
+                style={[styles.thumb, { borderColor: theme.cardBorder }]}
+                testID={`case-thumb-${item.id}-${i}`}
+              />
+            ))}
+            {(item.videoUrls ?? []).length > 0 ? (
+              <View style={[styles.thumb, styles.videoBadge, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundTertiary }]}>
+                <Feather name="film" size={16} color={theme.textMuted} />
+              </View>
+            ) : null}
+            {((item.photoUrls?.length ?? 0) + (item.videoUrls?.length ?? 0)) > 4 ? (
+              <Text style={[styles.codeMore, { color: theme.textMuted }]}>
+                +{(item.photoUrls?.length ?? 0) + (item.videoUrls?.length ?? 0) - 4}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {item.vehicleName ? (
           <View style={styles.metaRow}>
@@ -639,7 +666,10 @@ const styles = StyleSheet.create({
   codesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" },
   codeChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   codeChipText: { ...Typography.caption, fontFamily: "monospace", fontWeight: "600", fontSize: 11 },
-  codeMore: { ...Typography.caption, fontSize: 11 },
+  codeMore: { ...Typography.caption, fontSize: 11, alignSelf: "center" },
+  thumbStrip: { flexDirection: "row", gap: 6, marginTop: 4, alignItems: "center" },
+  thumb: { width: 56, height: 56, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
+  videoBadge: { alignItems: "center", justifyContent: "center" },
   rootCauseBox: {
     flexDirection: "row",
     alignItems: "center",
