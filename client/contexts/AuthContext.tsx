@@ -11,6 +11,8 @@ export interface User {
   role: string;
   onboardingCompleted: boolean;
   onboardingGoals: string[];
+  email?: string | null;
+  notificationsEnabled?: boolean;
 }
 
 interface AuthContextType {

@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -34,8 +34,25 @@ export const users = pgTable("users", {
   shopAffiliation: varchar("shop_affiliation", { length: 200 }),
   onboardingCompleted: boolean("onboarding_completed").default(false),
   onboardingGoals: json("onboarding_goals").$type<string[]>().default([]),
+  email: varchar("email", { length: 200 }),
+  expoPushToken: varchar("expo_push_token", { length: 200 }),
+  notificationsEnabled: boolean("notifications_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const REMINDER_CHANNELS = ["push", "email", "none"] as const;
+export type ReminderChannel = typeof REMINDER_CHANNELS[number];
+
+export const maintenanceReminders = pgTable("maintenance_reminders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  noteId: varchar("note_id", { length: 36 }).notNull().references(() => vehicleNotes.id, { onDelete: "cascade" }),
+  channel: varchar("channel", { length: 20 }).notNull(),
+  reason: varchar("reason", { length: 50 }),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("maintenance_reminders_user_note_unique").on(t.userId, t.noteId),
+]);
 
 export const usersRelations = relations(users, ({ many }) => ({
   vehicles: many(vehicles),
@@ -764,6 +781,15 @@ export const insertVehicleNoteSchema = z.object({
   ),
   isPrivate: z.boolean().optional().default(false),
 });
+
+export const updateNotificationPrefsSchema = z.object({
+  email: z.string().email().nullable().optional().or(z.literal("")),
+  expoPushToken: z.string().max(200).nullable().optional().or(z.literal("")),
+  notificationsEnabled: z.boolean().optional(),
+});
+export type UpdateNotificationPrefsInput = z.infer<typeof updateNotificationPrefsSchema>;
+
+export type MaintenanceReminder = typeof maintenanceReminders.$inferSelect;
 
 export const insertReportSchema = createInsertSchema(reports).pick({
   reporterId: true,

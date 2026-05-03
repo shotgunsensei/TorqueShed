@@ -33,6 +33,7 @@ import {
   updateProductSchema,
   insertSubscriptionSchema,
   insertSellerProfileSchema,
+  updateNotificationPrefsSchema,
   escalateCaseSchema,
   type SellerProfile,
   type ShopService,
@@ -297,6 +298,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: user.role,
         onboardingCompleted: user.onboardingCompleted ?? true,
         onboardingGoals: user.onboardingGoals ?? [],
+        email: user.email ?? null,
+        notificationsEnabled: user.notificationsEnabled ?? true,
       });
     } catch (error) {
       console.error("Error fetching current user:", error);
@@ -373,6 +376,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error completing onboarding:", error);
       res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
+  app.patch("/api/users/me/notifications", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = updateNotificationPrefsSchema.parse(req.body);
+      const updates: Record<string, unknown> = {};
+      if (parsed.email !== undefined) updates.email = parsed.email === "" ? null : parsed.email;
+      if (parsed.expoPushToken !== undefined) updates.expoPushToken = parsed.expoPushToken === "" ? null : parsed.expoPushToken;
+      if (parsed.notificationsEnabled !== undefined) updates.notificationsEnabled = parsed.notificationsEnabled;
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid updates provided" });
+      }
+      await db.update(users).set(updates).where(eq(users.id, req.userId!));
+      const [refreshed] = await db
+        .select({
+          email: users.email,
+          expoPushToken: users.expoPushToken,
+          notificationsEnabled: users.notificationsEnabled,
+        })
+        .from(users)
+        .where(eq(users.id, req.userId!));
+      res.json(refreshed ?? {});
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
+      }
+      console.error("Error updating notification prefs:", error);
+      res.status(500).json({ error: "Failed to update notification preferences" });
+    }
+  });
+
+  app.post("/api/admin/maintenance-reminders/run", requireAuth, requireAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { runMaintenanceRemindersOnce } = await import("./maintenance-reminders");
+      const stats = await runMaintenanceRemindersOnce();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error running maintenance reminders:", error);
+      res.status(500).json({ error: "Failed to run reminders" });
     }
   });
 

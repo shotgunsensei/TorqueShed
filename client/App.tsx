@@ -21,9 +21,10 @@ import { queryClient } from "@/lib/query-client";
 
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/components/Toast";
 import { StripeReturnHandler } from "@/components/StripeReturnHandler";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -55,7 +56,7 @@ export default function App() {
                 <ToastProvider>
                   <StripeReturnHandler />
                   <NavigationContainer>
-                    <RootStackNavigator />
+                    <AppShell />
                   </NavigationContainer>
                   <StatusBar style="auto" />
                 </ToastProvider>
@@ -66,6 +67,12 @@ export default function App() {
       </QueryClientProvider>
     </ErrorBoundary>
   );
+}
+
+function AppShell() {
+  const { isAuthenticated } = useAuth();
+  usePushNotifications(isAuthenticated);
+  return <RootStackNavigator />;
 }
 
 const styles = StyleSheet.create({

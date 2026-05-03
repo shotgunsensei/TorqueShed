@@ -16,6 +16,7 @@ import { syncAllLocalSubscriptions } from "./stripeBilling";
 import { assertSchemaInSync } from "./schemaCheck";
 import { setupStripeWebhook } from "./stripeWebhookRoute";
 import { detectPublicWebhookUrl } from "./stripeWebhookUrl";
+import { startMaintenanceReminderScheduler } from "./maintenance-reminders";
 
 const app = express();
 const log = console.log;
@@ -810,6 +811,9 @@ async function initStripe(): Promise<void> {
 
   // Initialize Stripe schema, managed webhook, and backfill (fire and forget)
   void initStripe();
+
+  // Daily maintenance reminders for Garage Pro / Shop Pro users
+  startMaintenanceReminderScheduler();
 
   // Error handler (must be last)
   setupErrorHandler(app);

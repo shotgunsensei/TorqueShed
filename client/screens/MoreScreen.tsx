@@ -94,7 +94,7 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
     items: [
       { label: "Subscription", icon: "star", action: "stack", screen: "Subscription", description: "Plans, billing, and premium features" },
       { label: "Billing", icon: "credit-card", action: "stack", screen: "Billing", description: "Invoices, payment method, and Stripe portal" },
-      { label: "Settings", icon: "settings", action: "toast", toastMessage: "Settings panel is coming soon.", description: "App preferences and notifications" },
+      { label: "Notifications", icon: "bell", action: "stack", screen: "NotificationSettings", description: "Maintenance reminders by push or email" },
       { label: "Help", icon: "help-circle", action: "toast", toastMessage: "Help center is coming soon.", description: "FAQs, support, and contact" },
     ],
   },
