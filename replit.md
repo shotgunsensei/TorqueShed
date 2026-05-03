@@ -25,6 +25,9 @@ Core features include a personalized Home Feed, a "Cases" system for automotive 
 ### Database Schema
 The database schema, managed by Drizzle ORM, comprises tables for users, garages, vehicles, threads, swap shop listings, products, reports, diagnostic sessions, subscriptions, and specialized tables for Shop Pro functionalities like shop services, leads, team members, and case customer summaries.
 
+### Rate Limiting
+Auth and other public endpoints share a single limiter (`server/lib/rateLimit.ts`). When `REDIS_URL` is set the limiter uses Redis (via `ioredis`) so counters are shared across every backend instance — required in production / autoscale deployments to prevent attackers from bypassing limits by hopping between servers. Without `REDIS_URL` it falls back to a per-process in-memory map, which is fine for local dev but **must not be relied on in production**.
+
 ### UI Component Library & Error Handling
 A custom UI component library ensures consistency, featuring components like `Card`, `Button`, `Input`, and `Skeleton` loaders, with theme-aware primitives. Error handling includes skeleton loaders, branded `EmptyState` components, toast notifications for mutations, and inline form validation, with an `ErrorBoundary` for crash recovery.
 

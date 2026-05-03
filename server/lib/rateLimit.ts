@@ -17,11 +17,15 @@ let redisEnabled = false;
 async function initRedis(): Promise<void> {
   if (redisClient !== null || !process.env.REDIS_URL) return;
   try {
-    // @ts-expect-error ioredis is an optional dep, only loaded when REDIS_URL is set
     const { default: Redis } = await import("ioredis");
     const client = new Redis(process.env.REDIS_URL);
     client.on("error", (err: Error) => {
-      console.error("[RateLimiter] Redis error, falling back to in-memory:", err.message);
+      // Loud — losing Redis means rate limits silently degrade to per-process,
+      // which is the exact bypass this module exists to prevent in production.
+      console.error(
+        "[RateLimiter] CRITICAL: Redis error, falling back to in-memory limiter (rate limits no longer shared across instances):",
+        err.message,
+      );
       redisEnabled = false;
     });
     client.on("connect", () => {
@@ -30,7 +34,10 @@ async function initRedis(): Promise<void> {
     });
     redisClient = client as unknown as RedisClientLike;
   } catch (err) {
-    console.warn("[RateLimiter] Failed to initialise Redis, using in-memory limiter:", err);
+    console.error(
+      "[RateLimiter] CRITICAL: REDIS_URL is set but Redis client failed to initialise — production rate limits will NOT be shared across instances:",
+      err,
+    );
     redisEnabled = false;
   }
 }
@@ -78,13 +85,15 @@ function checkInMemory(opts: RateLimitOptions): RateLimitResult {
   };
 }
 
-async function checkRedis(opts: RateLimitOptions): Promise<RateLimitResult> {
-  if (!redisClient || !redisEnabled) return checkInMemory(opts);
+async function checkRedisWith(
+  client: RedisClientLike,
+  opts: RateLimitOptions,
+): Promise<RateLimitResult> {
   const key = `ratelimit:${opts.key}`;
   const windowSeconds = Math.max(1, Math.ceil(opts.windowMs / 1000));
   try {
-    const current = await redisClient.incr(key);
-    if (current === 1) await redisClient.expire(key, windowSeconds);
+    const current = await client.incr(key);
+    if (current === 1) await client.expire(key, windowSeconds);
     if (current > opts.max) {
       return { allowed: false, remaining: 0, retryAfterSeconds: windowSeconds };
     }
@@ -96,8 +105,26 @@ async function checkRedis(opts: RateLimitOptions): Promise<RateLimitResult> {
 }
 
 export async function checkRateLimit(opts: RateLimitOptions): Promise<RateLimitResult> {
-  if (redisEnabled && redisClient) return checkRedis(opts);
+  if (redisEnabled && redisClient) return checkRedisWith(redisClient, opts);
   return checkInMemory(opts);
+}
+
+// Testing-only: build a checker bound to a specific Redis client. Used to
+// simulate two backend instances sharing one Redis bucket — each instance
+// gets its own client wrapper, but both point at the same backend state.
+export function _checkRateLimitWithClient(
+  client: RedisClientLike,
+  opts: RateLimitOptions,
+): Promise<RateLimitResult> {
+  return checkRedisWith(client, opts);
+}
+
+// Testing-only: inject a fake Redis client and toggle the enabled flag so
+// the public checkRateLimit() routes through the Redis path. Lets tests
+// verify production wiring without spinning up a real Redis server.
+export function _setRedisForTesting(client: RedisClientLike | null, enabled: boolean): void {
+  redisClient = client;
+  redisEnabled = enabled;
 }
 
 function clientIp(req: Request): string {
