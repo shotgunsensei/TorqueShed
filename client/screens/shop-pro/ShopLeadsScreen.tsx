@@ -1,5 +1,5 @@
-import React, { useLayoutEffect, useState } from "react";
-import { View, StyleSheet, FlatList, Pressable, Linking, Switch, Platform } from "react-native";
+import React, { useLayoutEffect, useMemo, useState } from "react";
+import { View, StyleSheet, FlatList, Pressable, Linking, Switch, Platform, TextInput } from "react-native";
 import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,6 +62,75 @@ interface TeamMembership {
   ownerHasCustomerSummaries: boolean;
 }
 
+type RangePreset = "all" | "today" | "7d" | "30d" | "custom";
+
+interface DateRange {
+  preset: RangePreset;
+  from: Date | null;
+  to: Date | null;
+}
+
+const PRESETS: { key: RangePreset; label: string }[] = [
+  { key: "all", label: "All time" },
+  { key: "today", label: "Today" },
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "custom", label: "Custom" },
+];
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+function resolvePresetRange(preset: RangePreset): { from: Date | null; to: Date | null } {
+  const now = new Date();
+  switch (preset) {
+    case "today":
+      return { from: startOfDay(now), to: endOfDay(now) };
+    case "7d": {
+      const from = startOfDay(now);
+      from.setDate(from.getDate() - 6);
+      return { from, to: endOfDay(now) };
+    }
+    case "30d": {
+      const from = startOfDay(now);
+      from.setDate(from.getDate() - 29);
+      return { from, to: endOfDay(now) };
+    }
+    case "all":
+    case "custom":
+    default:
+      return { from: null, to: null };
+  }
+}
+
+function toIsoDate(d: Date): string {
+  // Local YYYY-MM-DD so the server's date-only parsing matches what the user picked.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatRangeLabel(range: DateRange): string {
+  if (!range.from && !range.to) return "All time";
+  const fmt = (d: Date) => d.toLocaleDateString();
+  if (range.from && range.to) {
+    if (toIsoDate(range.from) === toIsoDate(range.to)) return fmt(range.from);
+    return `${fmt(range.from)} – ${fmt(range.to)}`;
+  }
+  if (range.from) return `From ${fmt(range.from)}`;
+  return `Through ${fmt(range.to!)}`;
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => {
     switch (ch) {
@@ -89,7 +158,7 @@ function formatDate(s: string) {
   }
 }
 
-function buildLeadsHtml(leads: ShopLead[]): string {
+function buildLeadsHtml(leads: ShopLead[], rangeLabel: string): string {
   const generated = new Date().toLocaleString();
   const rows = leads.map((l) => `
     <tr>
@@ -106,7 +175,8 @@ function buildLeadsHtml(leads: ShopLead[]): string {
 <style>
   body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; margin: 24px; }
   h1 { margin: 0 0 4px 0; font-size: 22px; }
-  .meta { color: #555; font-size: 12px; margin-bottom: 16px; }
+  .meta { color: #555; font-size: 12px; margin-bottom: 4px; }
+  .range { color: #111; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
   th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
   th { background: #f3f4f6; }
@@ -115,6 +185,7 @@ function buildLeadsHtml(leads: ShopLead[]): string {
 <body>
   <h1>TorqueShed — Customer Leads</h1>
   <div class="meta">Generated ${escapeHtml(generated)} · ${leads.length} lead${leads.length === 1 ? "" : "s"}</div>
+  <div class="range">Date range: ${escapeHtml(rangeLabel)}</div>
   <table>
     <thead><tr>
       <th>Received</th><th>Name</th><th>Vehicle</th><th>Contact</th><th>Prefers</th><th>Issue</th>
@@ -135,6 +206,7 @@ export default function ShopLeadsScreen() {
   const ownsLeadCapture = hasFeature("lead_capture");
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [range, setRange] = useState<DateRange>({ preset: "all", from: null, to: null });
 
   const { data: membershipData } = useQuery<{ memberships: TeamMembership[] }>({
     queryKey: ["/api/shop-team/memberships"],
@@ -179,18 +251,55 @@ export default function ShopLeadsScreen() {
     },
   });
 
+  const filterByRange = (lead: ShopLead): boolean => {
+    if (!range.from && !range.to) return true;
+    if (!lead.createdAt) return false;
+    const t = new Date(lead.createdAt).getTime();
+    if (range.from && t < range.from.getTime()) return false;
+    if (range.to && t > range.to.getTime()) return false;
+    return true;
+  };
+
+  const filteredAll = useMemo(() => (data ?? []).filter(filterByRange), [data, range]);
   // Owner-only export: leads belonging to the signed-in owner.
-  const ownerLeads = (data ?? []).filter((l) => l.ownerUserId === me.data?.id);
+  const ownerLeads = useMemo(
+    () => (data ?? []).filter((l) => l.ownerUserId === me.data?.id && filterByRange(l)),
+    [data, me.data?.id, range],
+  );
   const hasOwnerLeads = ownsLeadCapture && ownerLeads.length > 0;
+  const rangeLabel = formatRangeLabel(range);
+
+  const selectPreset = (preset: RangePreset) => {
+    if (preset === "custom") {
+      setRange((prev) => ({ preset: "custom", from: prev.from, to: prev.to }));
+      return;
+    }
+    const { from, to } = resolvePresetRange(preset);
+    setRange({ preset, from, to });
+  };
+
+  const onPickDate = (target: "from" | "to", value: Date | null) => {
+    setRange((prev) => {
+      const next: DateRange = { ...prev, preset: "custom" };
+      if (target === "from") next.from = value ? startOfDay(value) : null;
+      else next.to = value ? endOfDay(value) : null;
+      return next;
+    });
+  };
+
+  const buildExportUrl = (): string => {
+    const url = new URL("/api/shop-leads/export.csv", getApiUrl());
+    if (range.from) url.searchParams.set("from", toIsoDate(range.from));
+    if (range.to) url.searchParams.set("to", toIsoDate(range.to));
+    return url.toString();
+  };
 
   const exportCsv = async () => {
     if (exportingCsv) return;
     setExportingCsv(true);
     try {
-      const url = new URL("/api/shop-leads/export.csv", getApiUrl()).toString();
+      const url = buildExportUrl();
       if (Platform.OS === "web") {
-        // Browsers attach session cookies automatically; for token auth we fetch
-        // and trigger a Blob download so the Authorization header is honored.
         const token = await getToken();
         const res = await fetch(url, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -236,9 +345,8 @@ export default function ShopLeadsScreen() {
     if (ownerLeads.length === 0) return;
     setExportingPdf(true);
     try {
-      const html = buildLeadsHtml(ownerLeads);
+      const html = buildLeadsHtml(ownerLeads, rangeLabel);
       if (Platform.OS === "web") {
-        // expo-print on web opens a print dialog with the rendered HTML.
         await Print.printAsync({ html });
         return;
       }
@@ -289,7 +397,7 @@ export default function ShopLeadsScreen() {
           </View>
         ) : undefined,
     });
-  }, [navigation, hasOwnerLeads, exportingCsv, exportingPdf, theme.primary, theme.textMuted, ownerLeads.length]);
+  }, [navigation, hasOwnerLeads, exportingCsv, exportingPdf, theme.primary, theme.textMuted, ownerLeads.length, range.preset, range.from, range.to]);
 
   if (!canUse) {
     return (
@@ -366,10 +474,121 @@ export default function ShopLeadsScreen() {
     );
   };
 
+  const renderRangeControls = () => (
+    <Card elevation={1} style={[styles.rangeCard, { borderColor: theme.cardBorder }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Feather name="calendar" size={16} color={theme.primary} />
+        <ThemedText type="body" style={{ color: theme.text, flex: 1 }}>Date range</ThemedText>
+        <ThemedText type="caption" style={{ color: theme.textMuted }} testID="text-range-label">{rangeLabel}</ThemedText>
+      </View>
+      <View style={styles.presetRow}>
+        {PRESETS.map((p) => {
+          const active = range.preset === p.key;
+          return (
+            <Pressable
+              key={p.key}
+              onPress={() => selectPreset(p.key)}
+              style={[
+                styles.presetBtn,
+                {
+                  borderColor: active ? theme.primary : theme.cardBorder,
+                  backgroundColor: active ? theme.primary + "18" : theme.backgroundSecondary,
+                },
+              ]}
+              testID={`button-range-${p.key}`}
+            >
+              <ThemedText
+                type="small"
+                style={{ color: active ? theme.primary : theme.text, fontWeight: active ? "600" : "400" }}
+              >
+                {p.label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+      {range.preset === "custom" ? (
+        <View style={styles.customRow}>
+          {Platform.OS === "web" ? (
+            <>
+              {/* @ts-ignore: native HTML input on web */}
+              <input
+                type="date"
+                value={range.from ? toIsoDate(range.from) : ""}
+                onChange={(e: any) => {
+                  const v = e.target.value;
+                  onPickDate("from", v ? new Date(`${v}T00:00:00`) : null);
+                }}
+                data-testid="input-range-from"
+                style={webDateStyle(theme)}
+              />
+              {/* @ts-ignore */}
+              <input
+                type="date"
+                value={range.to ? toIsoDate(range.to) : ""}
+                onChange={(e: any) => {
+                  const v = e.target.value;
+                  onPickDate("to", v ? new Date(`${v}T00:00:00`) : null);
+                }}
+                data-testid="input-range-to"
+                style={webDateStyle(theme)}
+              />
+            </>
+          ) : (
+            <>
+              <TextInput
+                value={range.from ? toIsoDate(range.from) : ""}
+                onChangeText={(text) => {
+                  if (!text) return onPickDate("from", null);
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+                    const d = new Date(`${text}T00:00:00`);
+                    if (!isNaN(d.getTime())) onPickDate("from", d);
+                  }
+                }}
+                placeholder="From YYYY-MM-DD"
+                placeholderTextColor={theme.textMuted}
+                style={[styles.dateInput, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+                testID="input-range-from"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TextInput
+                value={range.to ? toIsoDate(range.to) : ""}
+                onChangeText={(text) => {
+                  if (!text) return onPickDate("to", null);
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+                    const d = new Date(`${text}T00:00:00`);
+                    if (!isNaN(d.getTime())) onPickDate("to", d);
+                  }
+                }}
+                placeholder="To YYYY-MM-DD"
+                placeholderTextColor={theme.textMuted}
+                style={[styles.dateInput, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+                testID="input-range-to"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </>
+          )}
+          {range.from || range.to ? (
+            <Pressable
+              onPress={() => setRange({ preset: "custom", from: null, to: null })}
+              style={[styles.dateBtn, { borderColor: theme.cardBorder }]}
+              testID="button-range-clear"
+            >
+              <Feather name="x" size={12} color={theme.textMuted} />
+              <ThemedText type="small" style={{ color: theme.textMuted, marginLeft: 4 }}>Clear</ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+    </Card>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
       <FlatList
-        data={data ?? []}
+        data={filteredAll}
         keyExtractor={(l) => l.id}
         renderItem={renderItem}
         refreshing={isLoading}
@@ -398,6 +617,7 @@ export default function ShopLeadsScreen() {
                 disabled={updatePrefs.isPending || !me.data}
               />
             </Card>
+            {ownsLeadCapture ? renderRangeControls() : null}
             {hasOwnerLeads ? (
               <View style={styles.exportRow}>
                 <Pressable
@@ -430,13 +650,28 @@ export default function ShopLeadsScreen() {
           isError ? (
             <EmptyState icon="alert-circle" title="Couldn't load leads" description="Please try again." actionLabel="Retry" onAction={() => refetch()} />
           ) : !isLoading ? (
-            <EmptyState icon="inbox" title="No leads yet" description="When customers submit your shop page, they'll show up here." />
+            (data ?? []).length > 0 ? (
+              <EmptyState icon="calendar" title="No leads in this range" description="Try a different date range to see more leads." />
+            ) : (
+              <EmptyState icon="inbox" title="No leads yet" description="When customers submit your shop page, they'll show up here." />
+            )
           ) : null
         }
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
       />
     </View>
   );
+}
+
+function webDateStyle(theme: any): any {
+  return {
+    padding: 8,
+    borderRadius: 8,
+    border: `1px solid ${theme.cardBorder}`,
+    backgroundColor: theme.backgroundSecondary,
+    color: theme.text,
+    fontSize: 13,
+  };
 }
 
 const styles = StyleSheet.create({
@@ -457,6 +692,17 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
   },
+  rangeCard: {
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  presetRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs, marginTop: Spacing.sm },
+  presetBtn: { paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
+  customRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm, marginTop: Spacing.sm, alignItems: "center" },
+  dateBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.sm, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  dateInput: { paddingHorizontal: Spacing.sm, paddingVertical: 8, borderRadius: 8, borderWidth: 1, minWidth: 150, fontSize: 13 },
   exportRow: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.md },
   exportBtn: {
     flexDirection: "row",
