@@ -587,8 +587,8 @@ export default function HomeScreen() {
                 testID={`card-continue-thread-${t.id}`}
               >
                 <View style={styles.promptContent}>
-                  <View style={[styles.promptIcon, { backgroundColor: theme.warning + "15", width: 36, height: 36, borderRadius: 18 }]}>
-                    <Feather name="message-circle" size={18} color={theme.warning} />
+                  <View style={[styles.promptIcon, { backgroundColor: theme.accent + "15", width: 36, height: 36, borderRadius: 18 }]}>
+                    <Feather name="message-circle" size={18} color={theme.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <ThemedText type="body" numberOfLines={1} style={{ fontFamily: "Inter_500Medium" }}>
@@ -666,7 +666,7 @@ export default function HomeScreen() {
               <Card
                 key={bay.id}
                 style={styles.activityCard}
-                onPress={() => navigation.navigate("GarageDetail", { garageId: bay.id })}
+                onPress={() => navigation.navigate("GarageDetail", { garageId: bay.id, garageName: bay.name })}
                 testID={`card-recommended-bay-${bay.id}`}
               >
                 <View style={styles.promptContent}>

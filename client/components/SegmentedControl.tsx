@@ -26,7 +26,7 @@ export function SegmentedControl({
     transform: [
       {
         translateX: withTiming(
-          (selectedIndex * 100) / segments.length + "%",
+          (`${(selectedIndex * 100) / segments.length}%` as unknown) as number,
           { duration: 200 }
         ),
       },

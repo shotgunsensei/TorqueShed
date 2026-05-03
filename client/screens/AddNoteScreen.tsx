@@ -180,7 +180,7 @@ export default function AddNoteScreen() {
           }
           value={title}
           onChangeText={setTitle}
-          leftIcon={selectedType?.icon || "file-text"}
+          leftIcon={(selectedType?.icon || "file-text") as any}
         />
 
         <Input

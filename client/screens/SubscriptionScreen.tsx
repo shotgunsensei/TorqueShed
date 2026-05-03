@@ -147,12 +147,7 @@ export default function SubscriptionScreen() {
         return;
       }
       queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      const msg =
-        variables === "free"
-          ? "Switched to the Free plan"
-          : data?.sandbox
-          ? "Plan updated (sandbox mode)"
-          : "Plan updated";
+      const msg = data?.sandbox ? "Switched to Free (sandbox mode)" : "Switched to the Free plan";
       toast.show(msg, "success");
     },
     onError: (error: Error) => toast.show(error.message || "Failed to update plan", "error"),

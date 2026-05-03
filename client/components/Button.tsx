@@ -11,12 +11,15 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { BorderRadius, Spacing } from "@/constants/theme";
 
+type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+
 interface ButtonProps {
   onPress?: () => void;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
   testID?: string;
+  variant?: ButtonVariant;
 }
 
 const springConfig: WithSpringConfig = {
@@ -35,9 +38,28 @@ export function Button({
   style,
   disabled = false,
   testID,
+  variant = "primary",
 }: ButtonProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
+
+  const variantStyle: ViewStyle =
+    variant === "outline"
+      ? { backgroundColor: "transparent", borderWidth: 1, borderColor: theme.link }
+      : variant === "ghost"
+      ? { backgroundColor: "transparent" }
+      : variant === "secondary"
+      ? { backgroundColor: theme.backgroundSecondary }
+      : variant === "danger"
+      ? { backgroundColor: "#EF4444" }
+      : { backgroundColor: theme.link };
+
+  const textColor =
+    variant === "outline" || variant === "ghost"
+      ? theme.link
+      : variant === "secondary"
+      ? theme.text
+      : theme.buttonText;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -64,17 +86,15 @@ export function Button({
       testID={testID}
       style={[
         styles.button,
-        {
-          backgroundColor: theme.link,
-          opacity: disabled ? 0.5 : 1,
-        },
+        variantStyle,
+        { opacity: disabled ? 0.5 : 1 },
         style,
         animatedStyle,
       ]}
     >
       <ThemedText
         type="body"
-        style={[styles.buttonText, { color: theme.buttonText }]}
+        style={[styles.buttonText, { color: textColor }]}
       >
         {children}
       </ThemedText>
