@@ -122,6 +122,24 @@ export default function SubscriptionScreen() {
   const periodEndDate = subscription?.currentPeriodEnd
     ? new Date(subscription.currentPeriodEnd)
     : null;
+  const subStatus = subscription?.status ?? "active";
+  const latestInvoiceStatus = subscription?.latestInvoiceStatus ?? null;
+  const paymentMethodLast4 = subscription?.paymentMethodLast4 ?? null;
+  const invoiceFailed =
+    hasStripeSubscription &&
+    (latestInvoiceStatus === "uncollectible" ||
+      (subStatus === "past_due" && latestInvoiceStatus !== "paid"));
+  const statusBadge: { label: string; tone: "ok" | "warn" | "info" } | null = !hasStripeSubscription
+    ? null
+    : cancelAtPeriodEnd
+      ? { label: "Canceling", tone: "info" }
+      : subStatus === "past_due"
+        ? { label: "Past due", tone: "warn" }
+        : subStatus === "canceled"
+          ? { label: "Canceled", tone: "warn" }
+          : subStatus === "trialing"
+            ? { label: "Trial", tone: "info" }
+            : { label: "Active", tone: "ok" };
   const [busyTier, setBusyTier] = useState<Tier | null>(null);
 
   const downgradeMutation = useMutation({
@@ -234,13 +252,20 @@ export default function SubscriptionScreen() {
         />
       ) : null}
 
-      {isBillingDelinquent ? (
+      {isBillingDelinquent || invoiceFailed ? (
         <BillingBanner
           tone="error"
           icon="credit-card"
-          title="Payment past due"
-          body="We couldn't charge your card. You still have read access, but new premium actions are paused until billing is back in good standing."
-          action={{ label: "Manage Billing", onPress: () => navigation.navigate("Billing") }}
+          title="Payment failed"
+          body={
+            paymentMethodLast4
+              ? `We couldn't charge the card ending in ${paymentMethodLast4}. Update your payment method to keep your plan active.`
+              : "We couldn't charge your card. Update your payment method in the billing portal to keep your plan active."
+          }
+          action={{
+            label: "Update payment method",
+            onPress: () => portalMutation.mutate(),
+          }}
         />
       ) : null}
 
@@ -260,15 +285,54 @@ export default function SubscriptionScreen() {
 
       {hasStripeSubscription ? (
         <>
-          {periodEndDate ? (
+          {statusBadge ? (
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor:
+                      statusBadge.tone === "ok"
+                        ? theme.primary + "22"
+                        : statusBadge.tone === "warn"
+                          ? theme.error + "22"
+                          : theme.primary + "18",
+                    borderColor:
+                      statusBadge.tone === "warn" ? theme.error : theme.primary,
+                  },
+                ]}
+                testID={`badge-subscription-${statusBadge.label.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <ThemedText
+                  type="caption"
+                  style={{
+                    color: statusBadge.tone === "warn" ? theme.error : theme.primary,
+                    fontWeight: "700",
+                  }}
+                >
+                  {statusBadge.label}
+                </ThemedText>
+              </View>
+              {periodEndDate ? (
+                <ThemedText
+                  type="caption"
+                  style={{ color: theme.textSecondary }}
+                  testID="text-renewal-note"
+                >
+                  {cancelAtPeriodEnd
+                    ? `Cancels ${periodEndDate.toLocaleDateString()}`
+                    : `Renews ${periodEndDate.toLocaleDateString()}`}
+                </ThemedText>
+              ) : null}
+            </View>
+          ) : null}
+          {paymentMethodLast4 ? (
             <ThemedText
               type="caption"
-              style={[styles.renewalNote, { color: cancelAtPeriodEnd ? theme.primary : theme.textSecondary }]}
-              testID="text-renewal-note"
+              style={[styles.renewalNote, { color: theme.textSecondary }]}
+              testID="text-payment-method"
             >
-              {cancelAtPeriodEnd
-                ? `Cancels on ${periodEndDate.toLocaleDateString()}`
-                : `Renews on ${periodEndDate.toLocaleDateString()}`}
+              Card on file: •••• {paymentMethodLast4}
             </ThemedText>
           ) : null}
           <Pressable
@@ -451,6 +515,19 @@ const styles = StyleSheet.create({
   currentPill: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xxs, borderRadius: BorderRadius.full },
   featureRow: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs },
   renewalNote: { textAlign: "center", marginBottom: Spacing.sm },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
   manageBtn: {
     flexDirection: "row",
     alignItems: "center",

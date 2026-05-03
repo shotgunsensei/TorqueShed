@@ -98,6 +98,8 @@ export interface SubscriptionInfo {
   status: SubscriptionStatus;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  latestInvoiceStatus: string | null;
+  paymentMethodLast4: string | null;
   hasStripeSubscription: boolean;
   stripeConfigured: boolean;
   stripeMode: StripeMode;

@@ -2211,6 +2211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       status,
       currentPeriodEnd: sub?.currentPeriodEnd ?? null,
       cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      latestInvoiceStatus: sub?.latestInvoiceStatus ?? null,
+      paymentMethodLast4: sub?.paymentMethodLast4 ?? null,
       stripeConfigured,
       stripeMode,
       hasStripeCustomer: Boolean(sub?.stripeCustomerId),

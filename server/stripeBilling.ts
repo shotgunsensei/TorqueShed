@@ -185,12 +185,16 @@ interface NormalizedStripeSub {
   current_period_end: number | null;
   cancel_at_period_end: boolean;
   priceId: string | null;
+  defaultPaymentMethodId: string | null;
+  latestInvoiceId: string | null;
 }
 
 interface StripeSubscriptionAttrs {
   current_period_end?: number | null;
   cancel_at_period_end?: boolean | null;
   items?: { data?: Array<{ price?: { id?: string } | null }> };
+  default_payment_method?: string | { id?: string } | null;
+  latest_invoice?: string | { id?: string } | null;
 }
 
 type StripeSubscriptionRow = {
@@ -215,6 +219,8 @@ function normalizeApiSub(sub: Stripe.Subscription): NormalizedStripeSub {
     apiSub.current_period_end ??
     sub.items?.data?.[0]?.current_period_end ??
     null;
+  const dpm = sub.default_payment_method;
+  const inv = sub.latest_invoice;
   return {
     id: sub.id,
     customer: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
@@ -222,7 +228,45 @@ function normalizeApiSub(sub: Stripe.Subscription): NormalizedStripeSub {
     current_period_end: periodEnd,
     cancel_at_period_end: Boolean(sub.cancel_at_period_end),
     priceId: pickPriceIdFromStripeSub(sub),
+    defaultPaymentMethodId: typeof dpm === "string" ? dpm : dpm?.id ?? null,
+    latestInvoiceId: typeof inv === "string" ? inv : inv?.id ?? null,
   };
+}
+
+async function fetchInvoiceStatus(stripe: Stripe, invoiceId: string | null): Promise<string | null> {
+  if (!invoiceId) return null;
+  try {
+    const inv = await stripe.invoices.retrieve(invoiceId);
+    return inv.status ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPaymentMethodLast4(
+  stripe: Stripe,
+  customerId: string,
+  paymentMethodId: string | null,
+): Promise<string | null> {
+  let pmId = paymentMethodId;
+  if (!pmId) {
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer && !customer.deleted) {
+        const dpm = customer.invoice_settings?.default_payment_method;
+        pmId = typeof dpm === "string" ? dpm : dpm?.id ?? null;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (!pmId) return null;
+  try {
+    const pm = await stripe.paymentMethods.retrieve(pmId);
+    return pm.card?.last4 ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -254,6 +298,8 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
       const row = result.rows[0];
       const attrs = row.attrs ?? {};
       const periodEnd = row.current_period_end ?? attrs.current_period_end ?? null;
+      const dpm = attrs.default_payment_method;
+      const inv = attrs.latest_invoice;
       stripeSub = {
         id: row.id,
         customer: row.customer,
@@ -261,6 +307,8 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
         current_period_end: periodEnd ?? null,
         cancel_at_period_end: Boolean(attrs.cancel_at_period_end),
         priceId: attrs.items?.data?.[0]?.price?.id ?? null,
+        defaultPaymentMethodId: typeof dpm === "string" ? dpm : dpm?.id ?? null,
+        latestInvoiceId: typeof inv === "string" ? inv : inv?.id ?? null,
       };
     }
   } catch {
@@ -300,6 +348,8 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
         stripeSubscriptionId: null,
         currentPeriodEnd: null,
         cancelAtPeriodEnd: false,
+        latestInvoiceStatus: null,
+        paymentMethodLast4: null,
         updatedAt: new Date(),
       })
       .where(eq(subscriptions.userId, local.userId));
@@ -308,6 +358,18 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
 
   const isLive = ["active", "trialing"].includes(stripeSub.status);
   const tier = isLive ? await getTierForPriceId(stripeSub.priceId) : "free";
+
+  let latestInvoiceStatus: string | null = null;
+  let paymentMethodLast4: string | null = null;
+  try {
+    const stripe = await getUncachableStripeClient();
+    [latestInvoiceStatus, paymentMethodLast4] = await Promise.all([
+      fetchInvoiceStatus(stripe, stripeSub.latestInvoiceId),
+      fetchPaymentMethodLast4(stripe, stripeCustomerId, stripeSub.defaultPaymentMethodId),
+    ]);
+  } catch (err) {
+    console.error("[stripe] Failed to fetch invoice/payment details", err);
+  }
 
   await db
     .update(subscriptions)
@@ -319,6 +381,8 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
         ? new Date(stripeSub.current_period_end * 1000)
         : null,
       cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+      latestInvoiceStatus,
+      paymentMethodLast4,
       updatedAt: new Date(),
     })
     .where(eq(subscriptions.userId, local.userId));

@@ -406,6 +406,8 @@ export const subscriptions = pgTable("subscriptions", {
   stripePriceId: varchar("stripe_price_id", { length: 100 }),
   currentPeriodEnd: timestamp("current_period_end"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  latestInvoiceStatus: varchar("latest_invoice_status", { length: 30 }),
+  paymentMethodLast4: varchar("payment_method_last4", { length: 4 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
