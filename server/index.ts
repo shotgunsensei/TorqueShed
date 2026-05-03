@@ -15,6 +15,7 @@ import { getStripeSync, isStripeConfigured } from "./stripeClient";
 import { syncAllLocalSubscriptions } from "./stripeBilling";
 import { assertSchemaInSync } from "./schemaCheck";
 import { setupStripeWebhook } from "./stripeWebhookRoute";
+import { detectPublicWebhookUrl } from "./stripeWebhookUrl";
 
 const app = express();
 const log = console.log;
@@ -666,6 +667,55 @@ async function seedAccount(
   }
 }
 
+async function reconcileStripeManagedWebhook(): Promise<void> {
+  const webhookUrl = detectPublicWebhookUrl();
+  if (!webhookUrl) {
+    log("[stripe-webhook] No public host detected — skipping managed webhook reconciliation");
+    return;
+  }
+
+  const stripeSync = await getStripeSync();
+
+  // findOrCreateManagedWebhook already deletes any stale webhook rows whose
+  // url does not match the current host (both in Stripe and in
+  // stripe._managed_webhooks), then creates a fresh endpoint pointing at us.
+  const webhook = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
+  log(`[stripe-webhook] Active managed webhook: ${webhook.url} (id: ${webhook.id})`);
+
+  // Sync the in-process STRIPE_WEBHOOK_SECRET so any code that reads it (e.g.
+  // billing config status, fallback verifier in routes.ts) is always aligned
+  // with the secret stored alongside the managed webhook row. Stripe only
+  // returns the signing secret at creation time, so we read it back from the
+  // managed_webhooks table when it isn't on the response.
+  let secret: string | null = webhook.secret ?? null;
+  if (!secret) {
+    try {
+      const result = await stripeSync.postgresClient.query(
+        `SELECT secret FROM "stripe"."_managed_webhooks" WHERE id = $1 LIMIT 1`,
+        [webhook.id],
+      );
+      secret = (result.rows[0]?.secret as string | undefined) ?? null;
+    } catch (err) {
+      console.error("[stripe-webhook] Failed to read signing secret from managed_webhooks:", err);
+    }
+  }
+
+  if (!secret) {
+    log("[stripe-webhook] WARNING: managed webhook has no signing secret on file");
+    return;
+  }
+
+  const previous = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+  if (previous !== secret) {
+    process.env.STRIPE_WEBHOOK_SECRET = secret;
+    log(
+      `[stripe-webhook] STRIPE_WEBHOOK_SECRET ${previous ? "rotated" : "set"} to match managed webhook`,
+    );
+  } else {
+    log("[stripe-webhook] STRIPE_WEBHOOK_SECRET already aligned with managed webhook");
+  }
+}
+
 async function initStripe(): Promise<void> {
   if (!isStripeConfigured()) {
     log("Stripe integration not connected — skipping Stripe init (sandbox mode)");
@@ -684,23 +734,10 @@ async function initStripe(): Promise<void> {
 
     const stripeSync = await getStripeSync();
 
-    const baseDomain =
-      process.env.PUBLIC_BASE_URL ||
-      (process.env.REPLIT_DOMAINS ? process.env.REPLIT_DOMAINS.split(",")[0].trim() : null) ||
-      process.env.REPLIT_DEV_DOMAIN ||
-      null;
-    if (baseDomain) {
-      const webhookUrl = baseDomain.startsWith("http")
-        ? `${baseDomain}/api/stripe/webhook`
-        : `https://${baseDomain}/api/stripe/webhook`;
-      try {
-        const webhook = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
-        log(`Stripe managed webhook configured: ${webhook?.url ?? webhookUrl}`);
-      } catch (err) {
-        console.error("Failed to set up Stripe managed webhook:", err);
-      }
-    } else {
-      log("No public domain detected — skipping managed webhook setup");
+    try {
+      await reconcileStripeManagedWebhook();
+    } catch (err) {
+      console.error("Failed to reconcile Stripe managed webhook:", err);
     }
 
     // Backfill stripe schema, then sync our local subscriptions table
