@@ -11,7 +11,9 @@ import {
   Switch,
   Alert,
   RefreshControl,
+  Image,
 } from "react-native";
+import { resolveImageUri } from "@/utils/objectStorageExpo";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -47,6 +49,7 @@ export interface SwapListing {
   willShip: boolean;
   createdAt: string;
   imageUrl: string | null;
+  extraImageUrls?: string[] | null;
 }
 
 export interface SwapItem {
@@ -65,6 +68,8 @@ export interface SwapItem {
   willShip: boolean;
   postedTime: string;
   hasImage: boolean;
+  coverImageUrl: string | null;
+  extraImageCount: number;
   contactMethod: "in-app";
 }
 
@@ -102,6 +107,8 @@ function transformToSwapItem(listing: SwapListing): SwapItem {
     willShip: listing.willShip,
     postedTime: formatTimeAgo(listing.createdAt),
     hasImage: Boolean(listing.imageUrl),
+    coverImageUrl: listing.imageUrl,
+    extraImageCount: Array.isArray(listing.extraImageUrls) ? listing.extraImageUrls.length : 0,
     contactMethod: "in-app",
   };
 }
@@ -135,8 +142,19 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
     >
       <View style={styles.cardContent}>
         <View style={[styles.imagePlaceholder, { backgroundColor: theme.backgroundTertiary }]}>
-          {item.hasImage ? (
-            <Feather name="image" size={24} color={theme.textMuted} />
+          {item.coverImageUrl ? (
+            <>
+              <Image
+                source={{ uri: resolveImageUri(item.coverImageUrl) || undefined }}
+                style={styles.coverImage}
+                testID={`swap-cover-${item.id}`}
+              />
+              {item.extraImageCount > 0 ? (
+                <View style={styles.extraCountBadge}>
+                  <Text style={styles.extraCountText}>+{item.extraImageCount}</Text>
+                </View>
+              ) : null}
+            </>
           ) : (
             <Feather name="camera-off" size={24} color={theme.textMuted} />
           )}
@@ -560,6 +578,25 @@ const styles = StyleSheet.create({
     width: 100,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%",
+  },
+  extraCountBadge: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  extraCountText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
   cardDetails: {
     flex: 1,

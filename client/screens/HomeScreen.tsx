@@ -6,7 +6,10 @@ import {
   RefreshControl,
   Pressable,
   FlatList,
+  Image,
 } from "react-native";
+import { resolveImageUri } from "@/utils/objectStorageExpo";
+import { resolveMediaUrl } from "@/components/MediaPickerRow";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -47,6 +50,7 @@ interface FeedThread {
   solutionCountTotal: number;
   lastActivityAt?: string;
   createdAt?: string;
+  photoUrls?: string[] | null;
 }
 
 interface FeedListing {
@@ -56,6 +60,8 @@ interface FeedListing {
   condition: string;
   userName: string;
   createdAt?: string;
+  imageUrl?: string | null;
+  extraImageUrls?: string[] | null;
 }
 
 interface FeedData {
@@ -68,8 +74,8 @@ interface FeedData {
 }
 
 interface ContinueActivity {
-  unresolvedThreads: { id: string; title: string; garageId: string; replyCount: number | null; lastActivityAt: string | null; createdAt: string | null }[];
-  activeListings: { id: string; title: string; price: string; condition: string; createdAt: string | null }[];
+  unresolvedThreads: { id: string; title: string; garageId: string; replyCount: number | null; lastActivityAt: string | null; createdAt: string | null; photoUrls?: string[] | null }[];
+  activeListings: { id: string; title: string; price: string; condition: string; createdAt: string | null; imageUrl?: string | null; extraImageUrls?: string[] | null }[];
 }
 
 interface RecommendedBay {
@@ -202,6 +208,10 @@ function ThreadCard({
   const timeAgo = formatTimeAgo(thread.lastActivityAt || thread.createdAt);
   const isNew = isNewContent(thread.createdAt);
 
+  const photos = thread.photoUrls ?? [];
+  const coverPhoto = photos[0];
+  const extraCount = Math.max(0, photos.length - 1);
+
   return (
     <Card
       style={[styles.horizontalCard, { minWidth: 260 }]}
@@ -218,9 +228,25 @@ function ThreadCard({
         ) : null}
         {isNew ? <StatusBadge label="New" variant="primary" size="sm" /> : null}
       </View>
-      <ThemedText type="h4" numberOfLines={2} style={{ marginTop: garageInfo || isNew ? Spacing.xs : 0 }}>
-        {thread.title}
-      </ThemedText>
+      <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: garageInfo || isNew ? Spacing.xs : 0 }}>
+        {coverPhoto ? (
+          <View style={[styles.threadThumbWrap, { borderColor: theme.cardBorder }]}>
+            <Image
+              source={{ uri: resolveMediaUrl(coverPhoto) }}
+              style={styles.threadThumb}
+              testID={`thread-thumb-${thread.id}`}
+            />
+            {extraCount > 0 ? (
+              <View style={styles.thumbCountBadge}>
+                <ThemedText style={styles.thumbCountText}>+{extraCount}</ThemedText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        <ThemedText type="h4" numberOfLines={2} style={{ flex: 1 }}>
+          {thread.title}
+        </ThemedText>
+      </View>
       <View style={styles.threadMeta}>
         <ThemedText type="caption" style={{ color: theme.textMuted }}>
           {thread.userName}
@@ -281,12 +307,28 @@ function ListingCard({
   const listingTimeAgo = formatTimeAgo(listing.createdAt);
   const listingIsNew = isNewContent(listing.createdAt);
 
+  const extraCount = Array.isArray(listing.extraImageUrls) ? listing.extraImageUrls.length : 0;
+
   return (
     <Card
       style={[styles.horizontalCard, { minWidth: 180 }]}
       onPress={onPress}
       testID={`card-listing-${listing.id}`}
     >
+      {listing.imageUrl ? (
+        <View style={[styles.listingCover, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundTertiary }]}>
+          <Image
+            source={{ uri: resolveImageUri(listing.imageUrl) || undefined }}
+            style={styles.listingCoverImage}
+            testID={`listing-cover-${listing.id}`}
+          />
+          {extraCount > 0 ? (
+            <View style={styles.thumbCountBadge}>
+              <ThemedText style={styles.thumbCountText}>+{extraCount}</ThemedText>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       {listingIsNew ? (
         <View style={{ marginBottom: Spacing.xs }}>
           <StatusBadge label="New" variant="primary" size="sm" />
@@ -579,7 +621,11 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <SectionHeader title="Continue Your Activity" icon="clock" />
           {hasUnresolved ? (
-            continueActivity!.unresolvedThreads.map((t) => (
+            continueActivity!.unresolvedThreads.map((t) => {
+              const tPhotos = t.photoUrls ?? [];
+              const tCover = tPhotos[0];
+              const tExtra = Math.max(0, tPhotos.length - 1);
+              return (
               <Card
                 key={t.id}
                 style={styles.activityCard}
@@ -587,9 +633,24 @@ export default function HomeScreen() {
                 testID={`card-continue-thread-${t.id}`}
               >
                 <View style={styles.promptContent}>
-                  <View style={[styles.promptIcon, { backgroundColor: theme.accent + "15", width: 36, height: 36, borderRadius: 18 }]}>
-                    <Feather name="message-circle" size={18} color={theme.accent} />
-                  </View>
+                  {tCover ? (
+                    <View style={[styles.activityThumbWrap, { borderColor: theme.cardBorder }]}>
+                      <Image
+                        source={{ uri: resolveMediaUrl(tCover) }}
+                        style={styles.threadThumb}
+                        testID={`continue-thread-thumb-${t.id}`}
+                      />
+                      {tExtra > 0 ? (
+                        <View style={styles.thumbCountBadge}>
+                          <ThemedText style={styles.thumbCountText}>+{tExtra}</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <View style={[styles.promptIcon, { backgroundColor: theme.accent + "15", width: 36, height: 36, borderRadius: 18 }]}>
+                      <Feather name="message-circle" size={18} color={theme.accent} />
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <ThemedText type="body" numberOfLines={1} style={{ fontFamily: "Inter_500Medium" }}>
                       {t.title}
@@ -601,10 +662,13 @@ export default function HomeScreen() {
                   <StatusBadge label="Unsolved" variant="warning" size="sm" />
                 </View>
               </Card>
-            ))
+              );
+            })
           ) : null}
           {hasActiveListings ? (
-            continueActivity!.activeListings.map((l) => (
+            continueActivity!.activeListings.map((l) => {
+              const lExtra = Array.isArray(l.extraImageUrls) ? l.extraImageUrls.length : 0;
+              return (
               <Card
                 key={l.id}
                 style={styles.activityCard}
@@ -612,9 +676,24 @@ export default function HomeScreen() {
                 testID={`card-continue-listing-${l.id}`}
               >
                 <View style={styles.promptContent}>
-                  <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15", width: 36, height: 36, borderRadius: 18 }]}>
-                    <Feather name="tag" size={18} color={theme.primary} />
-                  </View>
+                  {l.imageUrl ? (
+                    <View style={[styles.activityThumbWrap, { borderColor: theme.cardBorder }]}>
+                      <Image
+                        source={{ uri: resolveImageUri(l.imageUrl) || undefined }}
+                        style={styles.threadThumb}
+                        testID={`continue-listing-thumb-${l.id}`}
+                      />
+                      {lExtra > 0 ? (
+                        <View style={styles.thumbCountBadge}>
+                          <ThemedText style={styles.thumbCountText}>+{lExtra}</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15", width: 36, height: 36, borderRadius: 18 }]}>
+                      <Feather name="tag" size={18} color={theme.primary} />
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <ThemedText type="body" numberOfLines={1} style={{ fontFamily: "Inter_500Medium" }}>
                       {l.title}
@@ -626,7 +705,8 @@ export default function HomeScreen() {
                   <StatusBadge label="Active" variant="success" size="sm" />
                 </View>
               </Card>
-            ))
+              );
+            })
           ) : null}
         </View>
       ) : null}
@@ -769,6 +849,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xxs,
     borderRadius: BorderRadius.xs,
+  },
+  threadThumbWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.sm,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  activityThumbWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.sm,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  threadThumb: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbCountBadge: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: BorderRadius.full,
+  },
+  thumbCountText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+  listingCover: {
+    width: "100%",
+    height: 100,
+    borderRadius: BorderRadius.sm,
+    overflow: "hidden",
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  listingCoverImage: {
+    width: "100%",
+    height: "100%",
   },
   threadMeta: {
     flexDirection: "row",

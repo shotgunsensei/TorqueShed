@@ -891,6 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           replyCount: threads.replyCount,
           lastActivityAt: threads.lastActivityAt,
           createdAt: threads.createdAt,
+          photoUrls: threads.photoUrls,
         })
         .from(threads)
         .where(and(eq(threads.userId, userId), eq(threads.hasSolution, false)))
@@ -905,6 +906,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           condition: swapShopListings.condition,
           isActive: swapShopListings.isActive,
           createdAt: swapShopListings.createdAt,
+          imageUrl: swapShopListings.imageUrl,
+          extraImageUrls: swapShopListings.extraImageUrls,
         })
         .from(swapShopListings)
         .where(and(eq(swapShopListings.userId, userId), eq(swapShopListings.isActive, true)))

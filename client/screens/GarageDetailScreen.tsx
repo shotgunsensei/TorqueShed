@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput, Image } from "react-native";
+import { resolveMediaUrl } from "@/components/MediaPickerRow";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
@@ -37,6 +38,7 @@ interface ApiThread {
   yearsWrenching: number | null;
   focusAreas: string[];
   solutionCountTotal: number;
+  photoUrls?: string[] | null;
 }
 
 interface ApiGarageDetail {
@@ -73,7 +75,7 @@ function formatTimeAgo(dateString: string): string {
   return "Just now";
 }
 
-function transformToThread(apiThread: ApiThread): Thread & { yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number } {
+function transformToThread(apiThread: ApiThread): Thread & { yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; photoUrls: string[] } {
   const lastActivityTime = new Date(apiThread.lastActivityAt).getTime();
   const createdAt = new Date(apiThread.createdAt).getTime();
   const isNew = Date.now() - lastActivityTime < 24 * 60 * 60 * 1000;
@@ -92,6 +94,7 @@ function transformToThread(apiThread: ApiThread): Thread & { yearsWrenching: num
     yearsWrenching: apiThread.yearsWrenching,
     focusAreas: apiThread.focusAreas || [],
     solutionCountTotal: apiThread.solutionCountTotal || 0,
+    photoUrls: apiThread.photoUrls || [],
   };
 }
 
@@ -181,8 +184,11 @@ export default function GarageDetailScreen() {
     return filtered;
   }, [apiThreads, activeTab, searchQuery]);
 
-  const renderThread = useCallback(({ item }: { item: Thread & { yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number } }) => {
+  const renderThread = useCallback(({ item }: { item: Thread & { yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; photoUrls: string[] } }) => {
     const isTrustedSolver = (item.solutionCountTotal || 0) >= 3;
+    const photos = item.photoUrls ?? [];
+    const coverPhoto = photos[0];
+    const extraCount = Math.max(0, photos.length - 1);
     return (
       <Pressable
         style={({ pressed }) => [
@@ -199,6 +205,20 @@ export default function GarageDetailScreen() {
         testID={`thread-card-${item.id}`}
       >
         <View style={styles.threadHeader}>
+          {coverPhoto ? (
+            <View style={[styles.threadThumbWrap, { borderColor: theme.cardBorder }]}>
+              <Image
+                source={{ uri: resolveMediaUrl(coverPhoto) }}
+                style={styles.threadThumb}
+                testID={`thread-thumb-${item.id}`}
+              />
+              {extraCount > 0 ? (
+                <View style={styles.thumbCountBadge}>
+                  <ThemedText style={styles.thumbCountText}>+{extraCount}</ThemedText>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           <ThemedText type="h4" numberOfLines={2} style={styles.threadTitle}>
             {item.title}
           </ThemedText>
@@ -628,10 +648,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: Spacing.sm,
   },
   threadTitle: {
     flex: 1,
     marginRight: Spacing.sm,
+  },
+  threadThumbWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.sm,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  threadThumb: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbCountBadge: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: BorderRadius.full,
+  },
+  thumbCountText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "700",
   },
   threadBadges: {
     flexDirection: "row",

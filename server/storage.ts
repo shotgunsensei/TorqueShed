@@ -924,6 +924,7 @@ export class DatabaseStorage implements IStorage {
         localPickup: swapShopListings.localPickup,
         willShip: swapShopListings.willShip,
         imageUrl: swapShopListings.imageUrl,
+        extraImageUrls: swapShopListings.extraImageUrls,
         isActive: swapShopListings.isActive,
         createdAt: swapShopListings.createdAt,
         updatedAt: swapShopListings.updatedAt,
