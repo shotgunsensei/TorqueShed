@@ -14,6 +14,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
 import { UserAvatar, getUserRoleDisplay } from "@/components/UserAvatar";
+import { TrialReminderBanner } from "@/components/TrialReminderBanner";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useEntitlements } from "@/lib/entitlements";
@@ -206,6 +207,8 @@ export default function MoreScreen() {
         </View>
         <Feather name="chevron-right" size={20} color={theme.textMuted} />
       </Pressable>
+
+      <TrialReminderBanner onManageBilling={() => navigation.navigate("Billing")} />
 
       {showVerifyBanner ? (
         <Card
