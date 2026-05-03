@@ -19,6 +19,9 @@ The frontend is built with React Native and Expo (SDK 54) using TypeScript. It u
 ### Backend (Express + PostgreSQL)
 The backend is an Express.js server developed with TypeScript, running on port 5000. It uses PostgreSQL as its primary database, managed by Drizzle ORM. Authentication is JWT-based, incorporating bcrypt for password hashing and middleware for secure access control (`requireAuth`, `requireAdmin`). The API is RESTful, served under `/api/*`. CORS is configured dynamically from environment variables and hardcoded production domains. Security measures include Helmet headers, trust proxy settings, and a 1MB request body limit.
 
+#### Seeded accounts (QA / reviewer)
+On every backend boot, `seedAccount` in `server/index.ts` upserts a reviewer account so QA can log in immediately after a fresh `db:push`. The default reviewer credentials are `reviewer` / `reviewer123` (role `user`), and the password hash is re-synced on every start so any drift from a previous run is corrected automatically — no manual database fix required. The defaults can be overridden via the optional `REVIEWER_USERNAME` / `REVIEWER_PASSWORD` env vars (when set, those take precedence and become the working credentials). The admin account is env-only via `ADMIN_USERNAME` / `ADMIN_PASSWORD` (no defaults — skipped if unset).
+
 ### Key Features
 - **Home Feed**: Personalized content based on user onboarding goals.
 - **Cases**: Central hub for automotive problem-solving, featuring a flat feed, search, quick actions, and filtering. Includes a "New Case" wizard for structured problem reporting.

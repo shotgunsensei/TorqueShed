@@ -840,7 +840,18 @@ async function initStripe(): Promise<void> {
   await seedDefaultGarages();
 
   // Seed accounts
-  await seedAccount(process.env.REVIEWER_USERNAME, process.env.REVIEWER_PASSWORD, "user", "Reviewer");
+  // Reviewer account: always seeded with documented defaults so QA/reviewer
+  // login works immediately after a fresh `db:push` regardless of whether the
+  // optional REVIEWER_* env overrides are present. The password hash is
+  // re-synced on every boot, so any drift from a previous run is corrected.
+  const DEFAULT_REVIEWER_USERNAME = "reviewer";
+  const DEFAULT_REVIEWER_PASSWORD = "reviewer123";
+  await seedAccount(
+    process.env.REVIEWER_USERNAME || DEFAULT_REVIEWER_USERNAME,
+    process.env.REVIEWER_PASSWORD || DEFAULT_REVIEWER_PASSWORD,
+    "user",
+    "Reviewer",
+  );
   await seedAccount(process.env.ADMIN_USERNAME, process.env.ADMIN_PASSWORD, "admin", "Admin");
 
   // Initialize Stripe schema, managed webhook, and backfill (fire and forget)
