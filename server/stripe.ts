@@ -82,32 +82,38 @@ export async function probeStripe(): Promise<{ reachable: boolean; mode: "live" 
 export const PAID_TIERS = ["diy_pro", "garage_pro", "shop_pro"] as const;
 export type PaidTier = typeof PAID_TIERS[number];
 
-const PRICE_ENV_KEYS: Record<PaidTier, string> = {
-  diy_pro: "STRIPE_PRICE_DIY_PRO",
-  garage_pro: "STRIPE_PRICE_GARAGE_PRO",
-  shop_pro: "STRIPE_PRICE_SHOP_PRO",
+export type BillingInterval = "month" | "year";
+
+const PRICE_ENV_KEYS: Record<PaidTier, Record<BillingInterval, string>> = {
+  diy_pro: { month: "STRIPE_PRICE_DIY_PRO", year: "STRIPE_PRICE_DIY_PRO_ANNUAL" },
+  garage_pro: { month: "STRIPE_PRICE_GARAGE_PRO", year: "STRIPE_PRICE_GARAGE_PRO_ANNUAL" },
+  shop_pro: { month: "STRIPE_PRICE_SHOP_PRO", year: "STRIPE_PRICE_SHOP_PRO_ANNUAL" },
 };
 
-export function getPriceIdForTier(tier: PaidTier): string | null {
-  const v = process.env[PRICE_ENV_KEYS[tier]]?.trim();
+export function getPriceIdForTier(tier: PaidTier, interval: BillingInterval = "month"): string | null {
+  const v = process.env[PRICE_ENV_KEYS[tier][interval]]?.trim();
   return v && v.length > 0 ? v : null;
 }
 
-export function getTierForPriceId(priceId: string): SubscriptionTier | null {
+export function getTierForPriceId(priceId: string): { tier: SubscriptionTier; interval: BillingInterval } | null {
   for (const t of PAID_TIERS) {
-    if (getPriceIdForTier(t) === priceId) return t;
+    if (getPriceIdForTier(t, "month") === priceId) return { tier: t, interval: "month" };
+    if (getPriceIdForTier(t, "year") === priceId) return { tier: t, interval: "year" };
   }
   return null;
 }
 
 export function getBillingConfigStatus() {
-  const priceIds: Record<PaidTier, string | null> = {
-    diy_pro: getPriceIdForTier("diy_pro"),
-    garage_pro: getPriceIdForTier("garage_pro"),
-    shop_pro: getPriceIdForTier("shop_pro"),
+  const priceIds: Record<PaidTier, { month: string | null; year: string | null }> = {
+    diy_pro: { month: getPriceIdForTier("diy_pro", "month"), year: getPriceIdForTier("diy_pro", "year") },
+    garage_pro: { month: getPriceIdForTier("garage_pro", "month"), year: getPriceIdForTier("garage_pro", "year") },
+    shop_pro: { month: getPriceIdForTier("shop_pro", "month"), year: getPriceIdForTier("shop_pro", "year") },
   };
-  const allPricesConfigured = (Object.values(priceIds) as Array<string | null>).every((p) => Boolean(p));
+  // Annual prices are optional from a "live billing works" standpoint — monthly
+  // is still the baseline that gates the missing_config banner.
+  const allPricesConfigured = (Object.values(priceIds)).every((p) => Boolean(p.month));
+  const allAnnualPricesConfigured = (Object.values(priceIds)).every((p) => Boolean(p.year));
   const webhookSecretConfigured = Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim());
   const portalReturnUrl = process.env.STRIPE_BILLING_RETURN_URL?.trim() || null;
-  return { priceIds, allPricesConfigured, webhookSecretConfigured, portalReturnUrl };
+  return { priceIds, allPricesConfigured, allAnnualPricesConfigured, webhookSecretConfigured, portalReturnUrl };
 }

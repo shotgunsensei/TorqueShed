@@ -67,6 +67,7 @@ import {
 } from "./stripeBilling";
 import { isStripeConfigured } from "./stripeClient";
 import { getStripeClient, getPriceIdForTier, getBillingConfigStatus, probeStripe, PAID_TIERS, type PaidTier } from "./stripe";
+import type Stripe from "stripe";
 import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
@@ -2364,12 +2365,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== Subscriptions & Billing ==========
   // Display-only price metadata. Real prices live in Stripe; these are for the
   // marketing labels on the subscription screen.
-  const TIER_PRICE_MAP: Record<SubscriptionTier, { monthly: number; label: string }> = {
-    free: { monthly: 0, label: "Free" },
-    diy_pro: { monthly: 999, label: "DIY Pro" },
-    garage_pro: { monthly: 2900, label: "Garage Pro" },
-    shop_pro: { monthly: 7900, label: "Shop Pro" },
+  const TIER_PRICE_MAP: Record<
+    SubscriptionTier,
+    { monthly: number; yearly: number; label: string }
+  > = {
+    free: { monthly: 0, yearly: 0, label: "Free" },
+    diy_pro: { monthly: 999, yearly: 9900, label: "DIY Pro" },
+    garage_pro: { monthly: 2900, yearly: 29000, label: "Garage Pro" },
+    shop_pro: { monthly: 7900, yearly: 79000, label: "Shop Pro" },
   };
+  const TRIAL_PERIOD_DAYS = 14;
   const FREE_SAVED_THREAD_LIMIT = 3;
 
   function pickReturnBaseUrl(req: Request): string {
@@ -2398,10 +2403,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     const isBillingDelinquent = status === "past_due";
+    // A user is trial-eligible if they've never had a Stripe subscription on
+    // file. Stripe also blocks repeat trials at the customer level when set up
+    // accordingly, but this guard avoids re-offering trials to anyone who
+    // previously held a paid plan in our system.
+    const trialEligible = !sub?.stripeSubscriptionId;
     return {
       tier,
       status,
+      interval: (sub?.interval as "month" | "year" | null | undefined) ?? null,
       currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+      trialEndsAt: sub?.trialEndsAt ?? null,
       cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
       latestInvoiceStatus: sub?.latestInvoiceStatus ?? null,
       paymentMethodLast4: sub?.paymentMethodLast4 ?? null,
@@ -2409,7 +2421,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       stripeMode,
       hasStripeCustomer: Boolean(sub?.stripeCustomerId),
       isBillingDelinquent,
+      trialEligible,
+      trialPeriodDays: TRIAL_PERIOD_DAYS,
       webhookConfigured: billing.webhookSecretConfigured,
+      annualPricesConfigured: billing.allAnnualPricesConfigured,
       prices: TIER_PRICE_MAP,
       tierPriceIds: billing.priceIds,
     };
@@ -2519,13 +2534,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/billing/create-checkout-session", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const tier = req.body?.tier as PaidTier | undefined;
+      const rawInterval = typeof req.body?.interval === "string" ? req.body.interval : "month";
+      const interval: "month" | "year" = rawInterval === "year" ? "year" : "month";
       if (!tier || !PAID_TIERS.includes(tier)) {
         return res.status(400).json({ error: "Valid paid tier required (diy_pro, garage_pro, shop_pro)." });
       }
-      const priceId = getPriceIdForTier(tier);
+      const priceId = getPriceIdForTier(tier, interval);
       if (!priceId) {
+        const envName =
+          interval === "year"
+            ? tier === "diy_pro"
+              ? "STRIPE_PRICE_DIY_PRO_ANNUAL"
+              : tier === "garage_pro"
+                ? "STRIPE_PRICE_GARAGE_PRO_ANNUAL"
+                : "STRIPE_PRICE_SHOP_PRO_ANNUAL"
+            : tier === "diy_pro"
+              ? "STRIPE_PRICE_DIY_PRO"
+              : tier === "garage_pro"
+                ? "STRIPE_PRICE_GARAGE_PRO"
+                : "STRIPE_PRICE_SHOP_PRO";
         return res.status(503).json({
-          error: `Stripe price not configured for ${tierLabel(tier)}. Set ${tier === "diy_pro" ? "STRIPE_PRICE_DIY_PRO" : tier === "garage_pro" ? "STRIPE_PRICE_GARAGE_PRO" : "STRIPE_PRICE_SHOP_PRO"} on the server.`,
+          error: `Stripe ${interval === "year" ? "annual" : "monthly"} price not configured for ${tierLabel(tier)}. Set ${envName} on the server.`,
           missingConfig: true,
         });
       }
@@ -2558,6 +2587,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerId = await ensureStripeCustomerForUser(req.userId!);
       const stripe = await getStripeClient();
       const baseUrl = pickReturnBaseUrl(req);
+
+      // Trial-eligible only when the user has never had a Stripe subscription
+      // on file. (existingSub is the row we already loaded above.)
+      const trialEligible = !existingSub?.stripeSubscriptionId;
+
+      const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
+        metadata: { userId: req.userId!, tier, interval },
+      };
+      if (trialEligible) {
+        subscriptionData.trial_period_days = TRIAL_PERIOD_DAYS;
+      }
+
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer: customerId,
@@ -2565,15 +2606,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success_url: `${baseUrl}/?billing=success&tier=${tier}&stripe=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/?billing=cancelled`,
         allow_promotion_codes: false,
-        metadata: { userId: req.userId!, tier },
-        subscription_data: {
-          metadata: { userId: req.userId!, tier },
-        },
+        metadata: { userId: req.userId!, tier, interval },
+        subscription_data: subscriptionData,
       });
       if (!session.url) {
         return res.status(502).json({ error: "Stripe did not return a checkout URL." });
       }
-      res.json({ url: session.url, sessionId: session.id });
+      res.json({
+        url: session.url,
+        sessionId: session.id,
+        interval,
+        trialPeriodDays: trialEligible ? TRIAL_PERIOD_DAYS : 0,
+      });
     } catch (error) {
       console.error("Error creating Stripe checkout session:", error);
       const message = error instanceof Error ? error.message : "Failed to start checkout";
@@ -2742,9 +2786,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stripeMode: probe.mode,
         webhookSecretConfigured: cfg.webhookSecretConfigured,
         priceIdsPresent: {
-          diy_pro: Boolean(cfg.priceIds.diy_pro),
-          garage_pro: Boolean(cfg.priceIds.garage_pro),
-          shop_pro: Boolean(cfg.priceIds.shop_pro),
+          diy_pro: Boolean(cfg.priceIds.diy_pro.month),
+          garage_pro: Boolean(cfg.priceIds.garage_pro.month),
+          shop_pro: Boolean(cfg.priceIds.shop_pro.month),
+        },
+        annualPriceIdsPresent: {
+          diy_pro: Boolean(cfg.priceIds.diy_pro.year),
+          garage_pro: Boolean(cfg.priceIds.garage_pro.year),
+          shop_pro: Boolean(cfg.priceIds.shop_pro.year),
         },
         portalReturnUrlConfigured: Boolean(cfg.portalReturnUrl),
         error: probe.error ?? null,

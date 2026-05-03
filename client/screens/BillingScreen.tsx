@@ -50,9 +50,22 @@ export default function BillingScreen() {
     }
   };
 
-  const renewBlurb = subscription?.currentPeriodEnd
-    ? `${subscription.cancelAtPeriodEnd ? "Cancels" : "Renews"} ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+  const renewDate = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+  const renewBlurb = renewDate
+    ? `${subscription?.cancelAtPeriodEnd ? "Cancels" : "Renews"} ${renewDate.toLocaleDateString()}`
     : "No renewal scheduled";
+
+  const trialEndsDate = subscription?.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
+  const trialDaysLeft = trialEndsDate
+    ? Math.max(0, Math.ceil((trialEndsDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+  const isInTrial = subscription?.status === "trialing" && trialDaysLeft !== null && trialDaysLeft > 0;
+  const intervalLabel =
+    subscription?.interval === "year"
+      ? "Annual"
+      : subscription?.interval === "month"
+        ? "Monthly"
+        : null;
 
   const statusColor =
     subscription?.status === "active" || subscription?.status === "trialing"
@@ -86,9 +99,23 @@ export default function BillingScreen() {
             {(subscription?.status ?? "active").replace("_", " ")}
           </ThemedText>
         </View>
+        {intervalLabel ? (
+          <View style={styles.row}>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>Billing interval</ThemedText>
+            <ThemedText type="small" testID="text-billing-interval">{intervalLabel}</ThemedText>
+          </View>
+        ) : null}
+        {isInTrial ? (
+          <View style={styles.row}>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>Trial</ThemedText>
+            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "700" }} testID="text-trial-countdown">
+              {trialDaysLeft === 1 ? "Ends tomorrow" : `Ends in ${trialDaysLeft} days`}
+            </ThemedText>
+          </View>
+        ) : null}
         <View style={styles.row}>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>Billing cycle</ThemedText>
-          <ThemedText type="small">{renewBlurb}</ThemedText>
+          <ThemedText type="small" testID="text-renew-blurb">{renewBlurb}</ThemedText>
         </View>
         <View style={styles.row}>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>Stripe mode</ThemedText>

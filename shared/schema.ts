@@ -428,6 +428,9 @@ export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[number];
 export const SUBSCRIPTION_STATUSES = ["active", "canceled", "past_due", "trialing", "incomplete"] as const;
 export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
 
+export const SUBSCRIPTION_INTERVALS = ["month", "year"] as const;
+export type SubscriptionInterval = typeof SUBSCRIPTION_INTERVALS[number];
+
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -436,7 +439,9 @@ export const subscriptions = pgTable("subscriptions", {
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   stripePriceId: varchar("stripe_price_id", { length: 100 }),
+  interval: varchar("interval", { length: 10 }),
   currentPeriodEnd: timestamp("current_period_end"),
+  trialEndsAt: timestamp("trial_ends_at"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   latestInvoiceStatus: varchar("latest_invoice_status", { length: 30 }),
   paymentMethodLast4: varchar("payment_method_last4", { length: 4 }),

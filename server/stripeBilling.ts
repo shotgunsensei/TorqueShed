@@ -35,13 +35,17 @@ type StripePriceMetadataRow = {
  * Look up the active Stripe price for a tier by metadata.tier.
  * Prefers the synced stripe schema and falls back to a Stripe API call.
  */
-export async function getPriceForTier(tier: Exclude<SubscriptionTier, "free">): Promise<string | null> {
+export async function getPriceForTier(
+  tier: Exclude<SubscriptionTier, "free">,
+  interval: "month" | "year" = "month",
+): Promise<string | null> {
   try {
     const result = await db.execute<StripePriceRow>(sql`
       SELECT pr.id
       FROM stripe.prices pr
       WHERE pr.active = true
         AND (pr.metadata ->> 'tier') = ${tier}
+        AND (pr.metadata ->> 'interval') = ${interval}
       ORDER BY pr.created DESC
       LIMIT 1
     `);
@@ -55,7 +59,7 @@ export async function getPriceForTier(tier: Exclude<SubscriptionTier, "free">): 
   try {
     const stripe = await getUncachableStripeClient();
     const list = await stripe.prices.search({
-      query: `active:'true' AND metadata['tier']:'${tier}'`,
+      query: `active:'true' AND metadata['tier']:'${tier}' AND metadata['interval']:'${interval}'`,
       limit: 1,
     });
     if (list.data.length > 0) return list.data[0].id;
@@ -183,18 +187,26 @@ interface NormalizedStripeSub {
   customer: string;
   status: string;
   current_period_end: number | null;
+  trial_end: number | null;
   cancel_at_period_end: boolean;
   priceId: string | null;
+  interval: "month" | "year" | null;
   defaultPaymentMethodId: string | null;
   latestInvoiceId: string | null;
 }
 
 interface StripeSubscriptionAttrs {
   current_period_end?: number | null;
+  trial_end?: number | null;
   cancel_at_period_end?: boolean | null;
-  items?: { data?: Array<{ price?: { id?: string } | null }> };
+  items?: {
+    data?: Array<{
+      price?: { id?: string; recurring?: { interval?: string | null } | null } | null;
+    }>;
+  };
   default_payment_method?: string | { id?: string } | null;
   latest_invoice?: string | { id?: string } | null;
+  metadata?: Record<string, string> | null;
 }
 
 type StripeSubscriptionRow = {
@@ -221,13 +233,23 @@ function normalizeApiSub(sub: Stripe.Subscription): NormalizedStripeSub {
     null;
   const dpm = sub.default_payment_method;
   const inv = sub.latest_invoice;
+  const priceInterval = sub.items?.data?.[0]?.price?.recurring?.interval;
+  const metaInterval = sub.metadata?.interval;
+  const interval: "month" | "year" | null =
+    metaInterval === "month" || metaInterval === "year"
+      ? metaInterval
+      : priceInterval === "month" || priceInterval === "year"
+        ? priceInterval
+        : null;
   return {
     id: sub.id,
     customer: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
     status: sub.status,
     current_period_end: periodEnd,
+    trial_end: sub.trial_end ?? null,
     cancel_at_period_end: Boolean(sub.cancel_at_period_end),
     priceId: pickPriceIdFromStripeSub(sub),
+    interval,
     defaultPaymentMethodId: typeof dpm === "string" ? dpm : dpm?.id ?? null,
     latestInvoiceId: typeof inv === "string" ? inv : inv?.id ?? null,
   };
@@ -300,13 +322,23 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
       const periodEnd = row.current_period_end ?? attrs.current_period_end ?? null;
       const dpm = attrs.default_payment_method;
       const inv = attrs.latest_invoice;
+      const priceInterval = attrs.items?.data?.[0]?.price?.recurring?.interval;
+      const metaInterval = attrs.metadata?.interval;
+      const interval: "month" | "year" | null =
+        metaInterval === "month" || metaInterval === "year"
+          ? metaInterval
+          : priceInterval === "month" || priceInterval === "year"
+            ? priceInterval
+            : null;
       stripeSub = {
         id: row.id,
         customer: row.customer,
         status: row.status,
         current_period_end: periodEnd ?? null,
+        trial_end: attrs.trial_end ?? null,
         cancel_at_period_end: Boolean(attrs.cancel_at_period_end),
         priceId: attrs.items?.data?.[0]?.price?.id ?? null,
+        interval,
         defaultPaymentMethodId: typeof dpm === "string" ? dpm : dpm?.id ?? null,
         latestInvoiceId: typeof inv === "string" ? inv : inv?.id ?? null,
       };
@@ -348,6 +380,8 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
         stripeSubscriptionId: null,
         currentPeriodEnd: null,
         cancelAtPeriodEnd: false,
+        interval: null,
+        trialEndsAt: null,
         latestInvoiceStatus: null,
         paymentMethodLast4: null,
         updatedAt: new Date(),
@@ -380,6 +414,8 @@ export async function syncLocalSubscriptionForCustomer(stripeCustomerId: string)
       currentPeriodEnd: stripeSub.current_period_end
         ? new Date(stripeSub.current_period_end * 1000)
         : null,
+      trialEndsAt: stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null,
+      interval: stripeSub.interval ?? null,
       cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
       latestInvoiceStatus,
       paymentMethodLast4,

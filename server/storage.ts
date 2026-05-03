@@ -1254,8 +1254,10 @@ export class DatabaseStorage implements IStorage {
       stripeCustomerId: string;
       stripeSubscriptionId: string | null;
       stripePriceId: string | null;
+      interval?: "month" | "year" | null;
       cancelAtPeriodEnd: boolean;
       currentPeriodEnd: Date | null;
+      trialEndsAt?: Date | null;
     },
   ): Promise<Subscription> {
     const existing = await this.getSubscription(userId);

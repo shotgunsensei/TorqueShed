@@ -47,7 +47,11 @@ function subscriptionIdOf(value: unknown): string | null {
 
 interface SubscriptionLikeItem {
   current_period_end?: number | null;
-  price?: { id?: string | null; metadata?: Record<string, string> | null } | null;
+  price?: {
+    id?: string | null;
+    metadata?: Record<string, string> | null;
+    recurring?: { interval?: string | null } | null;
+  } | null;
 }
 
 interface SubscriptionLike {
@@ -56,8 +60,22 @@ interface SubscriptionLike {
   status: string;
   cancel_at_period_end?: boolean | null;
   current_period_end?: number | null;
+  trial_end?: number | null;
   items?: { data?: SubscriptionLikeItem[] };
   metadata?: Record<string, string> | null;
+}
+
+function pickInterval(sub: SubscriptionLike): "month" | "year" | null {
+  const fromMeta = sub.metadata?.interval;
+  if (fromMeta === "month" || fromMeta === "year") return fromMeta;
+  const fromPrice = sub.items?.data?.[0]?.price?.recurring?.interval;
+  if (fromPrice === "month" || fromPrice === "year") return fromPrice;
+  return null;
+}
+
+function pickTrialEnd(sub: SubscriptionLike): Date | null {
+  const ts = typeof sub.trial_end === "number" ? sub.trial_end : null;
+  return ts ? new Date(ts * 1000) : null;
 }
 
 function pickPeriodEnd(sub: SubscriptionLike): Date | null {
@@ -95,14 +113,31 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<boolean> {
       if (!local) return false;
       const tier = asTier(session.metadata?.tier, local.tier as SubscriptionTier);
       const subscriptionId = subscriptionIdOf(session.subscription) ?? local.stripeSubscriptionId ?? null;
+      const sessionInterval =
+        session.metadata?.interval === "year" || session.metadata?.interval === "month"
+          ? (session.metadata.interval as "month" | "year")
+          : (local.interval as "month" | "year" | null) ?? null;
+      // Preserve a trialing status already recorded by customer.subscription.* events
+      // for the same subscription; webhook ordering is not guaranteed and forcing
+      // "active" here would erase a valid trial countdown shown to the user.
+      const localStatus = local.status as SubscriptionStatus;
+      const sameSub =
+        subscriptionId !== null && local.stripeSubscriptionId === subscriptionId;
+      const trialStillActive =
+        local.trialEndsAt instanceof Date && local.trialEndsAt.getTime() > Date.now();
+      const preserveTrial =
+        sameSub && (localStatus === "trialing" || trialStillActive);
+      const status: SubscriptionStatus = preserveTrial ? "trialing" : "active";
       await storage.updateSubscriptionFromStripe(local.userId, {
         tier,
-        status: "active",
+        status,
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId,
         stripePriceId: local.stripePriceId ?? null,
+        interval: sessionInterval,
         cancelAtPeriodEnd: false,
         currentPeriodEnd: local.currentPeriodEnd ?? null,
+        trialEndsAt: local.trialEndsAt ?? null,
       });
       return true;
     }
@@ -126,8 +161,10 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<boolean> {
         stripeCustomerId: customerId,
         stripeSubscriptionId: sub.id,
         stripePriceId: pickPriceId(sub),
+        interval: pickInterval(sub) ?? (local.interval as "month" | "year" | null) ?? null,
         cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
         currentPeriodEnd: pickPeriodEnd(sub),
+        trialEndsAt: pickTrialEnd(sub),
       });
       return true;
     }
@@ -144,8 +181,10 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<boolean> {
         stripeCustomerId: customerId,
         stripeSubscriptionId: sub.id,
         stripePriceId: pickPriceId(sub),
+        interval: pickInterval(sub) ?? (local.interval as "month" | "year" | null) ?? null,
         cancelAtPeriodEnd: false,
         currentPeriodEnd: pickPeriodEnd(sub),
+        trialEndsAt: null,
       });
       return true;
     }
@@ -165,8 +204,10 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<boolean> {
         stripeCustomerId: customerId,
         stripeSubscriptionId: local.stripeSubscriptionId ?? null,
         stripePriceId: local.stripePriceId ?? null,
+        interval: (local.interval as "month" | "year" | null) ?? null,
         cancelAtPeriodEnd: Boolean(local.cancelAtPeriodEnd),
         currentPeriodEnd: local.currentPeriodEnd ?? null,
+        trialEndsAt: local.trialEndsAt ?? null,
       });
       return true;
     }

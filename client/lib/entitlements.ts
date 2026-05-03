@@ -93,6 +93,8 @@ export const FREE_LISTING_LIMIT = 3;
 export type StripeMode = "live" | "test" | "missing_config";
 export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "incomplete";
 
+export type BillingInterval = "month" | "year";
+
 export interface SubscriptionInfo {
   tier: Tier;
   status: SubscriptionStatus;
@@ -106,8 +108,13 @@ export interface SubscriptionInfo {
   hasStripeCustomer: boolean;
   isBillingDelinquent: boolean;
   webhookConfigured: boolean;
-  prices: Record<Tier, { monthly: number; label: string }>;
+  prices: Record<Tier, { monthly: number; yearly?: number; label: string }>;
   tierPriceIds: Record<Exclude<Tier, "free">, string | null>;
+  interval: BillingInterval | null;
+  trialEndsAt: string | null;
+  trialEligible: boolean;
+  trialPeriodDays: number;
+  annualPricesConfigured: boolean;
 }
 
 export function useEntitlements() {

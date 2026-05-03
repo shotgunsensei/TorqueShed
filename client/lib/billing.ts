@@ -5,14 +5,19 @@ import { apiRequest } from "@/lib/query-client";
 import type { Tier } from "@/lib/entitlements";
 import { rememberPendingCheckoutSession } from "@/lib/stripe-return";
 
+export type BillingInterval = "month" | "year";
+
 export type CheckoutResult =
-  | { kind: "opened"; url: string; sessionId?: string | null; mode?: string }
+  | { kind: "opened"; url: string; sessionId?: string | null; mode?: string; trialPeriodDays?: number; interval?: BillingInterval }
   | { kind: "missing_config"; message: string }
   | { kind: "error"; message: string };
 
-export async function startCheckout(tier: Exclude<Tier, "free">): Promise<CheckoutResult> {
+export async function startCheckout(
+  tier: Exclude<Tier, "free">,
+  interval: BillingInterval = "month",
+): Promise<CheckoutResult> {
   try {
-    const res = await apiRequest("POST", "/api/billing/create-checkout-session", { tier });
+    const res = await apiRequest("POST", "/api/billing/create-checkout-session", { tier, interval });
     const data = await res.json();
     if (!data?.url) {
       return { kind: "error", message: "Stripe did not return a checkout URL." };
@@ -23,7 +28,9 @@ export async function startCheckout(tier: Exclude<Tier, "free">): Promise<Checko
       rememberPendingCheckoutSession(sessionId);
     }
     await openExternal(data.url);
-    return { kind: "opened", url: data.url, sessionId, mode };
+    const trialPeriodDays = typeof data?.trialPeriodDays === "number" ? data.trialPeriodDays : 0;
+    const responseInterval: BillingInterval = data?.interval === "year" ? "year" : "month";
+    return { kind: "opened", url: data.url, sessionId, mode, trialPeriodDays, interval: responseInterval };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start checkout";
     if (/missingConfig|not configured|503/.test(message)) {

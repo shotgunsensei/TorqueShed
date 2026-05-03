@@ -44,3 +44,15 @@ A custom UI component library ensures consistency, featuring components like `Ca
 - **bcrypt**: Password hashing.
 - **jsonwebtoken**: JWT authentication.
 - **zod**: Schema validation.
+- **Stripe**: Payment processing and subscription management.
+
+### Billing & Entitlements
+Subscription tiers (DIY Pro, Garage Pro, Shop Pro) ship with both monthly and annual prices. The `subscriptions` table stores `interval` (`month`|`year`) and `trialEndsAt` so the client can render a trial countdown and a "Renews YYYY-MM-DD" line on the Billing screen. New paying customers automatically receive a 14-day free trial via Stripe Checkout `trial_period_days` (gated on `!subscription.stripeSubscriptionId`, so reactivations skip the trial).
+
+Required Stripe env vars:
+- `STRIPE_PRICE_DIY_PRO`, `STRIPE_PRICE_GARAGE_PRO`, `STRIPE_PRICE_SHOP_PRO` — monthly recurring price IDs (baseline; missing IDs put the app into `missing_config` mode).
+- `STRIPE_PRICE_DIY_PRO_ANNUAL`, `STRIPE_PRICE_GARAGE_PRO_ANNUAL`, `STRIPE_PRICE_SHOP_PRO_ANNUAL` — yearly price IDs ($99 / $290 / $790). When all three are present, `/api/subscription` reports `annualPricesConfigured: true` and the SubscriptionScreen renders the Monthly/Annual toggle with a "2 months free" badge.
+- `STRIPE_WEBHOOK_SECRET` and `STRIPE_BILLING_RETURN_URL` as before.
+
+Run `npx tsx scripts/seed-stripe-tiers.ts` in test mode to (idempotently) create products and both monthly + annual prices tagged `metadata.tier` and `metadata.interval`. Copy the printed price IDs into the env vars above.
+- **Resend / Postmark**: Email sending providers.

@@ -31,7 +31,7 @@ export function checkoutSessionCompletedEvent(overrides: Partial<Stripe.Checkout
     subscription: SUBSCRIPTION_ID,
     mode: "subscription",
     status: "complete",
-    metadata: { tier: "garage_pro", userId: "user_1" },
+    metadata: { tier: "garage_pro", userId: "user_1", interval: "month" },
     ...overrides,
   } as unknown as Stripe.Checkout.Session;
   return envelope("checkout.session.completed", session);
@@ -49,6 +49,9 @@ export function expertEscalationCompletedEvent(): Stripe.Event {
   return envelope("checkout.session.completed", session);
 }
 
+export const TRIAL_END_UNIX = 1_800_000_000;
+export const TRIAL_END_DATE = new Date(TRIAL_END_UNIX * 1000);
+
 function buildSubscription(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: SUBSCRIPTION_ID,
@@ -57,6 +60,7 @@ function buildSubscription(overrides: Record<string, unknown> = {}): Record<stri
     status: "active",
     cancel_at_period_end: false,
     current_period_end: PERIOD_END_UNIX,
+    trial_end: null,
     metadata: {},
     items: {
       data: [
@@ -66,12 +70,36 @@ function buildSubscription(overrides: Record<string, unknown> = {}): Record<stri
           price: {
             id: PRICE_ID,
             metadata: { tier: "garage_pro" },
+            recurring: { interval: "month" },
           },
         },
       ],
     },
     ...overrides,
   };
+}
+
+export function subscriptionTrialingCreatedEvent(): Stripe.Event {
+  return envelope(
+    "customer.subscription.created",
+    buildSubscription({
+      status: "trialing",
+      trial_end: TRIAL_END_UNIX,
+      items: {
+        data: [
+          {
+            id: "si_test_1",
+            current_period_end: PERIOD_END_UNIX,
+            price: {
+              id: "price_test_diy_pro_annual",
+              metadata: { tier: "diy_pro", interval: "year" },
+              recurring: { interval: "year" },
+            },
+          },
+        ],
+      },
+    }),
+  );
 }
 
 export function subscriptionCreatedEvent(): Stripe.Event {

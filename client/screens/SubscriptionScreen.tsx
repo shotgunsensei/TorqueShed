@@ -13,7 +13,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useEntitlements, type Tier, tierIndex } from "@/lib/entitlements";
-import { startCheckout, openBillingPortal } from "@/lib/billing";
+import { startCheckout, openBillingPortal, type BillingInterval } from "@/lib/billing";
 import { confirmCheckoutSession } from "@/lib/stripe-return";
 import { apiRequest } from "@/lib/query-client";
 import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
@@ -24,7 +24,9 @@ type SubscriptionRouteProp = RouteProp<MoreStackParamList, "Subscription">;
 interface TierCard {
   tier: Tier;
   name: string;
-  price: string;
+  monthly: string;
+  annual: string | null;
+  monthlyEquivalent: string | null;
   tagline: string;
   features: string[];
 }
@@ -33,7 +35,9 @@ const TIERS: TierCard[] = [
   {
     tier: "free",
     name: "Free",
-    price: "$0",
+    monthly: "$0",
+    annual: null,
+    monthlyEquivalent: null,
     tagline: "Get help from the community",
     features: [
       "Basic case creation",
@@ -46,7 +50,9 @@ const TIERS: TierCard[] = [
   {
     tier: "diy_pro",
     name: "DIY Pro",
-    price: "$9.99 / month",
+    monthly: "$9.99 / month",
+    annual: "$99 / year",
+    monthlyEquivalent: "$8.25/mo billed yearly",
     tagline: "For weekend wrenchers",
     features: [
       "Advanced diagnostic tree",
@@ -60,7 +66,9 @@ const TIERS: TierCard[] = [
   {
     tier: "garage_pro",
     name: "Garage Pro",
-    price: "$29 / month",
+    monthly: "$29 / month",
+    annual: "$290 / year",
+    monthlyEquivalent: "$24.17/mo billed yearly",
     tagline: "For multi-vehicle households",
     features: [
       "Everything in DIY Pro",
@@ -75,7 +83,9 @@ const TIERS: TierCard[] = [
   {
     tier: "shop_pro",
     name: "Shop Pro",
-    price: "$79 / month",
+    monthly: "$79 / month",
+    annual: "$790 / year",
+    monthlyEquivalent: "$65.83/mo billed yearly",
     tagline: "For independent shops",
     features: [
       "Everything in Garage Pro",
@@ -142,6 +152,13 @@ export default function SubscriptionScreen() {
             ? { label: "Trial", tone: "info" }
             : { label: "Active", tone: "ok" };
   const [busyTier, setBusyTier] = useState<Tier | null>(null);
+  const annualPricesConfigured = subscription?.annualPricesConfigured ?? false;
+  const trialEligible = subscription?.trialEligible ?? false;
+  const trialPeriodDays = subscription?.trialPeriodDays ?? 14;
+  const currentInterval = subscription?.interval ?? null;
+  const [interval, setInterval] = useState<BillingInterval>(
+    currentInterval === "year" ? "year" : "month",
+  );
 
   const downgradeMutation = useMutation({
     mutationFn: async () => {
@@ -204,7 +221,8 @@ export default function SubscriptionScreen() {
       return;
     }
     setBusyTier(target);
-    const result = await startCheckout(target);
+    const useInterval: BillingInterval = annualPricesConfigured ? interval : "month";
+    const result = await startCheckout(target, useInterval);
     setBusyTier(null);
     if (result.kind === "missing_config") {
       toast.show("Live billing is not fully configured yet — see Manage Billing.", "error");
@@ -295,6 +313,42 @@ export default function SubscriptionScreen() {
         Free covers casework. Upgrade only when you need premium diagnostics, exports, or shop tools.
       </ThemedText>
 
+      {annualPricesConfigured ? (
+        <View style={[styles.intervalToggle, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundTertiary }]}>
+          {(["month", "year"] as const).map((opt) => {
+            const active = interval === opt;
+            return (
+              <Pressable
+                key={opt}
+                onPress={() => setInterval(opt)}
+                style={[
+                  styles.intervalPill,
+                  active && { backgroundColor: theme.primary },
+                ]}
+                testID={`toggle-interval-${opt}`}
+              >
+                <ThemedText
+                  type="small"
+                  style={{ color: active ? "#0D0F12" : theme.text, fontWeight: "700" }}
+                >
+                  {opt === "month" ? "Monthly" : "Annual"}
+                </ThemedText>
+                {opt === "year" ? (
+                  <View style={[styles.savePill, { backgroundColor: active ? "#0D0F12" : theme.primary + "22" }]}>
+                    <ThemedText
+                      type="caption"
+                      style={{ color: active ? theme.primary : theme.primary, fontWeight: "700" }}
+                    >
+                      2 months free
+                    </ThemedText>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
       {hasStripeSubscription ? (
         <>
           {statusBadge ? (
@@ -367,13 +421,16 @@ export default function SubscriptionScreen() {
           const targetIndex = tierIndex(t.tier);
           const isUpgrade = targetIndex > currentIndex;
           const isDowngrade = targetIndex < currentIndex;
+          const showTrialTag = trialEligible && isUpgrade && t.tier !== "free";
           const cta =
             isCurrent
               ? hasStripeCustomer && t.tier !== "free"
                 ? "Manage Billing"
                 : "Current"
               : isUpgrade
-                ? `Upgrade to ${t.name}`
+                ? showTrialTag
+                  ? `Start ${trialPeriodDays}-day free trial`
+                  : `Upgrade to ${t.name}`
                 : isDowngrade
                   ? hasStripeCustomer
                     ? "Manage Billing"
@@ -381,6 +438,9 @@ export default function SubscriptionScreen() {
                       ? "Downgrade to Free"
                       : `Switch to ${t.name}`
                   : `Switch to ${t.name}`;
+          const showAnnual = annualPricesConfigured && interval === "year" && t.annual;
+          const priceLabel = showAnnual ? (t.annual as string) : t.monthly;
+          const priceSubLabel = showAnnual ? t.monthlyEquivalent : null;
 
           const disabled =
             (isCurrent && (t.tier === "free" || !hasStripeCustomer)) ||
@@ -416,10 +476,23 @@ export default function SubscriptionScreen() {
                   </View>
                 ) : null}
               </View>
-              <ThemedText type="h4" style={{ color: theme.primary, marginTop: Spacing.xs }}>{t.price}</ThemedText>
+              <ThemedText type="h4" style={{ color: theme.primary, marginTop: Spacing.xs }} testID={`text-tier-price-${t.tier}`}>{priceLabel}</ThemedText>
+              {priceSubLabel ? (
+                <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.xxs }}>
+                  {priceSubLabel}
+                </ThemedText>
+              ) : null}
               <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xxs, marginBottom: Spacing.md }}>
                 {t.tagline}
               </ThemedText>
+              {showTrialTag ? (
+                <View style={[styles.trialTag, { borderColor: theme.primary, backgroundColor: theme.primary + "18" }]}>
+                  <Feather name="gift" size={12} color={theme.primary} style={{ marginRight: Spacing.xxs }} />
+                  <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
+                    {trialPeriodDays}-day free trial · cancel anytime
+                  </ThemedText>
+                </View>
+              ) : null}
               {t.features.map((f) => (
                 <View key={f} style={styles.featureRow}>
                   <Feather name="check" size={16} color={theme.primary} style={{ marginRight: Spacing.sm }} />
@@ -570,6 +643,38 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   disclaimer: { textAlign: "center", marginTop: Spacing.lg, paddingHorizontal: Spacing.md },
+  intervalToggle: {
+    flexDirection: "row",
+    alignSelf: "center",
+    padding: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    gap: 4,
+  },
+  intervalPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    gap: Spacing.xs,
+  },
+  savePill: {
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  trialTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
   banner: {
     flexDirection: "row",
     alignItems: "flex-start",
