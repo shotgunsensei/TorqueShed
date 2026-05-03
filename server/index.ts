@@ -14,6 +14,7 @@ import { ZodError } from "zod";
 import { WebhookHandlers } from "./webhookHandlers";
 import { getStripeSync, isStripeConfigured } from "./stripeClient";
 import { reconcileWebhookPayload, syncAllLocalSubscriptions } from "./stripeBilling";
+import type Stripe from "stripe";
 
 const app = express();
 const log = console.log;
@@ -146,6 +147,46 @@ function setupCors(app: express.Application) {
   });
 }
 
+async function handleExpertEscalationEvent(payload: Buffer): Promise<void> {
+  let event: Stripe.Event;
+  try {
+    event = JSON.parse(payload.toString("utf8")) as Stripe.Event;
+  } catch {
+    return;
+  }
+
+  if (
+    event.type !== "checkout.session.completed" &&
+    event.type !== "checkout.session.expired" &&
+    event.type !== "checkout.session.async_payment_failed"
+  ) {
+    return;
+  }
+
+  const session = event.data?.object as Stripe.Checkout.Session | undefined;
+  if (!session || session.metadata?.kind !== "expert_escalation") return;
+
+  const reviewId = session.metadata?.reviewId;
+  if (!reviewId) return;
+
+  try {
+    if (event.type === "checkout.session.completed") {
+      const paymentIntentId =
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id ?? null;
+      await storage.markExpertReviewPaid(reviewId, paymentIntentId);
+    } else {
+      await storage.markExpertReviewFailed(reviewId);
+    }
+  } catch (err) {
+    console.error(
+      `[stripe] Failed handling expert-escalation event ${event.type} for review ${reviewId}:`,
+      err,
+    );
+  }
+}
+
 function setupStripeWebhook(app: express.Application) {
   // CRITICAL: this route must be registered BEFORE express.json() so the body
   // arrives as a raw Buffer for Stripe signature verification.
@@ -174,6 +215,9 @@ function setupStripeWebhook(app: express.Application) {
         // After the stripe schema is updated, propagate the change to our local
         // subscriptions table so getUserTier() reflects the new state.
         await reconcileWebhookPayload(buf);
+        // One-time expert-escalation checkouts aren't subscriptions, so the
+        // reconcile above does nothing for them. Handle them here.
+        await handleExpertEscalationEvent(buf);
 
         res.status(200).json({ received: true });
       } catch (err: unknown) {

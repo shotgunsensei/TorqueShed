@@ -64,8 +64,7 @@ import {
   isPaidTier,
 } from "./stripeBilling";
 import { isStripeConfigured } from "./stripeClient";
-import { getStripeClient, getTierForPriceId, getPriceIdForTier, getBillingConfigStatus, probeStripe, PAID_TIERS, type PaidTier } from "./stripe";
-import type Stripe from "stripe";
+import { getStripeClient, getPriceIdForTier, getBillingConfigStatus, probeStripe, PAID_TIERS, type PaidTier } from "./stripe";
 import PDFDocument from "pdfkit";
 
 const BCRYPT_ROUNDS = 12;
@@ -2374,164 +2373,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ---- Stripe webhook ----
-  // Uses the raw body buffer captured by the express.json `verify` callback in
-  // server/index.ts (`req.rawBody`). Idempotent: webhooks may be redelivered.
-  app.post("/api/stripe/webhook", async (req: Request, res: Response) => {
-    const signature = req.header("stripe-signature");
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
-    if (!signature || !webhookSecret) {
-      return res.status(400).json({ error: "Webhook signature or secret missing." });
-    }
-    const rawBody = req.rawBody;
-    if (!rawBody || !(rawBody instanceof Buffer)) {
-      return res.status(400).json({ error: "Raw body unavailable for signature verification." });
-    }
-
-    let event: Stripe.Event;
-    try {
-      const stripe = await getStripeClient();
-      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-    } catch (err) {
-      console.error("Stripe webhook signature verification failed:", err);
-      const message = err instanceof Error ? err.message : "Invalid signature";
-      return res.status(400).json({ error: `Webhook signature verification failed: ${message}` });
-    }
-
-    try {
-      await handleStripeEvent(event);
-      res.json({ received: true });
-    } catch (err) {
-      console.error(`Failed handling Stripe event ${event.id} (${event.type}):`, err);
-      res.status(500).json({ error: "Failed to process webhook event." });
-    }
-  });
-
-  async function handleStripeEvent(event: Stripe.Event) {
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.metadata?.userId;
-        const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
-
-        // Branch on the kind of checkout we created. Subscription checkouts
-        // hold a `subscription` field; one-time expert escalations use
-        // metadata.kind === 'expert_escalation'.
-        if (session.metadata?.kind === "expert_escalation") {
-          const reviewId = session.metadata?.reviewId;
-          if (reviewId) {
-            const paymentIntentId = typeof session.payment_intent === "string"
-              ? session.payment_intent
-              : session.payment_intent?.id ?? null;
-            await storage.markExpertReviewPaid(reviewId, paymentIntentId);
-          }
-          return;
-        }
-
-        const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
-        if (!customerId || !subscriptionId) return;
-        if (userId) {
-          await storage.setStripeCustomerId(userId, customerId);
-        }
-        const stripe = await getStripeClient();
-        const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        await applyStripeSubscriptionToDb(sub, userId);
-        return;
-      }
-      case "checkout.session.async_payment_failed":
-      case "checkout.session.expired": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        if (session.metadata?.kind === "expert_escalation") {
-          const reviewId = session.metadata?.reviewId;
-          if (reviewId) await storage.markExpertReviewFailed(reviewId);
-        }
-        return;
-      }
-      case "customer.subscription.created":
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
-        await applyStripeSubscriptionToDb(sub);
-        return;
-      }
-      case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = typeof (invoice as unknown as { subscription?: string | Stripe.Subscription }).subscription === "string"
-          ? ((invoice as unknown as { subscription?: string }).subscription as string)
-          : (invoice as unknown as { subscription?: Stripe.Subscription }).subscription?.id;
-        if (!subscriptionId) return;
-        const stripe = await getStripeClient();
-        const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        await applyStripeSubscriptionToDb(sub);
-        return;
-      }
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
-        const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
-        if (!customerId) return;
-        const existing = await storage.getSubscriptionByStripeCustomerId(customerId);
-        if (!existing) return;
-        await storage.updateSubscriptionFromStripe(existing.userId, {
-          tier: existing.tier as SubscriptionTier,
-          status: "past_due",
-          stripeCustomerId: customerId,
-          stripeSubscriptionId: existing.stripeSubscriptionId ?? null,
-          stripePriceId: existing.stripePriceId ?? null,
-          cancelAtPeriodEnd: existing.cancelAtPeriodEnd ?? false,
-          currentPeriodEnd: existing.currentPeriodEnd ?? null,
-        });
-        return;
-      }
-      default:
-        // Ignore unrelated events.
-        return;
-    }
-  }
-
-  async function applyStripeSubscriptionToDb(sub: Stripe.Subscription, fallbackUserId?: string) {
-    const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-    let userId = sub.metadata?.userId || fallbackUserId;
-    if (!userId) {
-      const existing = await storage.getSubscriptionByStripeCustomerId(customerId);
-      if (existing) userId = existing.userId;
-    }
-    if (!userId) {
-      console.warn(`Stripe subscription ${sub.id} has no userId metadata and no matching customer record; ignoring.`);
-      return;
-    }
-
-    const item = sub.items.data[0];
-    const priceId = item?.price?.id ?? null;
-    const tierFromPrice = priceId ? getTierForPriceId(priceId) : null;
-    const wasCanceled = sub.status === "canceled" || sub.status === "incomplete_expired" || sub.status === "unpaid";
-    const tier: SubscriptionTier = wasCanceled ? "free" : (tierFromPrice ?? "free");
-
-    const statusMap: Record<string, "active" | "trialing" | "past_due" | "canceled" | "incomplete"> = {
-      active: "active",
-      trialing: "trialing",
-      past_due: "past_due",
-      unpaid: "past_due",
-      canceled: "canceled",
-      incomplete: "incomplete",
-      incomplete_expired: "canceled",
-      paused: "canceled",
-    };
-    const status = statusMap[sub.status] ?? "incomplete";
-
-    const periodEndRaw = (item as unknown as { current_period_end?: number })?.current_period_end
-      ?? (sub as unknown as { current_period_end?: number }).current_period_end
-      ?? null;
-    const currentPeriodEnd = periodEndRaw ? new Date(periodEndRaw * 1000) : null;
-
-    await storage.updateSubscriptionFromStripe(userId, {
-      tier,
-      status,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: sub.id,
-      stripePriceId: priceId,
-      cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
-      currentPeriodEnd,
-    });
-  }
+  // The single Stripe webhook handler lives in `server/index.ts`
+  // (`setupStripeWebhook`). It must be registered before `express.json()` so
+  // the raw body Buffer is available for signature verification by
+  // `stripe-replit-sync`. That handler also covers expert-escalation one-time
+  // checkouts via `handleExpertEscalationEvent`. Do not add a second handler
+  // here — Express short-circuits on first response and the duplicate would
+  // be silently dead code.
 
   // Admin-only health: confirms presence of every Stripe env var. Never echoes
   // the actual values.
