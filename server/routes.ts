@@ -51,7 +51,7 @@ import {
   type ExpertServiceLevel,
 } from "@shared/schema";
 import { requireAuth, requireAdmin, optionalAuth, signJWT, type AuthenticatedRequest } from "./middleware/auth";
-import { rateLimited } from "./lib/rateLimit";
+import { rateLimited, checkRateLimit } from "./lib/rateLimit";
 import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
@@ -413,23 +413,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       await db.update(users).set(updates).where(eq(users.id, req.userId!));
+      let autoSendStatus: "sent" | "rate_limited" | "failed" | null = null;
       if (emailChanged) {
         await storage.invalidateEmailVerifications(req.userId!);
         // If the new email is non-null, immediately issue a fresh verification token
         // and send the link so the user does not have to take a second action.
+        // Per-user rate limit (5/hr) so this PATCH path cannot be abused to spam
+        // arbitrary recipients by repeatedly flipping the email field.
         if (normalizedEmail) {
-          try {
-            const { token } = await storage.createEmailVerification(req.userId!, normalizedEmail);
-            const { sendEmail, buildVerificationEmail } = await import("./lib/mailer");
-            const baseUrl = getVerifyBaseUrl(req);
-            const verifyUrl = `${baseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
-            const { subject, html, text } = buildVerificationEmail(verifyUrl, normalizedEmail);
-            const result = await sendEmail({ to: normalizedEmail, subject, html, text });
-            if (!result.ok) {
-              console.error("[email-verify] auto-send after email change failed:", result.error);
+          const limitCheck = await checkRateLimit({
+            key: `auth:emailsend:user:${req.userId!}`,
+            max: 5,
+            windowMs: 60 * 60 * 1000,
+          });
+          if (!limitCheck.allowed) {
+            autoSendStatus = "rate_limited";
+            console.warn(
+              `[email-verify] auto-send rate limited for user ${req.userId} (retry in ${limitCheck.retryAfterSeconds}s)`,
+            );
+          } else {
+            try {
+              const { token } = await storage.createEmailVerification(req.userId!, normalizedEmail);
+              const { sendEmail, buildVerificationEmail } = await import("./lib/mailer");
+              const baseUrl = getVerifyBaseUrl(req);
+              const verifyUrl = `${baseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
+              const { subject, html, text } = buildVerificationEmail(verifyUrl, normalizedEmail);
+              const result = await sendEmail({ to: normalizedEmail, subject, html, text });
+              if (!result.ok) {
+                autoSendStatus = "failed";
+                console.error("[email-verify] auto-send after email change failed:", result.error);
+              } else {
+                autoSendStatus = "sent";
+              }
+            } catch (err) {
+              autoSendStatus = "failed";
+              console.error("[email-verify] auto-send after email change threw:", err);
             }
-          } catch (err) {
-            console.error("[email-verify] auto-send after email change threw:", err);
           }
         }
       }
@@ -449,8 +468,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               emailVerifiedAt: refreshed.emailVerifiedAt
                 ? refreshed.emailVerifiedAt.toISOString()
                 : null,
+              verificationEmailStatus: autoSendStatus,
             }
-          : {},
+          : { verificationEmailStatus: autoSendStatus },
       );
     } catch (error) {
       if (error instanceof ZodError) {

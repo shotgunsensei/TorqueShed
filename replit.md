@@ -1,7 +1,7 @@
 # TorqueShed - Automotive Community Platform
 
 ## Overview
-TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers, aiming to be "The Garage for Real People." It fosters a community around automotive interests by offering brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), a curated tools marketplace ("Shop"), and rich user profiles. The project's vision is to create a vibrant, engaged community while providing essential tools for automotive repair and maintenance.
+TorqueShed is a mobile-first automotive community platform designed to connect mechanics, enthusiasts, and DIYers. Its core purpose is to build a strong community around automotive interests, acting as "The Garage for Real People." Key capabilities include brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), a curated marketplace for tools ("Shop"), and rich user profiles. The project aims to foster a vibrant community and provide essential tools for automotive repair and maintenance, with a vision to become the leading digital hub for automotive enthusiasts and professionals.
 
 ## User Preferences
 - Bold, industrial design aesthetic
@@ -13,42 +13,34 @@ TorqueShed is a mobile-first automotive community platform designed to connect m
 
 ## System Architecture
 
-### UI/UX Decisions
-The platform features a bold, industrial design with Racing Orange as the primary accent. It's mobile-first, inspired by iOS 26 liquid glass, and defaults to a dark theme (neutral-950 background). Typography uses Montserrat for headings and Inter for body text. The color palette includes Racing Orange (#FF6B35), Industrial Black (#0D0F12), and Caution Yellow (#F59E0B). A custom UI component library ensures consistency, including `Card`, `Button`, `FAB`, `EmptyState`, `Skeleton` loaders, `StatusBadge`, `UserAvatar`, `Input`, and theme-aware primitives.
+### Frontend
+The frontend is a mobile-first application built with React Native and Expo (SDK 54), utilizing TypeScript. It employs React Navigation 7+ for routing, adapting to both mobile (bottom tabs) and desktop (sidebar). Data fetching and state management are handled by `@tanstack/react-query`. Styling uses `StyleSheet.create` and theme-aware hooks, avoiding CSS files. Typography consists of Montserrat for headings and Inter for body text. The brand color palette includes Racing Orange (#FF6B35), Industrial Black (#0D0F12), and Caution Yellow (#F59E0B). UI/UX prioritizes a bold, industrial aesthetic, with a default dark theme and no emojis.
 
-### Technical Implementations
-The frontend is built with React Native and Expo (SDK 54) using TypeScript, employing React Navigation 7+ for responsive navigation. `@tanstack/react-query` handles data fetching and state management. Styling uses `StyleSheet.create` and theme-aware hooks.
-The backend is an Express.js server in TypeScript, using PostgreSQL with Drizzle ORM. Authentication is JWT-based with bcrypt for password hashing. API is RESTful (`/api/*`), with CORS configured dynamically. Security includes Helmet and request body limits. Email verification uses `email_verifications` table with hashed tokens and a custom mailer (`resend` or `postmark`). Billing is integrated with Stripe for subscription management and one-time expert escalations, enforced via server-side checks and middleware.
+### Backend
+The backend is an Express.js server developed in TypeScript, using PostgreSQL as its primary database managed by Drizzle ORM. Authentication is JWT-based, secured with bcrypt for password hashing and middleware (`requireAuth`, `requireAdmin`). The API is RESTful, served under `/api/*`. CORS is configured dynamically, and security includes Helmet headers and a 1MB request body limit. The system includes robust billing and entitlements managed via Stripe, supporting various subscription tiers and one-time charges for expert escalations. Email verification is implemented with secure token handling and a dedicated mailer service.
 
-### Feature Specifications
-- **Home Feed**: Personalized content.
-- **Cases**: Automotive problem-solving hub with search, filtering, and a "New Case" wizard. Supports structured replies and a "FinalFix" workflow.
-- **Bays (Garages)**: Brand-specific community forums.
-- **Garage (Build Journal)**: Vehicle build journals with VIN decoding.
-- **TorqueAssist**: Diagnostic engine with decision trees and DTC integration.
-- **Market Tab**: Integrates a curated "Shop," a peer-to-peer "Swap Shop," and a "Find Parts" search.
-- **User Profiles**: Detailed profiles with activity and credibility badges.
-- **Saved Items**: Bookmark functionality.
-- **Content Moderation**: Reporting system and admin review.
-- **Shop Pro**: Business features including profiles, service listings, lead capture, and team management.
-- **Monetization**: Four tiers (Free, DIY Pro, Garage Pro, Shop Pro) with premium-gated features like advanced diagnostics, full parts/tools access, expert reviews, and PDF exports.
+### Key Features
+Core features include a personalized Home Feed, a "Cases" system for automotive problem-solving with a structured "New Case" wizard and "FinalFix" workflow, brand-specific "Bays" (community forums), and "Garage" (build journals with VIN decoding). "TorqueAssist" provides professional diagnostics with decision trees and DTC code integration. The "Market Tab" unifies "Shop," "Swap Shop," and a "Find Parts" search. User Profiles display activity and credibility. The platform also supports saved items, content moderation, and "Shop Pro" features for businesses, including public profiles, service listings, and lead capture. Monetization is handled through a tiered Stripe billing system (Free, DIY Pro, Garage Pro, Shop Pro) with premium-gated features.
 
-### System Design Choices
-Error handling includes skeleton loaders, `EmptyState` components, toast notifications, and inline form validation. An `ErrorBoundary` is implemented for crash recovery. The database schema includes tables for users, garages, vehicles, threads, listings, products, reports, diagnostic sessions, subscriptions, and specialized Shop Pro features.
+### Database Schema
+The database schema, managed by Drizzle ORM, comprises tables for users, garages, vehicles, threads, swap shop listings, products, reports, diagnostic sessions, subscriptions, and specialized tables for Shop Pro functionalities like shop services, leads, team members, and case customer summaries.
+
+### UI Component Library & Error Handling
+A custom UI component library ensures consistency, featuring components like `Card`, `Button`, `Input`, and `Skeleton` loaders, with theme-aware primitives. Error handling includes skeleton loaders, branded `EmptyState` components, toast notifications for mutations, and inline form validation, with an `ErrorBoundary` for crash recovery.
 
 ## External Dependencies
-- **React Native + Expo**: Mobile application development.
-- **Express.js**: Backend web framework.
-- **PostgreSQL**: Relational database.
-- **Drizzle ORM**: Database interaction.
+- **React Native + Expo**: Mobile application framework.
+- **Express.js**: Backend server framework.
+- **PostgreSQL**: Primary relational database.
+- **Drizzle ORM**: Object-Relational Mapper.
 - **@tanstack/react-query**: Data fetching and state management.
-- **React Navigation**: Application navigation.
+- **React Navigation**: Navigation for React Native.
+- **Stripe**: Payment processing and subscription management.
+- **Resend/Postmark**: Email sending services (via `server/lib/mailer.ts`).
 - **expo-linear-gradient**: Gradient effects.
 - **expo-haptics**: Haptic feedback.
-- **expo-clipboard**: Clipboard functionality.
+- **expo-clipboard**: Clipboard interaction.
 - **expo-web-browser**: In-app web browsing.
 - **bcrypt**: Password hashing.
 - **jsonwebtoken**: JWT authentication.
 - **zod**: Schema validation.
-- **Stripe**: Payment processing and subscription management.
-- **Resend / Postmark**: Email sending providers.
