@@ -87,6 +87,8 @@ export function tierIndex(tier: Tier): number {
 }
 
 export const FREE_SAVED_THREAD_LIMIT = 3;
+export const FREE_VEHICLE_LIMIT = 1;
+export const FREE_LISTING_LIMIT = 3;
 
 export type StripeMode = "live" | "test" | "missing_config";
 export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "incomplete";

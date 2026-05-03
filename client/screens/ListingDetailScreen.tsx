@@ -115,6 +115,7 @@ export default function ListingDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/listings/me"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Listing deleted", "success");
       navigation.goBack();

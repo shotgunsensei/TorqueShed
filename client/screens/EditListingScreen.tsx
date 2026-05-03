@@ -145,6 +145,7 @@ export default function EditListingScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
       queryClient.invalidateQueries({ queryKey: [`/api/swap-shop/${listingId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/listings/me"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Listing updated", "success");
       navigation.goBack();

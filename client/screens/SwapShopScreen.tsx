@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
+import { useEntitlements, FREE_LISTING_LIMIT } from "@/lib/entitlements";
 import { Feather } from "@expo/vector-icons";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -242,7 +243,28 @@ export default function SwapShopScreen() {
     queryKey: ["/api/swap-shop"],
   });
 
+  const { tier } = useEntitlements();
+  const isFreeTier = tier === "free";
+  const { data: myListings = [] } = useQuery<{ id: string; isDraft: boolean }[]>({
+    queryKey: ["/api/listings/me"],
+  });
+  const myActiveCount = myListings.filter((l) => !l.isDraft).length;
+  const atListingLimit = isFreeTier && myActiveCount >= FREE_LISTING_LIMIT;
+
   const handlePostItem = () => {
+    if (atListingLimit) {
+      navigation.navigate("Main", {
+        screen: "MoreTab",
+        params: {
+          screen: "Subscription",
+          params: {
+            reason: `Free accounts can post up to ${FREE_LISTING_LIMIT} active listings. Upgrade to Garage Pro for unlimited listings, drafts, and advanced photo galleries.`,
+            feature: "advanced_listing_options",
+          },
+        },
+      });
+      return;
+    }
     navigation.navigate("AddListing");
   };
 
@@ -345,12 +367,31 @@ export default function SwapShopScreen() {
               />
             </View>
             <Pressable
-              style={[styles.postButton, { backgroundColor: theme.primary }]}
+              style={[
+                styles.postButton,
+                { backgroundColor: atListingLimit ? theme.backgroundTertiary : theme.primary },
+              ]}
               onPress={handlePostItem}
               testID="button-post-item"
             >
-              <Feather name="plus" size={20} color="#FFFFFF" />
-              <Text style={styles.postButtonText}>{microcopy.post} Item</Text>
+              <Feather
+                name={atListingLimit ? "lock" : "plus"}
+                size={20}
+                color={atListingLimit ? theme.primary : "#FFFFFF"}
+              />
+              <Text
+                style={[
+                  styles.postButtonText,
+                  atListingLimit ? { color: theme.primary } : null,
+                ]}
+              >
+                {atListingLimit ? `Upgrade — ${myActiveCount} of ${FREE_LISTING_LIMIT} listings used` : `${microcopy.post} Item`}
+              </Text>
+              {atListingLimit ? (
+                <View style={[styles.proPill, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.proPillText}>PRO</Text>
+                </View>
+              ) : null}
             </Pressable>
           </View>
         }
@@ -495,6 +536,17 @@ const styles = StyleSheet.create({
   postButtonText: {
     color: "#FFFFFF",
     ...Typography.h4,
+  },
+  proPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    marginLeft: 4,
+  },
+  proPillText: {
+    color: "#0D0F12",
+    fontWeight: "800",
+    fontSize: 11,
   },
   card: {
     marginBottom: Spacing.md,

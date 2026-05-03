@@ -20,6 +20,8 @@ import { Card } from "@/components/Card";
 import { FAB } from "@/components/FAB";
 import { Skeleton } from "@/components/Skeleton";
 import { MaintenanceDueWidget } from "@/components/MaintenanceDueWidget";
+import { LimitPill } from "@/components/LimitPill";
+import { useEntitlements, FREE_VEHICLE_LIMIT } from "@/lib/entitlements";
 import type { NotesStackParamList } from "@/navigation/NotesStackNavigator";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -98,10 +100,14 @@ export default function NotesScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
+  const { hasFeature } = useEntitlements();
+  const hasMultiVehicle = hasFeature("multi_vehicle");
 
   const { data: vehicles = [], isLoading, isError, refetch, isRefetching } = useQuery<VehicleItem[]>({
     queryKey: ["/api/vehicles"],
   });
+
+  const atVehicleLimit = !hasMultiVehicle && vehicles.length >= FREE_VEHICLE_LIMIT;
 
   const handleVehiclePress = (vehicle: VehicleItem) => {
     const vehicleName = vehicle.nickname || [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle";
@@ -111,7 +117,24 @@ export default function NotesScreen() {
     });
   };
 
+  const goToVehicleUpgrade = () => {
+    navigation.navigate("Main", {
+      screen: "MoreTab",
+      params: {
+        screen: "Subscription",
+        params: {
+          reason: `You're tracking ${vehicles.length} of ${FREE_VEHICLE_LIMIT} vehicle${FREE_VEHICLE_LIMIT === 1 ? "" : "s"} on your current plan. Upgrade to Garage Pro for unlimited vehicles, maintenance schedules, and build logs.`,
+          feature: "multi_vehicle",
+        },
+      },
+    });
+  };
+
   const handleAddVehicle = () => {
+    if (atVehicleLimit) {
+      goToVehicleUpgrade();
+      return;
+    }
     navigation.navigate("AddVehicle");
   };
 
@@ -163,9 +186,20 @@ export default function NotesScreen() {
           ListHeaderComponent={
             <View style={styles.headerSection}>
               <MaintenanceDueWidget />
-              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-                Your Builds ({vehicles.length})
-              </Text>
+              <View style={styles.builderRow}>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                  Your Builds ({vehicles.length})
+                </Text>
+                {!hasMultiVehicle ? (
+                  <LimitPill
+                    used={vehicles.length}
+                    limit={FREE_VEHICLE_LIMIT}
+                    noun="vehicle"
+                    onPressAtLimit={goToVehicleUpgrade}
+                    testID="limit-pill-vehicles"
+                  />
+                ) : null}
+              </View>
             </View>
           }
         />
@@ -180,7 +214,7 @@ export default function NotesScreen() {
       )}
       {vehicles.length > 0 ? (
         <FAB
-          icon="plus"
+          icon={atVehicleLimit ? "lock" : "plus"}
           onPress={handleAddVehicle}
           bottom={tabBarHeight + Spacing.lg}
         />
@@ -199,10 +233,16 @@ const styles = StyleSheet.create({
   headerSection: {
     marginBottom: Spacing.md,
   },
-  sectionLabel: {
-    ...Typography.caption,
+  builderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  sectionLabel: {
+    ...Typography.caption,
   },
   card: {
     marginBottom: Spacing.md,

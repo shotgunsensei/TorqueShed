@@ -88,15 +88,21 @@ export default function SellerDashboardScreen() {
       {data.atLimit ? (
         <Card elevation={2} style={{ ...styles.upsell, borderColor: theme.primary, borderWidth: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs }}>
-            <Feather name="alert-circle" size={18} color={theme.primary} />
+            <Feather name="lock" size={18} color={theme.primary} />
             <ThemedText type="h4" style={{ marginLeft: Spacing.sm }}>Free-tier limit reached</ThemedText>
           </View>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
             You've hit the {data.listingLimit}-listing free cap. Upgrade to Garage Pro for unlimited listings and advanced features.
           </ThemedText>
           <Pressable
-            onPress={() => navigation.navigate("Subscription")}
+            onPress={() =>
+              navigation.navigate("Subscription", {
+                reason: `You've hit the ${data.listingLimit}-listing free cap. Upgrade to Garage Pro for unlimited listings, drafts, and advanced photo galleries.`,
+                feature: "advanced_listing_options",
+              })
+            }
             style={[styles.upsellBtn, { backgroundColor: theme.primary }]}
+            testID="button-seller-upgrade"
           >
             <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>See plans</ThemedText>
           </Pressable>

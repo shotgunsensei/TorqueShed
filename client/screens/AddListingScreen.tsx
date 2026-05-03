@@ -14,10 +14,11 @@ import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
 import { LockedFeature } from "@/components/LockedFeature";
+import { LimitPill } from "@/components/LimitPill";
 import { PhotoPickerGrid } from "@/components/PhotoPickerGrid";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
-import { useEntitlements } from "@/lib/entitlements";
+import { useEntitlements, FREE_LISTING_LIMIT } from "@/lib/entitlements";
 import { Feather } from "@expo/vector-icons";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
@@ -49,8 +50,26 @@ export default function AddListingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { hasFeature } = useEntitlements();
+  const { tier, hasFeature } = useEntitlements();
+  const isFreeTier = tier === "free";
   const canAdvancedListing = hasFeature("advanced_listing_options");
+
+  const { data: myListings = [] } = useQuery<{ id: string; isDraft: boolean }[]>({
+    queryKey: ["/api/listings/me"],
+  });
+  const activeCount = myListings.filter((l) => !l.isDraft).length;
+  const atListingLimit = isFreeTier && activeCount >= FREE_LISTING_LIMIT;
+  const goToListingUpgrade = () =>
+    navigation.navigate("Main", {
+      screen: "MoreTab",
+      params: {
+        screen: "Subscription",
+        params: {
+          reason: `Free accounts can post up to ${FREE_LISTING_LIMIT} active listings. Upgrade to Garage Pro for unlimited listings, drafts, and advanced photo galleries.`,
+          feature: "advanced_listing_options",
+        },
+      },
+    });
 
   const route = useRoute<any>();
   const presetCaseId: string | undefined = route?.params?.caseId;
@@ -108,6 +127,7 @@ export default function AddListingScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swap-shop"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/listings/me"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Listing posted", "success");
       navigation.goBack();
@@ -118,6 +138,10 @@ export default function AddListingScreen() {
   });
 
   const handleSubmit = () => {
+    if (atListingLimit) {
+      goToListingUpgrade();
+      return;
+    }
     if (!validate()) return;
     createListingMutation.mutate();
   };
@@ -134,12 +158,32 @@ export default function AddListingScreen() {
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
-      <ThemedText type="h2" style={styles.title}>
-        Post an Item
-      </ThemedText>
+      <View style={styles.titleRow}>
+        <ThemedText type="h2" style={styles.title}>
+          Post an Item
+        </ThemedText>
+        {isFreeTier ? (
+          <LimitPill
+            used={activeCount}
+            limit={FREE_LISTING_LIMIT}
+            noun="active"
+            onPressAtLimit={goToListingUpgrade}
+            testID="limit-pill-listings"
+          />
+        ) : null}
+      </View>
       <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
         List your parts, tools, or gear for the community
       </ThemedText>
+
+      {atListingLimit ? (
+        <LockedFeature
+          feature="advanced_listing_options"
+          title={`You've used all ${FREE_LISTING_LIMIT} free listings`}
+          description="Upgrade to Garage Pro for unlimited listings, drafts, multi-photo galleries, and contact-method controls."
+          onUpgrade={goToListingUpgrade}
+        />
+      ) : null}
 
       <View style={styles.section}>
         <View>
@@ -381,8 +425,16 @@ export default function AddListingScreen() {
         </View>
       </View>
 
-      <Button onPress={handleSubmit} disabled={!isValid || createListingMutation.isPending} testID="button-submit-listing">
-        {createListingMutation.isPending ? "Posting..." : "Post Item"}
+      <Button
+        onPress={handleSubmit}
+        disabled={(!atListingLimit && !isValid) || createListingMutation.isPending}
+        testID="button-submit-listing"
+      >
+        {createListingMutation.isPending
+          ? "Posting..."
+          : atListingLimit
+            ? "Upgrade to post more  •  PRO"
+            : "Post Item"}
       </Button>
     </KeyboardAwareScrollViewCompat>
   );
@@ -392,8 +444,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  title: {
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
+  },
+  title: {
+    flexShrink: 1,
   },
   subtitle: {
     marginBottom: Spacing.xl,

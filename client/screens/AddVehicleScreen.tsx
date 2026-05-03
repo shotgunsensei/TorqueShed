@@ -15,9 +15,10 @@ import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ThemedText } from "@/components/ThemedText";
 import { LockedFeature } from "@/components/LockedFeature";
+import { LimitPill } from "@/components/LimitPill";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
-import { useEntitlements } from "@/lib/entitlements";
+import { useEntitlements, FREE_VEHICLE_LIMIT } from "@/lib/entitlements";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { Vehicle } from "@shared/schema";
@@ -60,7 +61,19 @@ export default function AddVehicleScreen() {
   const toast = useToast();
   const { hasFeature } = useEntitlements();
   const { data: existingVehicles = [] } = useQuery<Vehicle[]>({ queryKey: ["/api/vehicles"] });
-  const atVehicleLimit = !hasFeature("multi_vehicle") && existingVehicles.length >= 1;
+  const hasMultiVehicle = hasFeature("multi_vehicle");
+  const atVehicleLimit = !hasMultiVehicle && existingVehicles.length >= FREE_VEHICLE_LIMIT;
+  const goToUpgrade = () =>
+    navigation.navigate("Main", {
+      screen: "MoreTab",
+      params: {
+        screen: "Subscription",
+        params: {
+          reason: `Your current plan tracks ${FREE_VEHICLE_LIMIT} vehicle. Upgrade to Garage Pro for unlimited vehicles, maintenance schedules, and build logs.`,
+          feature: "multi_vehicle",
+        },
+      },
+    });
 
   const [inputMode, setInputMode] = useState(0);
   const [vin, setVin] = useState("");
@@ -151,9 +164,20 @@ export default function AddVehicleScreen() {
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
-      <ThemedText type="h2" style={styles.title}>
-        Add Vehicle
-      </ThemedText>
+      <View style={styles.titleRow}>
+        <ThemedText type="h2" style={styles.title}>
+          Add Vehicle
+        </ThemedText>
+        {!hasMultiVehicle ? (
+          <LimitPill
+            used={existingVehicles.length}
+            limit={FREE_VEHICLE_LIMIT}
+            noun="vehicle"
+            onPressAtLimit={goToUpgrade}
+            testID="limit-pill-vehicles"
+          />
+        ) : null}
+      </View>
       <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
         Add your vehicle to track maintenance and modifications
       </ThemedText>
@@ -163,7 +187,7 @@ export default function AddVehicleScreen() {
           feature="multi_vehicle"
           title="One vehicle per Free account"
           description="Garage Pro lets you track unlimited vehicles, with maintenance schedules, build logs, and per-vehicle cost tracking."
-          onUpgrade={() => navigation.navigate("Main", { screen: "MoreTab", params: { screen: "Subscription" } })}
+          onUpgrade={goToUpgrade}
         />
       ) : null}
 
@@ -290,8 +314,16 @@ export default function AddVehicleScreen() {
         />
       </View>
 
-      <Button onPress={handleSave} disabled={atVehicleLimit || !isValid || createVehicleMutation.isPending}>
-        {createVehicleMutation.isPending ? "Adding..." : atVehicleLimit ? "Upgrade to add more" : "Add Vehicle"}
+      <Button
+        onPress={atVehicleLimit ? goToUpgrade : handleSave}
+        disabled={(!atVehicleLimit && !isValid) || createVehicleMutation.isPending}
+        testID="button-add-vehicle"
+      >
+        {createVehicleMutation.isPending
+          ? "Adding..."
+          : atVehicleLimit
+            ? "Upgrade to add more  •  PRO"
+            : "Add Vehicle"}
       </Button>
     </KeyboardAwareScrollViewCompat>
   );
@@ -301,8 +333,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  title: {
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
+  },
+  title: {
+    flexShrink: 1,
   },
   subtitle: {
     marginBottom: Spacing.xl,
