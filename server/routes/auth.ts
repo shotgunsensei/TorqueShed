@@ -62,21 +62,62 @@ export function register(app: Express): void {
     try {
       const { username, password } = loginSchema.parse(req.body);
 
+      // Per-username lockout to slow distributed brute-force attempts.
+      const LOCKOUT_MAX_ATTEMPTS = 10;
+      const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+      const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+
+      const existingLockout = await storage.getLoginLockout(username);
+      if (existingLockout?.lockedUntil && existingLockout.lockedUntil.getTime() > Date.now()) {
+        const unlockAt = existingLockout.lockedUntil;
+        const retryAfterSeconds = Math.max(1, Math.ceil((unlockAt.getTime() - Date.now()) / 1000));
+        const unlockLabel = unlockAt.toISOString().slice(11, 16);
+        res.setHeader("Retry-After", String(retryAfterSeconds));
+        return res.status(423).json({
+          error: "Locked",
+          message: `Too many failed login attempts. Try again at ${unlockLabel} UTC.`,
+          unlockAt: unlockAt.toISOString(),
+          retryAfterSeconds,
+        });
+      }
+
+      const recordFailure = async () => {
+        const result = await storage.recordFailedLogin(username, {
+          maxAttempts: LOCKOUT_MAX_ATTEMPTS,
+          lockMs: LOCKOUT_DURATION_MS,
+          windowMs: LOCKOUT_WINDOW_MS,
+        });
+        if (result.lockedUntil) {
+          const retryAfterSeconds = Math.max(
+            1,
+            Math.ceil((result.lockedUntil.getTime() - Date.now()) / 1000),
+          );
+          const unlockLabel = result.lockedUntil.toISOString().slice(11, 16);
+          res.setHeader("Retry-After", String(retryAfterSeconds));
+          return res.status(423).json({
+            error: "Locked",
+            message: `Too many failed login attempts. Try again at ${unlockLabel} UTC.`,
+            unlockAt: result.lockedUntil.toISOString(),
+            retryAfterSeconds,
+          });
+        }
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Invalid username or password",
+        });
+      };
+
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        return res.status(401).json({ 
-          error: "Unauthorized", 
-          message: "Invalid username or password" 
-        });
+        return await recordFailure();
       }
 
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       if (!isValidPassword) {
-        return res.status(401).json({ 
-          error: "Unauthorized", 
-          message: "Invalid username or password" 
-        });
+        return await recordFailure();
       }
+
+      await storage.clearFailedLogins(username);
 
       const token = signJWT({ sub: user.id, role: user.role || "user" });
       

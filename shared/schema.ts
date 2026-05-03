@@ -41,6 +41,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const loginAttempts = pgTable("login_attempts", {
+  username: text("username").primaryKey(),
+  failedCount: integer("failed_count").notNull().default(0),
+  firstFailedAt: timestamp("first_failed_at"),
+  lastFailedAt: timestamp("last_failed_at"),
+  lockedUntil: timestamp("locked_until"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type LoginAttempt = typeof loginAttempts.$inferSelect;
+
 export const emailVerifications = pgTable("email_verifications", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),

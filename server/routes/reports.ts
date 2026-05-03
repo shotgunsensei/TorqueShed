@@ -99,4 +99,35 @@ export function register(app: Express): void {
       res.status(500).json({ error: "Failed to update report" });
     }
   });
+
+  // ========== Admin: Login lockouts ==========
+  app.get("/api/admin/login-lockouts", requireAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const rows = await storage.listActiveLockouts(200);
+      const now = Date.now();
+      res.json(
+        rows.map((r) => ({
+          username: r.username,
+          failedCount: r.failedCount,
+          firstFailedAt: r.firstFailedAt,
+          lastFailedAt: r.lastFailedAt,
+          lockedUntil: r.lockedUntil,
+          isLocked: !!(r.lockedUntil && r.lockedUntil.getTime() > now),
+        })),
+      );
+    } catch (error) {
+      console.error("Error listing login lockouts:", error);
+      res.status(500).json({ error: "Failed to list login lockouts" });
+    }
+  });
+
+  app.delete("/api/admin/login-lockouts/:username", requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      await storage.clearFailedLogins(req.params.username);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error clearing login lockout:", error);
+      res.status(500).json({ error: "Failed to clear login lockout" });
+    }
+  });
 }

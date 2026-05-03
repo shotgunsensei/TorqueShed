@@ -23,6 +23,8 @@ import {
   shopTeamMembers,
   caseCustomerSummaries,
   savedThreads,
+  loginAttempts,
+  type LoginAttempt,
   type ShopService,
   type InsertShopService,
   type ShopLead,
@@ -1915,6 +1917,84 @@ export class DatabaseStorage implements IStorage {
       .where(eq(caseCustomerSummaries.caseId, caseId))
       .returning();
     return updated;
+  }
+
+  // ========== Login lockout (brute-force protection) ==========
+  async getLoginLockout(username: string): Promise<LoginAttempt | undefined> {
+    const [row] = await db
+      .select()
+      .from(loginAttempts)
+      .where(eq(loginAttempts.username, username))
+      .limit(1);
+    return row || undefined;
+  }
+
+  async recordFailedLogin(
+    username: string,
+    opts: { maxAttempts: number; lockMs: number; windowMs: number },
+  ): Promise<{ failedCount: number; lockedUntil: Date | null }> {
+    const now = new Date();
+    const existing = await this.getLoginLockout(username);
+    let failedCount = 1;
+    let firstFailedAt: Date = now;
+    let lockedUntil: Date | null = null;
+
+    if (existing) {
+      const windowExpired =
+        existing.firstFailedAt &&
+        now.getTime() - existing.firstFailedAt.getTime() > opts.windowMs;
+      const lockExpired =
+        !existing.lockedUntil || existing.lockedUntil.getTime() <= now.getTime();
+
+      if (windowExpired && lockExpired) {
+        failedCount = 1;
+        firstFailedAt = now;
+      } else {
+        failedCount = (existing.failedCount ?? 0) + 1;
+        firstFailedAt = existing.firstFailedAt ?? now;
+        lockedUntil = lockExpired ? null : existing.lockedUntil;
+      }
+    }
+
+    if (failedCount >= opts.maxAttempts) {
+      lockedUntil = new Date(now.getTime() + opts.lockMs);
+    }
+
+    await db
+      .insert(loginAttempts)
+      .values({
+        username,
+        failedCount,
+        firstFailedAt,
+        lastFailedAt: now,
+        lockedUntil,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: loginAttempts.username,
+        set: {
+          failedCount,
+          firstFailedAt,
+          lastFailedAt: now,
+          lockedUntil,
+          updatedAt: now,
+        },
+      });
+
+    return { failedCount, lockedUntil };
+  }
+
+  async clearFailedLogins(username: string): Promise<void> {
+    await db.delete(loginAttempts).where(eq(loginAttempts.username, username));
+  }
+
+  async listActiveLockouts(limit = 100): Promise<LoginAttempt[]> {
+    return db
+      .select()
+      .from(loginAttempts)
+      .where(gt(loginAttempts.failedCount, 0))
+      .orderBy(desc(loginAttempts.lastFailedAt))
+      .limit(limit);
   }
 
   // ========== Shop Pro: Credibility ==========
