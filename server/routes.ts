@@ -171,7 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const kindRaw = (req.body?.kind as string | undefined) || "image";
       const kind = kindRaw === "video" ? "video" : "image";
       const svc = new ObjectStorageService();
-      const { uploadUrl, objectPath } = await svc.getUploadUrl(kind);
+      const { uploadUrl, objectPath } = await svc.getUploadUrl(kind, req.userId);
       res.json({ uploadUrl, objectPath });
     } catch (error) {
       console.error("Error getting upload URL:", error);
@@ -1382,6 +1382,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Returns true if `objectUrl` is still referenced by any active thread,
+  // thread reply, or swap-shop listing. Used to guard cleanup of legacy
+  // (non-user-scoped) object paths that may have been shared across records.
+  async function isObjectStillReferenced(objectUrl: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      SELECT 1 FROM threads
+        WHERE photo_urls::jsonb ? ${objectUrl}
+           OR video_urls::jsonb ? ${objectUrl}
+      UNION ALL
+      SELECT 1 FROM thread_replies
+        WHERE photo_urls::jsonb ? ${objectUrl}
+           OR video_urls::jsonb ? ${objectUrl}
+      UNION ALL
+      SELECT 1 FROM swap_shop_listings
+        WHERE image_url = ${objectUrl}
+           OR extra_image_urls::jsonb ? ${objectUrl}
+      LIMIT 1
+    `);
+    const rows = (result as unknown as { rows?: unknown[] }).rows;
+    if (Array.isArray(rows)) return rows.length > 0;
+    if (Array.isArray(result)) return (result as unknown[]).length > 0;
+    return false;
+  }
+
   // Team-aware thread access: returns true if requester is the case author,
   // a global admin, or a Shop Pro team member of the case author with one of
   // the allowed roles AND the author has the team_access feature.
@@ -1465,7 +1489,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      let replyMedia: Array<{ userId: string | null; photoUrls: string[] | null; videoUrls: string[] | null }> = [];
+      try {
+        replyMedia = await db
+          .select({
+            userId: threadReplies.userId,
+            photoUrls: threadReplies.photoUrls,
+            videoUrls: threadReplies.videoUrls,
+          })
+          .from(threadReplies)
+          .where(eq(threadReplies.threadId, req.params.id));
+      } catch (prefetchErr) {
+        console.error("Error prefetching reply media for cleanup:", prefetchErr);
+      }
+
       await storage.deleteThread(req.params.id);
+
+      try {
+        const objectSvc = new ObjectStorageService();
+        const items: Array<{ url: string | null | undefined; ownerUserId: string | null | undefined }> = [];
+        for (const url of thread.photoUrls ?? []) items.push({ url, ownerUserId: thread.userId });
+        for (const url of thread.videoUrls ?? []) items.push({ url, ownerUserId: thread.userId });
+        for (const r of replyMedia) {
+          for (const url of r.photoUrls ?? []) items.push({ url, ownerUserId: r.userId });
+          for (const url of r.videoUrls ?? []) items.push({ url, ownerUserId: r.userId });
+        }
+        await objectSvc.deleteOwnedObjects(items, {
+          isStillReferenced: (url) => isObjectStillReferenced(url),
+        });
+      } catch (cleanupErr) {
+        console.error("Error cleaning up thread objects:", cleanupErr);
+      }
+
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting thread:", error);
@@ -1781,6 +1836,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.deleteSwapShopListing(req.params.id);
+
+      try {
+        const objectSvc = new ObjectStorageService();
+        const items: Array<{ url: string | null | undefined; ownerUserId: string | null | undefined }> = [
+          { url: listing.imageUrl, ownerUserId: listing.userId },
+          ...((listing.extraImageUrls ?? []).map((url) => ({ url, ownerUserId: listing.userId }))),
+        ];
+        await objectSvc.deleteOwnedObjects(items, {
+          isStillReferenced: (url) => isObjectStillReferenced(url),
+        });
+      } catch (cleanupErr) {
+        console.error("Error cleaning up listing objects:", cleanupErr);
+      }
+
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting listing:", error);

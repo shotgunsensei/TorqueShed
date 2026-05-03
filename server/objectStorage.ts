@@ -120,12 +120,16 @@ export class ObjectStorageService {
     return file;
   }
 
-  async getUploadUrl(kind: UploadKind = "image"): Promise<{ uploadUrl: string; objectPath: string }> {
+  async getUploadUrl(
+    kind: UploadKind = "image",
+    userId?: string,
+  ): Promise<{ uploadUrl: string; objectPath: string }> {
     let privateDir = this.getPrivateObjectDir();
     if (!privateDir.endsWith("/")) privateDir += "/";
     const folder = kind === "video" ? "videos" : "photos";
     const objectId = randomUUID();
-    const fullPath = `${privateDir}case-uploads/${folder}/${objectId}`;
+    const userSegment = userId ? `u/${userId}/` : "";
+    const fullPath = `${privateDir}case-uploads/${userSegment}${folder}/${objectId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
     const uploadUrl = await signObjectURL({
       bucketName,
@@ -133,7 +137,21 @@ export class ObjectStorageService {
       method: "PUT",
       ttlSec: 900,
     });
-    return { uploadUrl, objectPath: `/objects/case-uploads/${folder}/${objectId}` };
+    return {
+      uploadUrl,
+      objectPath: `/objects/case-uploads/${userSegment}${folder}/${objectId}`,
+    };
+  }
+
+  isObjectSafeToDelete(rawUrl: string, ownerUserId: string | null | undefined): boolean {
+    if (!rawUrl) return false;
+    const normalized = this.normalizeObjectEntityPath(rawUrl);
+    if (!normalized.startsWith("/objects/case-uploads/")) return false;
+    const userScoped = normalized.match(/\/objects\/case-uploads\/u\/([^/]+)\//);
+    if (userScoped) {
+      return Boolean(ownerUserId) && userScoped[1] === ownerUserId;
+    }
+    return true;
   }
 
   normalizeObjectEntityPath(rawUrl: string): string {
@@ -152,6 +170,63 @@ export class ObjectStorageService {
       /* not a URL */
     }
     return rawUrl;
+  }
+
+  async deleteObjectByPath(rawUrl: string): Promise<void> {
+    if (!rawUrl) return;
+    const normalized = this.normalizeObjectEntityPath(rawUrl);
+    if (!normalized.startsWith("/objects/")) return;
+    const entityId = normalized.slice("/objects/".length);
+    if (!entityId) return;
+    let dir = this.getPrivateObjectDir();
+    if (!dir.endsWith("/")) dir += "/";
+    const fullPath = `${dir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    await objectStorageClient.bucket(bucketName).file(objectName).delete({ ignoreNotFound: true });
+  }
+
+  isLegacyUnscopedPath(rawUrl: string): boolean {
+    if (!rawUrl) return false;
+    const normalized = this.normalizeObjectEntityPath(rawUrl);
+    if (!normalized.startsWith("/objects/case-uploads/")) return false;
+    return !/\/objects\/case-uploads\/u\/[^/]+\//.test(normalized);
+  }
+
+  async deleteOwnedObjects(
+    items: Array<{ url: string | null | undefined; ownerUserId: string | null | undefined }>,
+    options: { isStillReferenced?: (url: string) => Promise<boolean> } = {},
+  ): Promise<void> {
+    const valid = items.filter(
+      (i): i is { url: string; ownerUserId: string | null | undefined } =>
+        typeof i.url === "string" && i.url.length > 0,
+    );
+    await Promise.all(
+      valid.map(async ({ url, ownerUserId }) => {
+        if (!this.isObjectSafeToDelete(url, ownerUserId)) {
+          console.log(`Skip cleanup (unsafe path / cross-user): ${url}`);
+          return;
+        }
+        // For legacy unscoped paths, the object is not provably owned by the
+        // record owner; only delete if no other active record still references
+        // it. This avoids deleting objects another user/record relies on.
+        if (this.isLegacyUnscopedPath(url) && options.isStillReferenced) {
+          try {
+            if (await options.isStillReferenced(url)) {
+              console.log(`Skip cleanup (legacy path still referenced): ${url}`);
+              return;
+            }
+          } catch (refErr) {
+            console.error(`Reference check failed for ${url}; skipping:`, refErr);
+            return;
+          }
+        }
+        try {
+          await this.deleteObjectByPath(url);
+        } catch (err) {
+          console.error(`Failed to delete object ${url}:`, err);
+        }
+      }),
+    );
   }
 
   async downloadObject(file: File, res: Response, cacheTtlSec = 3600): Promise<void> {
