@@ -3482,6 +3482,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/public/shops/:slug/leads", async (req: Request, res: Response) => {
     try {
+      const clientId = `lead:${req.ip || "unknown"}:${req.params.slug}`;
+      const allowed = await checkRateLimitAsync(clientId);
+      if (!allowed) {
+        return res.status(429).json({ error: "Too many submissions. Please wait a few minutes and try again." });
+      }
       const profile = await storage.getShopProfileBySlug(req.params.slug);
       if (!profile || !profile.isPublic) return res.status(404).json({ error: "Shop not found" });
       const tier = await getUserTier(profile.userId);
@@ -3548,6 +3553,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/public/diagnostic-summary/:token", async (_req: Request, res: Response) => {
     res.sendFile(path.resolve(process.cwd(), "server", "templates", "public-summary.html"));
+  });
+
+  app.get("/shops/:slug", async (req: Request, res: Response) => {
+    const profile = await storage.getShopProfileBySlug(req.params.slug);
+    if (!profile || !profile.isPublic) {
+      return res.status(404).sendFile(path.resolve(process.cwd(), "server", "templates", "public-shop.html"));
+    }
+    res.sendFile(path.resolve(process.cwd(), "server", "templates", "public-shop.html"));
   });
 
   const httpServer = createServer(app);

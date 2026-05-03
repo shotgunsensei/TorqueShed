@@ -1513,6 +1513,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async isSlugAvailable(slug: string, excludeUserId?: string): Promise<boolean> {
+    const RESERVED_SLUGS = new Set([
+      "admin", "api", "public", "shops", "shop", "auth", "login", "logout",
+      "signup", "settings", "billing", "subscription", "objects", "uploads",
+      "healthz", "stripe", "webhook", "static", "assets", "manifest", "_expo",
+    ]);
+    if (RESERVED_SLUGS.has(slug.toLowerCase())) return false;
     const existing = await this.getShopProfileBySlug(slug);
     if (!existing) return true;
     if (excludeUserId && existing.userId === excludeUserId) return true;
