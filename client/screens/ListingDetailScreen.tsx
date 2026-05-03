@@ -16,6 +16,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Skeleton } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { PhotoViewerModal } from "@/components/PhotoViewerModal";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -79,6 +80,7 @@ export default function ListingDetailScreen() {
   const toast = useToast();
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const { data: listing, isLoading } = useQuery<Listing>({
     queryKey: [`/api/swap-shop/${listingId}`],
@@ -211,6 +213,11 @@ export default function ListingDetailScreen() {
   const isOwner = currentUser?.id === listing.userId;
   const conditionVariant = CONDITION_VARIANTS[listing.condition] || "default";
 
+  const allPhotoUris: string[] = [
+    ...(listing.imageUrl ? [resolveImageUri(listing.imageUrl)] : []),
+    ...((listing.extraImageUrls || []).map((u) => resolveImageUri(u))),
+  ].filter((u): u is string => !!u);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
@@ -222,13 +229,15 @@ export default function ListingDetailScreen() {
         }}
       >
         {listing.imageUrl ? (
-          <Image
-            source={{ uri: resolveImageUri(listing.imageUrl) || undefined }}
-            style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}
-            contentFit="cover"
-            transition={200}
-            testID="image-listing-cover"
-          />
+          <Pressable onPress={() => setViewerIndex(0)} testID="button-open-listing-cover">
+            <Image
+              source={{ uri: resolveImageUri(listing.imageUrl) || undefined }}
+              style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}
+              contentFit="cover"
+              transition={200}
+              testID="image-listing-cover"
+            />
+          </Pressable>
         ) : (
           <View style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}>
             <Feather name="image" size={48} color={theme.textSecondary} />
@@ -249,15 +258,21 @@ export default function ListingDetailScreen() {
             {listing.extraImageUrls.map((u, idx) => {
               const uri = resolveImageUri(u);
               if (!uri) return null;
+              const viewerIdx = listing.imageUrl ? idx + 1 : idx;
               return (
-                <Image
+                <Pressable
                   key={`${idx}-${u}`}
-                  source={{ uri }}
-                  style={styles.extraImageThumb}
-                  contentFit="cover"
-                  transition={200}
-                  testID={`image-listing-extra-${idx}`}
-                />
+                  onPress={() => setViewerIndex(viewerIdx)}
+                  testID={`button-open-listing-extra-${idx}`}
+                >
+                  <Image
+                    source={{ uri }}
+                    style={styles.extraImageThumb}
+                    contentFit="cover"
+                    transition={200}
+                    testID={`image-listing-extra-${idx}`}
+                  />
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -432,6 +447,13 @@ export default function ListingDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <PhotoViewerModal
+        visible={viewerIndex !== null}
+        uris={allPhotoUris}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
     </View>
   );
 }

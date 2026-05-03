@@ -1,18 +1,16 @@
 import React, { useState } from "react";
 import {
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { ThemedText } from "./ThemedText";
 import { resolveMediaUrl } from "./MediaPickerRow";
+import { PhotoViewerModal } from "./PhotoViewerModal";
 
 type Props = {
   photoUrls?: string[] | null;
@@ -37,22 +35,6 @@ function VideoTile({ uri, size, testID }: { uri: string; size: number; testID?: 
   );
 }
 
-function PhotoLightbox({ uri, onClose }: { uri: string; onClose: () => void }) {
-  const { theme } = useTheme();
-  return (
-    <Modal visible animationType="fade" transparent onRequestClose={onClose}>
-      <View style={[styles.lightbox, { backgroundColor: "rgba(0,0,0,0.92)" }]}>
-        <Pressable style={styles.lightboxClose} onPress={onClose} testID="button-lightbox-close">
-          <Feather name="x" size={28} color="#fff" />
-        </Pressable>
-        <Pressable style={styles.lightboxBody} onPress={onClose}>
-          <Image source={{ uri }} style={styles.lightboxImg} resizeMode="contain" />
-        </Pressable>
-      </View>
-    </Modal>
-  );
-}
-
 export function CaseMediaGallery({
   photoUrls,
   videoUrls,
@@ -60,12 +42,14 @@ export function CaseMediaGallery({
   thumbSize = 110,
 }: Props) {
   const { theme } = useTheme();
-  const [openPhoto, setOpenPhoto] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const photos = (photoUrls ?? []).filter(Boolean);
   const videos = (videoUrls ?? []).filter(Boolean);
 
   if (photos.length === 0 && videos.length === 0) return null;
+
+  const photoUris = photos.map((p) => resolveMediaUrl(p)).filter((u): u is string => !!u);
 
   return (
     <>
@@ -75,7 +59,7 @@ export function CaseMediaGallery({
           return (
             <Pressable
               key={`p-${i}-${p}`}
-              onPress={() => setOpenPhoto(uri)}
+              onPress={() => setViewerIndex(i)}
               style={[styles.tile, { width: thumbSize, height: thumbSize, borderColor: theme.cardBorder }]}
               testID={`${testIDPrefix}-photo-${i}`}
             >
@@ -95,7 +79,12 @@ export function CaseMediaGallery({
           );
         })}
       </ScrollView>
-      {openPhoto ? <PhotoLightbox uri={openPhoto} onClose={() => setOpenPhoto(null)} /> : null}
+      <PhotoViewerModal
+        visible={viewerIndex !== null}
+        uris={photoUris}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
     </>
   );
 }
@@ -108,19 +97,4 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   tileImg: { width: "100%", height: "100%" },
-  lightbox: { flex: 1, justifyContent: "center", alignItems: "center" },
-  lightboxBody: { flex: 1, width: "100%", justifyContent: "center", alignItems: "center" },
-  lightboxImg: { width: "100%", height: "85%" },
-  lightboxClose: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
 });
