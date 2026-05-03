@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable, Linking } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -23,12 +23,44 @@ interface MenuItem {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   description: string;
-  action: "stack" | "tab" | "toast";
+  action: "stack" | "tab" | "toast" | "external";
   screen?: keyof MoreStackParamList;
   tab?: string;
   toastMessage?: string;
+  url?: string;
   badgeKey?: "leads";
 }
+
+const ECOSYSTEM_ITEMS: MenuItem[] = [
+  {
+    label: "FaultlineLab",
+    icon: "target",
+    action: "external",
+    url: "https://faultlinelab.com",
+    description: "Sharpen diagnostic instincts with real-world fault scenarios",
+  },
+  {
+    label: "TradeFlowKit",
+    icon: "trending-up",
+    action: "external",
+    url: "https://tradeflowkit.com",
+    description: "Run your shop's quotes, invoices, and cash flow",
+  },
+  {
+    label: "TechDeck",
+    icon: "terminal",
+    action: "external",
+    url: "https://techdeck.app",
+    description: "Scripts and automation for IT and power users",
+  },
+  {
+    label: "Shotgun Ninjas",
+    icon: "compass",
+    action: "external",
+    url: "https://shotgunninjas.com",
+    description: "Explore the full Shotgun Ninjas ecosystem",
+  },
+];
 
 const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
   {
@@ -100,6 +132,12 @@ export default function MoreScreen() {
     }
     if (item.action === "toast" && item.toastMessage) {
       toast.show(item.toastMessage, "info");
+      return;
+    }
+    if (item.action === "external" && item.url) {
+      Linking.openURL(item.url).catch(() => {
+        toast.show("Could not open the link", "error");
+      });
     }
   };
 
@@ -142,7 +180,7 @@ export default function MoreScreen() {
         <Feather name="chevron-right" size={20} color={theme.textMuted} />
       </Pressable>
 
-      {MENU_GROUPS.map((group) => (
+      {[...MENU_GROUPS, { title: "Shotgun Ninjas Ecosystem", items: ECOSYSTEM_ITEMS }].map((group) => (
         <View key={group.title} style={styles.group}>
           <ThemedText type="caption" style={[styles.groupTitle, { color: theme.textMuted }]}>{group.title.toUpperCase()}</ThemedText>
           <View style={styles.menuList}>
@@ -182,6 +220,13 @@ export default function MoreScreen() {
           </View>
         </View>
       ))}
+
+      <ThemedText
+        type="caption"
+        style={{ color: theme.textMuted, textAlign: "center", marginTop: Spacing.md, letterSpacing: 1 }}
+      >
+        BUILT BY SHOTGUN NINJAS PRODUCTIONS
+      </ThemedText>
     </ScrollView>
   );
 }

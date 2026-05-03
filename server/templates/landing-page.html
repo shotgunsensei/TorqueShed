@@ -4,7 +4,17 @@
     <title>TorqueShed - The Garage for Real People</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="TorqueShed is a real automotive community for mechanics, DIYers, and enthusiasts. Get diagnostics help, torque specs, part numbers, and buy/sell parts locally." />
+    <meta name="description" content="TorqueShed is a real automotive community for mechanics, DIYers, and enthusiasts. Diagnose smarter, track repairs, find parts, tools, and real-world fixes faster." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TorqueShed" />
+    <meta property="og:title" content="TorqueShed — Diagnose smarter. Track repairs. Find fixes faster." />
+    <meta property="og:description" content="The garage for real people. Cases, build journals, TorqueAssist diagnostics, parts, tools, and a community that knows what they're talking about." />
+    <meta property="og:image" content="/assets/logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TorqueShed — Diagnose smarter. Track repairs. Find fixes faster." />
+    <meta name="twitter:description" content="The garage for real people. Cases, build journals, TorqueAssist diagnostics, parts, tools." />
+    <meta name="twitter:image" content="/assets/logo.png" />
+    <meta name="author" content="Shotgun Ninjas Productions" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#FF6B35" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -943,6 +953,76 @@
       }
       .footer-links a:hover { color: var(--gray-300); }
 
+      /* Ecosystem */
+      .ecosystem {
+        padding: 56px 24px 24px;
+        border-top: 1px solid var(--card-border);
+      }
+      .ecosystem-eyebrow {
+        text-align: center;
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--gray-500);
+        margin-bottom: 8px;
+      }
+      .ecosystem-title {
+        text-align: center;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--white);
+        margin-bottom: 32px;
+      }
+      .ecosystem-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      .eco-card {
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 14px;
+        padding: 16px 18px;
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: border-color 0.18s ease, transform 0.18s ease;
+      }
+      .eco-card:hover {
+        border-color: var(--orange);
+        transform: translateY(-2px);
+      }
+      .eco-card-name {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--white);
+      }
+      .eco-card-desc {
+        font-size: 12px;
+        color: var(--gray-400);
+        line-height: 1.45;
+      }
+      .built-by {
+        text-align: center;
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--gray-500);
+        margin-top: 12px;
+      }
+      .built-by a {
+        color: var(--gray-300);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .built-by a:hover { color: var(--orange); }
+
       /* Separator */
       .sep {
         height: 1px;
@@ -1439,6 +1519,30 @@
       </div>
     </section>
 
+    <!-- Ecosystem -->
+    <section class="ecosystem">
+      <p class="ecosystem-eyebrow">From the Shotgun Ninjas Ecosystem</p>
+      <h3 class="ecosystem-title">Tools that work the way you do</h3>
+      <div class="ecosystem-grid">
+        <a class="eco-card" href="https://faultlinelab.com" target="_blank" rel="noopener">
+          <span class="eco-card-name">FaultlineLab</span>
+          <span class="eco-card-desc">Train your diagnostic instincts with real-world fault scenarios.</span>
+        </a>
+        <a class="eco-card" href="https://tradeflowkit.com" target="_blank" rel="noopener">
+          <span class="eco-card-name">TradeFlowKit</span>
+          <span class="eco-card-desc">Run the business side of your shop — quotes, invoices, cash flow.</span>
+        </a>
+        <a class="eco-card" href="https://techdeck.app" target="_blank" rel="noopener">
+          <span class="eco-card-name">TechDeck</span>
+          <span class="eco-card-desc">Scripts and automation for the IT side of your operation.</span>
+        </a>
+        <a class="eco-card" href="https://shotgunninjavillage.com" target="_blank" rel="noopener">
+          <span class="eco-card-name">Shotgun Ninja Village</span>
+          <span class="eco-card-desc">Community, content, games, and creator hub.</span>
+        </a>
+      </div>
+    </section>
+
     <!-- Footer -->
     <footer class="footer">
       <div class="container">
@@ -1446,12 +1550,16 @@
           <img src="/assets/logo.png" alt="TorqueShed" class="footer-logo">
           <span class="footer-name">TorqueShed</span>
         </div>
-        <p>The Garage for Real People.</p>
+        <p>Diagnose smarter. Track repairs. Find parts, tools, and real-world fixes faster.</p>
         <div class="footer-links">
           <a href="/app">Web App</a>
           <a href="/delete-account">Delete Account</a>
           <a href="#beta">Beta Access</a>
+          <a href="https://shotgunninjas.com" target="_blank" rel="noopener">Ecosystem</a>
         </div>
+        <p class="built-by">
+          Built by <a href="https://shotgunninjas.com" target="_blank" rel="noopener">Shotgun Ninjas Productions</a>
+        </p>
       </div>
     </footer>
 
