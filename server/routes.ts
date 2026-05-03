@@ -72,19 +72,9 @@ import PDFDocument from "pdfkit";
 const BCRYPT_ROUNDS = 12;
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // ── Public POST sweep (Task #46) ────────────────────────────────────────────
-  // The following endpoints accept user-supplied bodies without requiring auth
-  // and are protected by the `rateLimited` middleware below:
-  //   • POST /api/auth/signup            — 5  / 60 min
-  //   • POST /api/auth/login             — 10 / 15 min
-  //   • POST /api/auth/forgot-password   — 5  / 60 min
-  //   • POST /api/auth/reset-password    — 10 / 15 min
-  //   • POST /api/products/:id/click     — 60 / 1  min  (cheap counter, abuse-prone)
-  //   • POST /api/torque-assist          — pre-existing limiter inside handler
-  //   • POST /api/public/shops/:slug/leads — pre-existing limiter inside handler
-  // All other mutating routes are gated by requireAuth / requireAdmin.
-  // ────────────────────────────────────────────────────────────────────────────
-
+  // Unauthenticated mutating endpoints are rate-limited by IP via rateLimited().
+  // Other mutating routes require auth (requireAuth / requireAdmin) or carry
+  // their own in-handler limiter (torque-assist, public shop leads).
   app.post("/api/auth/signup", rateLimited("auth:signup", 5, 60 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { username, password } = signupSchema.parse(req.body);
@@ -109,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!token) {
         return res.status(500).json({ 
           error: "Internal Server Error", 
-          message: "Failed to generate token. Check APP_JWT_SECRET configuration." 
+          message: "Failed to generate token. Check JWT_SECRET configuration." 
         });
       }
 
@@ -157,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!token) {
         return res.status(500).json({ 
           error: "Internal Server Error", 
-          message: "Failed to generate token. Check APP_JWT_SECRET configuration." 
+          message: "Failed to generate token. Check JWT_SECRET configuration." 
         });
       }
 

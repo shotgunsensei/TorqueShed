@@ -1,69 +1,105 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
-// Mock the db module BEFORE importing storage so the storage module picks up
-// the stubbed db. The storage module calls db.transaction(cb) and the cb is
-// expected to receive a `tx` with .select() and .delete() methods.
+// Real-database test: proves storage.deleteUser actually rolls back the
+// cascade in Postgres when a delete inside the transaction fails. We spy on
+// db.transaction to intercept the supplied tx and replace its final
+// `tx.delete(users)` call with one that rejects. The outer transaction
+// then ROLLBACKs, and we assert the previously-deleted vehicles row is
+// still present in the database.
+const hasDb = !!process.env.DATABASE_URL;
+const describeIfDb = hasDb ? describe : describe.skip;
 
-const transactionMock = vi.fn();
+describeIfDb("storage.deleteUser (real DB rollback)", () => {
+  let db: typeof import("../server/db").db;
+  let storage: typeof import("../server/storage").storage;
+  let users: typeof import("@shared/schema").users;
+  let vehicles: typeof import("@shared/schema").vehicles;
+  const created: string[] = [];
 
-const buildTx = (failOnDeleteCallNumber: number | null = null) => {
-  let deleteCalls = 0;
-  return {
-    select: vi.fn(() => ({
-      from: () => ({
-        where: () => Promise.resolve([]), // no vehicles for this user
-      }),
-    })),
-    delete: vi.fn(() => ({
-      where: () => {
-        deleteCalls += 1;
-        if (failOnDeleteCallNumber !== null && deleteCalls === failOnDeleteCallNumber) {
-          return Promise.reject(new Error("simulated mid-transaction failure"));
-        }
-        return Promise.resolve();
-      },
-    })),
-  };
-};
-
-vi.mock("../server/db", () => ({
-  db: {
-    transaction: (cb: (tx: unknown) => Promise<unknown>) => transactionMock(cb),
-  },
-  pool: {},
-}));
-
-// Import after the mock is registered.
-import { storage } from "../server/storage";
-
-describe("storage.deleteUser", () => {
-  beforeEach(() => {
-    transactionMock.mockReset();
+  beforeAll(async () => {
+    ({ db } = await import("../server/db"));
+    ({ storage } = await import("../server/storage"));
+    const schema = await import("@shared/schema");
+    users = schema.users;
+    vehicles = schema.vehicles;
   });
 
-  it("runs all cascade deletes inside a single db.transaction", async () => {
-    const tx = buildTx();
-    transactionMock.mockImplementation(async (cb: (t: unknown) => Promise<unknown>) => {
-      return cb(tx);
-    });
-
-    await storage.deleteUser("user-1");
-
-    expect(transactionMock).toHaveBeenCalledTimes(1);
-    // 4 deletes: vehicles, garageMembers, reports, users
-    // (vehicleNotes loop runs zero times since the select returns no vehicles)
-    expect(tx.delete).toHaveBeenCalledTimes(4);
-    expect(tx.select).toHaveBeenCalledTimes(1);
+  afterAll(async () => {
+    for (const id of created) {
+      await db.delete(users).where(eq(users.id, id)).catch(() => {});
+    }
   });
 
-  it("propagates errors so the transaction rolls back when a delete fails", async () => {
-    const tx = buildTx(2); // make the second delete reject
-    transactionMock.mockImplementation(async (cb: (t: unknown) => Promise<unknown>) => {
-      // Mimic Drizzle: if cb throws, transaction rejects (and would ROLLBACK).
-      return cb(tx);
-    });
+  async function makeUserWithVehicle(): Promise<{ userId: string; vehicleId: string }> {
+    const username = `txtest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const passwordHash = await bcrypt.hash("not-a-real-password", 4);
+    const [u] = await db
+      .insert(users)
+      .values({ username, passwordHash, role: "user" })
+      .returning();
+    created.push(u.id);
+    const [v] = await db
+      .insert(vehicles)
+      .values({ userId: u.id, year: 2020, make: "Test", model: "Car" })
+      .returning();
+    return { userId: u.id, vehicleId: v.id };
+  }
 
-    await expect(storage.deleteUser("user-2")).rejects.toThrow(/simulated mid-transaction/);
-    expect(transactionMock).toHaveBeenCalledTimes(1);
+  it("commits the cascade on the happy path", async () => {
+    const { userId } = await makeUserWithVehicle();
+
+    await storage.deleteUser(userId);
+
+    const remainingUsers = await db.select().from(users).where(eq(users.id, userId));
+    const remainingVehicles = await db
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId));
+    expect(remainingUsers).toHaveLength(0);
+    expect(remainingVehicles).toHaveLength(0);
+  });
+
+  it("Postgres ROLLBACKs the cascade when a mid-transaction delete fails", async () => {
+    const { userId, vehicleId } = await makeUserWithVehicle();
+
+    const originalTransaction = db.transaction.bind(db);
+    const spy = vi
+      .spyOn(db, "transaction")
+      .mockImplementation((cb: Parameters<typeof db.transaction>[0]) => {
+        return originalTransaction(async (tx) => {
+          const originalTxDelete = tx.delete.bind(tx);
+          // Wrap tx.delete: when the implementation attempts the final
+          // delete on the users table, force it to reject. Every prior
+          // delete in this transaction (vehicles, garage members, …) must
+          // then be rolled back by Postgres.
+          (tx as unknown as { delete: typeof tx.delete }).delete = ((table: unknown) => {
+            if (table === users) {
+              return {
+                where: () => Promise.reject(new Error("simulated mid-cascade failure")),
+              } as unknown as ReturnType<typeof tx.delete>;
+            }
+            return originalTxDelete(table as Parameters<typeof tx.delete>[0]);
+          }) as typeof tx.delete;
+          return cb(tx);
+        });
+      });
+
+    try {
+      await expect(storage.deleteUser(userId)).rejects.toThrow(/simulated mid-cascade/);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const remainingUsers = await db.select().from(users).where(eq(users.id, userId));
+    const remainingVehicles = await db
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.id, vehicleId));
+    // Both rows must still exist — proving the cascade was wrapped in a
+    // transaction that Postgres successfully rolled back.
+    expect(remainingUsers).toHaveLength(1);
+    expect(remainingVehicles).toHaveLength(1);
   });
 });

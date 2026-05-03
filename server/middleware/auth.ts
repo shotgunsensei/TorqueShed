@@ -15,14 +15,26 @@ export interface JWTPayload {
   iat?: number;
 }
 
-const JWT_ENV_VAR = "APP_JWT_SECRET";
+// Accept either env var name. JWT_SECRET is canonical going forward;
+// APP_JWT_SECRET is supported for backwards compatibility with existing
+// deployments. If both are set, JWT_SECRET wins.
+const JWT_ENV_VARS = ["JWT_SECRET", "APP_JWT_SECRET"] as const;
+
+function readSecretFromEnv(): string | null {
+  for (const name of JWT_ENV_VARS) {
+    const v = process.env[name];
+    if (v && v.length > 0) return v;
+  }
+  return null;
+}
 
 // Fail fast in production: refuse to boot without a real secret. There is NO
 // hardcoded fallback. In development a per-process ephemeral secret is
 // generated so dev tokens just rotate on restart.
-if (process.env.NODE_ENV === "production" && !process.env[JWT_ENV_VAR]) {
+if (process.env.NODE_ENV === "production" && !readSecretFromEnv()) {
   throw new Error(
-    `[auth] ${JWT_ENV_VAR} must be set in production. Refusing to start with an insecure default.`,
+    "[auth] JWT_SECRET (or APP_JWT_SECRET) must be set in production. " +
+      "Refusing to start with an insecure default.",
   );
 }
 
@@ -31,8 +43,8 @@ let warnedEphemeral = false;
 
 function getJwtSecret(): string | null {
   if (cachedSecret) return cachedSecret;
-  const fromEnv = process.env[JWT_ENV_VAR];
-  if (fromEnv && fromEnv.length > 0) {
+  const fromEnv = readSecretFromEnv();
+  if (fromEnv) {
     cachedSecret = fromEnv;
     return cachedSecret;
   }
@@ -44,8 +56,9 @@ function getJwtSecret(): string | null {
   if (!warnedEphemeral) {
     warnedEphemeral = true;
     console.warn(
-      `[auth] ${JWT_ENV_VAR} not set — generated an ephemeral secret for this process. ` +
-        `Tokens will be invalidated on every restart. Set ${JWT_ENV_VAR} for stable dev sessions.`,
+      "[auth] JWT_SECRET / APP_JWT_SECRET not set — generated an ephemeral secret " +
+        "for this process. Tokens will be invalidated on every restart. " +
+        "Set JWT_SECRET for stable dev sessions.",
     );
   }
   return cachedSecret;
