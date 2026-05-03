@@ -19,6 +19,18 @@ function detectProvider(): EmailProvider {
   const apiKey = process.env.EMAIL_API_KEY;
   if (!apiKey) return "log";
   if (requested === "resend" || requested === "postmark") return requested as EmailProvider;
+  // EMAIL_API_KEY is set but EMAIL_PROVIDER is missing/unrecognized. In production
+  // this is almost certainly a misconfiguration — fail loudly instead of silently
+  // logging emails to stdout. In dev we surface a warning and keep the dev fallback
+  // so local work isn't blocked.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `EMAIL_API_KEY is set but EMAIL_PROVIDER is "${requested || "(unset)"}". Set EMAIL_PROVIDER to "resend" or "postmark".`,
+    );
+  }
+  console.warn(
+    `[mailer] EMAIL_API_KEY is set but EMAIL_PROVIDER is "${requested || "(unset)"}". Falling back to console logging in development. Set EMAIL_PROVIDER to "resend" or "postmark".`,
+  );
   return "log";
 }
 
