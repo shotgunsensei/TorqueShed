@@ -2370,7 +2370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: "subscription",
         customer: customerId,
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${baseUrl}/?billing=success&tier=${tier}`,
+        success_url: `${baseUrl}/?billing=success&tier=${tier}&stripe=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/?billing=cancelled`,
         allow_promotion_codes: false,
         metadata: { userId: req.userId!, tier },
@@ -2403,6 +2403,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error instanceof Error ? error.message : "Failed to open billing portal";
       console.error("Error creating portal session:", error);
       res.status(400).json({ error: message });
+    }
+  });
+
+  app.post("/api/subscription/confirm", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId.trim() : "";
+      if (!sessionId) {
+        return res.status(400).json({ error: "sessionId is required" });
+      }
+      if (!isStripeConfigured()) {
+        return res.status(503).json({ error: "Stripe is not connected on this environment." });
+      }
+
+      const stripe = await getStripeClient();
+      let session;
+      try {
+        session = await stripe.checkout.sessions.retrieve(sessionId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not load Stripe session";
+        return res.status(404).json({ error: message });
+      }
+
+      const customerId =
+        typeof session.customer === "string"
+          ? session.customer
+          : session.customer && typeof session.customer === "object"
+            ? (session.customer as { id?: string }).id ?? null
+            : null;
+
+      const localSub = await storage.getSubscription(req.userId!);
+      const sessionUserId =
+        typeof session.metadata?.userId === "string" ? session.metadata.userId : null;
+
+      // Verify ownership: require either matching metadata.userId or a known
+      // local Stripe customer that matches the session's customer.
+      const userIdMatches = sessionUserId === req.userId;
+      const customerMatches = Boolean(
+        customerId && localSub?.stripeCustomerId && localSub.stripeCustomerId === customerId
+      );
+      if (!userIdMatches && !customerMatches) {
+        return res.status(403).json({ error: "This checkout session does not belong to you." });
+      }
+
+      let syncFailed = false;
+      if (customerId) {
+        try {
+          await syncLocalSubscriptionForCustomer(customerId);
+        } catch (err) {
+          console.error("[stripe] confirm sync failed", err);
+          syncFailed = true;
+        }
+      }
+
+      const data = await buildSubscriptionResponse(req.userId!);
+      const refreshed = await storage.getSubscription(req.userId!);
+      const checkoutComplete =
+        session.status === "complete" && session.payment_status === "paid";
+
+      // If the user paid but our local tier hasn't updated yet (e.g. webhook
+      // and sync both lagged), tell the client it's still pending so they can
+      // surface that instead of an incorrect "subscription updated" toast.
+      if (checkoutComplete && (syncFailed || data.tier === "free")) {
+        return res.status(202).json({
+          ...data,
+          hasStripeSubscription: Boolean(refreshed?.stripeSubscriptionId),
+          sessionStatus: session.status,
+          paymentStatus: session.payment_status,
+          pending: true,
+          message:
+            "Payment confirmed — your new plan is taking a moment to activate. Refresh in a few seconds.",
+        });
+      }
+
+      res.json({
+        ...data,
+        hasStripeSubscription: Boolean(refreshed?.stripeSubscriptionId),
+        sessionStatus: session.status,
+        paymentStatus: session.payment_status,
+        pending: false,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to confirm subscription";
+      console.error("Error confirming subscription:", error);
+      res.status(500).json({ error: message });
     }
   });
 

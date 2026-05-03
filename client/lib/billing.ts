@@ -3,9 +3,10 @@ import * as WebBrowser from "expo-web-browser";
 
 import { apiRequest } from "@/lib/query-client";
 import type { Tier } from "@/lib/entitlements";
+import { rememberPendingCheckoutSession } from "@/lib/stripe-return";
 
 export type CheckoutResult =
-  | { kind: "opened"; url: string }
+  | { kind: "opened"; url: string; sessionId?: string | null; mode?: string }
   | { kind: "missing_config"; message: string }
   | { kind: "error"; message: string };
 
@@ -16,8 +17,13 @@ export async function startCheckout(tier: Exclude<Tier, "free">): Promise<Checko
     if (!data?.url) {
       return { kind: "error", message: "Stripe did not return a checkout URL." };
     }
+    const sessionId: string | null = typeof data?.sessionId === "string" ? data.sessionId : null;
+    const mode: string | undefined = typeof data?.mode === "string" ? data.mode : undefined;
+    if (mode !== "portal") {
+      rememberPendingCheckoutSession(sessionId);
+    }
     await openExternal(data.url);
-    return { kind: "opened", url: data.url };
+    return { kind: "opened", url: data.url, sessionId, mode };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start checkout";
     if (/missingConfig|not configured|503/.test(message)) {

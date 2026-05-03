@@ -14,6 +14,7 @@ import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useEntitlements, type Tier, tierIndex } from "@/lib/entitlements";
 import { startCheckout, openBillingPortal } from "@/lib/billing";
+import { confirmCheckoutSession } from "@/lib/stripe-return";
 import { apiRequest } from "@/lib/query-client";
 import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
 
@@ -210,6 +211,17 @@ export default function SubscriptionScreen() {
       navigation.navigate("Billing");
     } else if (result.kind === "error") {
       toast.show(result.message, "error");
+    } else if (result.kind === "opened" && result.sessionId && result.mode !== "portal") {
+      // On native, openBrowserAsync resolves when the user dismisses the in-app
+      // browser. Confirm immediately with the session ID we already have so the
+      // UI reflects the new tier without waiting for the webhook (and in case
+      // the deep-link return URL didn't fire).
+      if (Platform.OS !== "web") {
+        await confirmCheckoutSession(result.sessionId, {
+          queryClient,
+          showToast: toast.show,
+        });
+      }
     }
   };
 

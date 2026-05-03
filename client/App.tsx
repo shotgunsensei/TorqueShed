@@ -23,6 +23,7 @@ import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/components/Toast";
+import { StripeReturnHandler } from "@/components/StripeReturnHandler";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,6 +53,7 @@ export default function App() {
             <GestureHandlerRootView style={styles.root}>
               <KeyboardProvider>
                 <ToastProvider>
+                  <StripeReturnHandler />
                   <NavigationContainer>
                     <RootStackNavigator />
                   </NavigationContainer>
