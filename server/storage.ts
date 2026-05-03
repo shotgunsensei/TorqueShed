@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { 
   users, 
   garages, 
@@ -5,6 +6,7 @@ import {
   vehicles,
   vehicleNotes,
   reports,
+  emailVerifications,
   products,
   threads,
   threadReplies,
@@ -63,7 +65,13 @@ import {
   type RepairPlanExportType,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, or, isNull, isNotNull, gt, inArray, type SQL } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull, isNotNull, gt, lt, inArray, type SQL } from "drizzle-orm";
+
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+function hashEmailToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 export interface ProfileUpdate {
   bio?: string;
@@ -173,6 +181,67 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async createEmailVerification(userId: string, email: string): Promise<{ token: string; expiresAt: Date }> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const token = crypto.randomBytes(32).toString("base64url");
+    const tokenHash = hashEmailToken(token);
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
+    // Invalidate any prior unconsumed tokens for this user.
+    await db
+      .update(emailVerifications)
+      .set({ consumedAt: new Date() })
+      .where(and(eq(emailVerifications.userId, userId), isNull(emailVerifications.consumedAt)));
+    await db.insert(emailVerifications).values({ userId, email: normalizedEmail, tokenHash, expiresAt });
+    return { token, expiresAt };
+  }
+
+  async consumeEmailVerification(token: string): Promise<{ userId: string; email: string } | null> {
+    if (!token || token.length < 16) return null;
+    const tokenHash = hashEmailToken(token);
+
+    return await db.transaction(async (tx) => {
+      // Atomically claim the token: only one concurrent caller can flip consumedAt
+      // from NULL → now() because of the isNull predicate. Returning rows tells us
+      // we won the race; an empty result means the token is missing, expired, or
+      // already used.
+      const claimed = await tx
+        .update(emailVerifications)
+        .set({ consumedAt: new Date() })
+        .where(
+          and(
+            eq(emailVerifications.tokenHash, tokenHash),
+            isNull(emailVerifications.consumedAt),
+            gt(emailVerifications.expiresAt, new Date()),
+          ),
+        )
+        .returning();
+      const row = claimed[0];
+      if (!row) return null;
+
+      const [user] = await tx
+        .select({ id: users.id, currentEmail: users.email })
+        .from(users)
+        .where(eq(users.id, row.userId));
+      // Token's email must still match the user's current email — otherwise the
+      // address changed since the token was issued and the row is left consumed.
+      if (
+        !user?.currentEmail ||
+        user.currentEmail.toLowerCase() !== row.email.toLowerCase()
+      ) {
+        return null;
+      }
+      await tx.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, row.userId));
+      return { userId: row.userId, email: row.email };
+    });
+  }
+
+  async invalidateEmailVerifications(userId: string): Promise<void> {
+    await db
+      .update(emailVerifications)
+      .set({ consumedAt: new Date() })
+      .where(and(eq(emailVerifications.userId, userId), isNull(emailVerifications.consumedAt)));
   }
 
   async deleteUser(id: string): Promise<void> {

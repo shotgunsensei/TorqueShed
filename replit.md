@@ -1,7 +1,7 @@
 # TorqueShed - Automotive Community Platform
 
 ## Overview
-TorqueShed is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers. Its purpose is to be "The Garage for Real People," building a strong community around automotive interests. Key capabilities include brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a step-by-step diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), a curated marketplace for tools and gear ("Shop"), and rich user profiles with credibility signals. The project aims to foster a vibrant, engaged community and provide essential tools for automotive repair and maintenance.
+TorqueShed is a mobile-first automotive community platform connecting mechanics, enthusiasts, and DIYers. It aims to be "The Garage for Real People," fostering a vibrant community around automotive interests. Key capabilities include brand-specific communities ("Bays"), vehicle maintenance tracking ("Garage"), a step-by-step diagnostic wizard ("TorqueAssist"), a peer-to-peer marketplace ("Swap Shop"), a curated marketplace for tools and gear ("Shop"), and rich user profiles with credibility signals. The project's vision is to provide essential tools for automotive repair and maintenance, building a strong, engaged community.
 
 ## User Preferences
 - Bold, industrial design aesthetic
@@ -13,63 +13,31 @@ TorqueShed is a mobile-first automotive community platform connecting mechanics,
 
 ## System Architecture
 
-### Frontend (Expo + React Native)
-The frontend is built with React Native and Expo (SDK 54) using TypeScript. It uses React Navigation 7+ for navigation, featuring a responsive design that adapts bottom tabs for mobile and a sidebar for desktop. Data fetching and state management are handled by `@tanstack/react-query`. Styling is implemented with `StyleSheet.create` and theme-aware hooks, specifically avoiding CSS files. Typography utilizes Montserrat for headings and Inter for body text. The brand color palette includes Racing Orange (#FF6B35), Industrial Black (#0D0F12), and Caution Yellow (#F59E0B).
+### Frontend
+The frontend is a React Native and Expo (SDK 54) application written in TypeScript, ensuring a mobile-first experience with responsive design adapting to different device sizes. Navigation is managed by React Navigation 7+. Data fetching and state management are handled by `@tanstack/react-query`. Styling uses `StyleSheet.create` and theme-aware hooks, avoiding CSS files, with Montserrat for headings and Inter for body text. The brand color palette includes Racing Orange (#FF6B35), Industrial Black (#0D0F12), and Caution Yellow (#F59E0B). A custom UI component library provides consistent elements like `Card`, `Button`, `FAB`, `EmptyState`, `Skeleton`, `StatusBadge`, `UserAvatar`, `Input`, and theme-aware primitives, alongside an `ErrorBoundary` for crash recovery. Error handling includes skeleton loaders, branded `EmptyState` components, toast notifications, and inline form validation.
 
-### Backend (Express + PostgreSQL)
-The backend is an Express.js server developed with TypeScript, running on port 5000. It uses PostgreSQL as its primary database, managed by Drizzle ORM. Authentication is JWT-based, incorporating bcrypt for password hashing and middleware for secure access control (`requireAuth`, `requireAdmin`). The API is RESTful, served under `/api/*`. CORS is configured dynamically from environment variables and hardcoded production domains. Security measures include Helmet headers, trust proxy settings, and a 1MB request body limit.
-
-#### Seeded accounts (QA / reviewer)
-On every backend boot, `seedAccount` in `server/index.ts` upserts a reviewer account so QA can log in immediately after a fresh `db:push`. The default reviewer credentials are `reviewer` / `reviewer123` (role `user`), and the password hash is re-synced on every start so any drift from a previous run is corrected automatically — no manual database fix required. The defaults can be overridden via the optional `REVIEWER_USERNAME` / `REVIEWER_PASSWORD` env vars (when set, those take precedence and become the working credentials). The admin account is env-only via `ADMIN_USERNAME` / `ADMIN_PASSWORD` (no defaults — skipped if unset).
+### Backend
+The backend is an Express.js server in TypeScript, using PostgreSQL as its primary database managed by Drizzle ORM. Authentication is JWT-based with bcrypt for password hashing and secure access control middleware (`requireAuth`, `requireAdmin`). The API is RESTful, served under `/api/*`. CORS is dynamically configured, and security is enhanced with Helmet headers and a 1MB request body limit. The system includes robust email verification with a dedicated table and a configurable mailer service supporting Resend or Postmark. Billing is integrated with Stripe for subscription management and one-time charges, supporting multiple tiers (Free, DIY Pro, Garage Pro, Shop Pro) with server-side enforcement of features based on user entitlements.
 
 ### Key Features
-- **Home Feed**: Personalized content based on user onboarding goals.
-- **Cases**: Central hub for automotive problem-solving, featuring a flat feed, search, quick actions, and filtering. Includes a "New Case" wizard for structured problem reporting.
-- **Bays (Garages)**: Brand-specific community forums with discussion threads and credibility signals.
-- **Garage (Build Journal)**: Vehicle build journals for tracking maintenance, modifications, and issues, with VIN decoding.
-- **Structured Replies & Solved Cases**: Advanced reply composer with type-specific badges and a verified "FinalFix" workflow for case resolution.
-- **TorqueAssist**: A professional diagnostic engine with decision trees, DTC code integration, and session persistence, providing ranked hypotheses and test procedures.
-- **Market Tab**: A unified hub for parts and tools, integrating a curated "Shop," a peer-to-peer "Swap Shop," and a "Find Parts" search across major vendors.
-- **User Profiles**: Detailed profiles showcasing user activity, vehicles, and credibility badges.
-- **Saved Items**: Functionality for users to bookmark threads and listings.
-- **Content Moderation**: Reporting system for user-generated content, with an admin review interface.
-- **Shop Pro**: Features for businesses including public profiles, service listings, lead capture, and team management.
-- **Monetization**: Production Stripe billing with four tiers (Free, DIY Pro $9.99/mo, Garage Pro $29/mo, Shop Pro $79/mo). Premium-gated features include the advanced diagnostic tree, full parts & tools panels, expert reviews, PDF repair plan exports, multi-vehicle and inventory tracking, and Shop Pro public profile/services/leads. Free tier is capped at 3 saved cases.
-
-### Billing & Entitlements
-- **Stripe integration**: Two parallel-but-compatible modules ship together. `server/stripeClient.ts` + `server/stripeBilling.ts` use the Replit Stripe connector for tier→price resolution by `metadata.tier`, Checkout, Portal, and webhook reconcile (mirrored to Postgres via `stripe-replit-sync`). `server/stripe.ts` exposes the lower-level `getStripeClient()`, env-var price-ID lookup (`STRIPE_PRICE_DIY_PRO`, `STRIPE_PRICE_GARAGE_PRO`, `STRIPE_PRICE_SHOP_PRO`), and webhook helpers. Webhook signing uses `STRIPE_WEBHOOK_SECRET`. Run `npx tsx scripts/seed-stripe-tiers.ts` to (re)create the three priced products tagged with `metadata.tier`.
-- **Stripe configuration**: The Replit Stripe connector is currently provisioned in **test** mode (`sk_test_...`) for this development environment; `GET /api/admin/billing-health` reports `stripeMode` accordingly. Configuration steps below are identical for both test and live mode — only the connector environment and the resulting price IDs/webhook differ. Switching to production: (1) provision the Stripe connector in the deployment's `production` environment with a verified live account, (2) recreate the three products + monthly recurring prices in the live account (DIY Pro $9.99, Garage Pro $29, Shop Pro $79) and put the live `price_*` IDs in production-environment env vars `STRIPE_PRICE_DIY_PRO`, `STRIPE_PRICE_GARAGE_PRO`, `STRIPE_PRICE_SHOP_PRO`, (3) register a Stripe webhook endpoint at `https://<production-host>/api/stripe/webhook` subscribed to `checkout.session.{completed,async_payment_failed,expired}`, `customer.subscription.{created,updated,deleted}`, and `invoice.payment_{succeeded,failed}`, and (4) store its `whsec_...` signing secret in `STRIPE_WEBHOOK_SECRET` (production env). The same shape is currently set up in dev with the test-mode connector and a webhook pointing at `https://$REPLIT_DEV_DOMAIN/api/stripe/webhook`. `GET /api/admin/billing-health` returns booleans for each piece (`stripeReachable`, `stripeMode`, `webhookSecretConfigured`, `priceIdsPresent.{diy_pro,garage_pro,shop_pro}`) and never echoes the actual secret values.
-- **Endpoints**:
-  - `POST /api/subscription/upgrade` — unified path that handles Free downgrade (direct or via Portal redirect) and paid upgrades (creates Stripe Checkout via `stripeBilling.createSubscriptionCheckoutSession`).
-  - `POST /api/subscription/portal` and `POST /api/billing/create-portal-session` — both open the Stripe Customer Portal.
-  - `POST /api/billing/create-checkout-session` — creates a Stripe Checkout session for the requested paid tier (uses `stripe.ts` directly).
-  - `POST /api/subscription/sync` — forces a local sync from the connected Stripe customer.
-  - `POST /api/stripe/webhook` — single handler registered in `server/index.ts` (`setupStripeWebhook`) **before** `express.json()` so the body is a raw Buffer for signature verification. The handler runs `stripe-replit-sync.processWebhook` (mirrors all events into the local `stripe.*` schema with signature verification using `STRIPE_WEBHOOK_SECRET`), then `reconcileWebhookPayload` (propagates subscription state from the synced schema to our `subscriptions` table for `getUserTier`), then `handleExpertEscalationEvent` (one-time expert-escalation checkouts: `markExpertReviewPaid` on `checkout.session.completed`, `markExpertReviewFailed` on `checkout.session.{expired,async_payment_failed}` when `metadata.kind === "expert_escalation"`). This covers `customer.subscription.{created,updated,deleted}`, `invoice.payment_{succeeded,failed}`, and `checkout.session.{completed,expired,async_payment_failed}`. Do not register a second handler in `server/routes.ts` — Express short-circuits on first response and the duplicate would be silently dead code.
-  - `GET /api/admin/billing-health` — admin-only diagnostic that reports whether the Stripe client, price IDs, and webhook secret are configured (booleans only — never returns secret values).
-- **Server enforcement**: `getUserTier` keeps the paid tier on `past_due` so users retain read access. `requireFeature` and `requireFeatureOrTeam` middleware additionally call `isUserBillingDelinquent` and return HTTP 402 `billingPastDue` for any premium write method (POST/PUT/PATCH/DELETE) when the user is delinquent. Free users are capped at `FREE_SAVED_THREAD_LIMIT = 3` saved cases by `POST /api/saved/threads/:threadId`.
-- **Expert escalations (one-time charges)**: `POST /api/cases/:caseId/escalate` now creates the `expert_reviews` row in `pending` state AND a Stripe Checkout session in `mode: "payment"` with `metadata.kind = "expert_escalation"`. The webhook listens for `checkout.session.completed` (paid → `markExpertReviewPaid`), `checkout.session.expired`, and `checkout.session.async_payment_failed` (failed → `markExpertReviewFailed`). Delinquent users are blocked. The escalate response shape is `{review, checkoutUrl}` and the client opens the URL via `expo-web-browser` / `window.location.assign`. New schema columns: `expert_reviews.stripe_session_id`, `expert_reviews.stripe_payment_intent_id`.
-- **Client UX**: `client/lib/billing.ts` opens Checkout/Portal via `expo-web-browser` on native and `window.location.assign` on web. `SubscriptionScreen` renders dynamic per-card CTAs (Current / Upgrade / Manage Billing / Switch) and shows banners for Stripe test mode, missing config, and past-due payments. The dedicated `BillingScreen` (More → Billing) shows current plan/status/renewal/Stripe mode and exposes the portal/checkout entry points. `LockedFeature` deep-links into the upgrade flow.
+- **Community & Content:** Personalized Home Feed, Cases for problem-solving with a "New Case" wizard, brand-specific "Bays" (Garages), vehicle "Garage" (Build Journal) with VIN decoding, structured replies, and "FinalFix" for case resolution.
+- **Diagnostic & Marketplace:** "TorqueAssist" provides professional diagnostics with decision trees. The "Market Tab" unifies a curated "Shop," a peer-to-peer "Swap Shop," and a "Find Parts" search.
+- **User Management:** Rich User Profiles with activity and credibility badges, Saved Items functionality, and Content Moderation tools.
+- **Business Features:** "Shop Pro" offers features for businesses, including public profiles, service listings, lead capture, and team management.
+- **Monetization:** Stripe billing supports multiple tiers (Free, DIY Pro, Garage Pro, Shop Pro) with premium-gated features like advanced diagnostics, full parts/tools panels, expert reviews, PDF repair plans, multi-vehicle tracking, and Shop Pro functionalities.
 
 ### Database Schema
-The database schema, managed by Drizzle ORM, includes tables for `users`, `garages`, `vehicles`, `threads`, `swapShopListings`, `products`, `reports`, `diagnosticSessions`, `subscriptions`, and specialized tables for `Shop Pro` features like `shopServices`, `shopLeads`, `shopTeamMembers`, and `caseCustomerSummaries`. `swapShopListings` is extended to support categories and case-specific recommendations.
-
-### UI Component Library
-A custom UI component library ensures consistency and reusability, including `Card`, `Button`, `FAB`, `EmptyState`, `Skeleton` loaders, `StatusBadge`, `UserAvatar`, `Input`, and theme-aware primitives (`ThemedText`, `ThemedView`). An `ErrorBoundary` is in place for crash recovery.
-
-### Error Handling
-Comprehensive error handling includes skeleton loaders for data fetching, branded `EmptyState` components for errors and empty states, toast notifications for mutation failures, and inline validation for forms.
+The Drizzle ORM-managed schema includes tables for `users`, `garages`, `vehicles`, `threads`, `swapShopListings`, `products`, `reports`, `diagnosticSessions`, `subscriptions`, `email_verifications`, and `Shop Pro` related tables such as `shopServices`, `shopLeads`, `shopTeamMembers`, and `caseCustomerSummaries`.
 
 ## External Dependencies
-- **React Native + Expo**: Mobile application framework.
-- **Express.js**: Backend server framework.
-- **PostgreSQL**: Primary relational database.
-- **Drizzle ORM**: Object-Relational Mapper for database interaction.
-- **@tanstack/react-query**: Data fetching, caching, and state management library.
-- **React Navigation**: Navigation solution for React Native applications.
-- **expo-linear-gradient**: For applying gradient effects.
-- **expo-haptics**: For providing haptic feedback.
-- **expo-clipboard**: For clipboard interaction.
-- **expo-web-browser**: For opening web links within the app.
-- **bcrypt**: Library for hashing passwords.
-- **jsonwebtoken**: For implementing JWT-based authentication.
-- **zod**: Schema declaration and validation library.
+- **React Native + Expo**: Mobile application development framework.
+- **Express.js**: Backend web application framework.
+- **PostgreSQL**: Relational database.
+- **Drizzle ORM**: ORM for database interactions.
+- **@tanstack/react-query**: Data fetching and state management.
+- **React Navigation**: In-app navigation.
+- **Stripe**: Payment processing and subscription management.
+- **bcrypt**: Password hashing library.
+- **jsonwebtoken**: JWT-based authentication.
+- **zod**: Schema validation.
+- **expo-linear-gradient, expo-haptics, expo-clipboard, expo-web-browser**: Expo SDK modules for specific mobile functionalities.

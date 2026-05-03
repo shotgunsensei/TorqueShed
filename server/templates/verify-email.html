@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verify your email — TorqueShed</title>
+    <meta name="robots" content="noindex" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/assets/images/favicon.png" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --orange: #FF6B35;
+        --orange-hover: #E65A2E;
+        --orange-glow: rgba(255, 107, 53, 0.15);
+        --black: #0D0F12;
+        --card: #111318;
+        --card-border: #1F2937;
+        --gray-300: #D1D5DB;
+        --gray-400: #9CA3AF;
+        --gray-500: #6B7280;
+        --gray-700: #374151;
+        --white: #FFFFFF;
+        --green: #22C55E;
+        --green-glow: rgba(34, 197, 94, 0.12);
+        --red: #EF4444;
+        --red-glow: rgba(239, 68, 68, 0.12);
+      }
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--black);
+        color: #E5E7EB;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 520px;
+        width: 100%;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 40px 32px;
+        text-align: center;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+      .brand img { width: 36px; height: 36px; }
+      .brand span {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 800;
+        font-size: 18px;
+        color: var(--white);
+        letter-spacing: -0.3px;
+      }
+      .icon-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        margin: 0 auto 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--orange-glow);
+      }
+      .icon-circle.success { background: var(--green-glow); }
+      .icon-circle.error { background: var(--red-glow); }
+      .icon-circle svg { width: 28px; height: 28px; }
+      .icon-circle.pending svg { color: var(--orange); }
+      .icon-circle.success svg { color: var(--green); }
+      .icon-circle.error svg { color: var(--red); }
+      h1 {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 800;
+        font-size: 24px;
+        color: var(--white);
+        margin-bottom: 12px;
+        letter-spacing: -0.5px;
+      }
+      p.lead {
+        font-size: 15px;
+        color: var(--gray-400);
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        padding: 12px 24px;
+        border-radius: 10px;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+        background: var(--orange);
+        color: var(--white);
+        transition: background 0.15s;
+      }
+      .btn:hover { background: var(--orange-hover); }
+      .btn-secondary {
+        background: transparent;
+        color: var(--white);
+        border: 1.5px solid var(--gray-700);
+      }
+      .btn-secondary:hover { background: rgba(255, 255, 255, 0.03); }
+      .footer-note {
+        margin-top: 24px;
+        font-size: 13px;
+        color: var(--gray-500);
+      }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="card" role="main">
+      <div class="brand">
+        <img src="/assets/images/icon.png" alt="" />
+        <span>TorqueShed</span>
+      </div>
+
+      <div id="state-pending">
+        <div class="icon-circle pending">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+        </div>
+        <h1>Verifying your email</h1>
+        <p class="lead">Hang tight — we're confirming your link.</p>
+      </div>
+
+      <div id="state-success" class="hidden">
+        <div class="icon-circle success">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <h1>Email verified</h1>
+        <p class="lead">You're all set. You can close this tab and return to the app.</p>
+        <a class="btn" href="/">Back to TorqueShed</a>
+      </div>
+
+      <div id="state-error" class="hidden">
+        <div class="icon-circle error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="13"></line><line x1="12" y1="16" x2="12" y2="16"></line></svg>
+        </div>
+        <h1>We couldn't verify that link</h1>
+        <p class="lead" id="error-msg">The link may have expired or already been used. Open the app and request a new verification email.</p>
+        <a class="btn btn-secondary" href="/">Back to TorqueShed</a>
+      </div>
+
+      <p class="footer-note">Need help? Email <a href="mailto:support@torqueshed.pro" style="color: var(--gray-300);">support@torqueshed.pro</a></p>
+    </div>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var token = params.get("token");
+        var pending = document.getElementById("state-pending");
+        var success = document.getElementById("state-success");
+        var errorEl = document.getElementById("state-error");
+        var errorMsg = document.getElementById("error-msg");
+
+        function show(el) {
+          pending.classList.add("hidden");
+          success.classList.add("hidden");
+          errorEl.classList.add("hidden");
+          el.classList.remove("hidden");
+        }
+
+        if (!token) {
+          errorMsg.textContent = "Missing verification token.";
+          show(errorEl);
+          return;
+        }
+
+        fetch("/api/auth/email/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token }),
+        })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { ok: res.ok, body: body };
+            });
+          })
+          .then(function (result) {
+            if (result.ok) {
+              show(success);
+            } else {
+              if (result.body && result.body.message) {
+                errorMsg.textContent = result.body.message;
+              }
+              show(errorEl);
+            }
+          })
+          .catch(function () {
+            errorMsg.textContent = "Network error. Please try again later.";
+            show(errorEl);
+          });
+      })();
+    </script>
+  </body>
+</html>

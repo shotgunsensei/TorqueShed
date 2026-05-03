@@ -12,6 +12,7 @@ export interface User {
   onboardingCompleted: boolean;
   onboardingGoals: string[];
   email?: string | null;
+  emailVerifiedAt?: string | null;
   notificationsEnabled?: boolean;
 }
 

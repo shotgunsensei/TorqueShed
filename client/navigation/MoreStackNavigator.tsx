@@ -16,6 +16,7 @@ import ShopServicesScreen from "@/screens/shop-pro/ShopServicesScreen";
 import ShopLeadsScreen from "@/screens/shop-pro/ShopLeadsScreen";
 import ShopTeamScreen from "@/screens/shop-pro/ShopTeamScreen";
 import NotificationSettingsScreen from "@/screens/NotificationSettingsScreen";
+import VerifyEmailScreen from "@/screens/VerifyEmailScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -39,6 +40,7 @@ export type MoreStackParamList = {
   ShopLeads: undefined;
   ShopTeam: undefined;
   NotificationSettings: undefined;
+  VerifyEmail: undefined;
 };
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -139,6 +141,11 @@ export default function MoreStackNavigator() {
         name="NotificationSettings"
         component={NotificationSettingsScreen}
         options={{ headerTitle: "Notifications" }}
+      />
+      <Stack.Screen
+        name="VerifyEmail"
+        component={VerifyEmailScreen}
+        options={{ headerTitle: "Verify Email" }}
       />
     </Stack.Navigator>
   );

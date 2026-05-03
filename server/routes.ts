@@ -303,6 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onboardingCompleted: user.onboardingCompleted ?? true,
         onboardingGoals: user.onboardingGoals ?? [],
         email: user.email ?? null,
+        emailVerifiedAt: user.emailVerifiedAt ? user.emailVerifiedAt.toISOString() : null,
         notificationsEnabled: user.notificationsEnabled ?? true,
       });
     } catch (error) {
@@ -387,13 +388,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = updateNotificationPrefsSchema.parse(req.body);
       const updates: Record<string, unknown> = {};
-      if (parsed.email !== undefined) updates.email = parsed.email === "" ? null : parsed.email;
+      let emailChanged = false;
+      let normalizedEmail: string | null | undefined = undefined;
+      if (parsed.email !== undefined) {
+        normalizedEmail = parsed.email === "" ? null : parsed.email.toLowerCase().trim();
+        updates.email = normalizedEmail;
+      }
       if (parsed.expoPushToken !== undefined) updates.expoPushToken = parsed.expoPushToken === "" ? null : parsed.expoPushToken;
       if (parsed.notificationsEnabled !== undefined) updates.notificationsEnabled = parsed.notificationsEnabled;
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No valid updates provided" });
       }
+      if (normalizedEmail !== undefined) {
+        const [existing] = await db.select({ email: users.email }).from(users).where(eq(users.id, req.userId!));
+        const prev = (existing?.email ?? null)?.toLowerCase() ?? null;
+        const next = normalizedEmail ? normalizedEmail.toLowerCase() : null;
+        if (prev !== next) {
+          emailChanged = true;
+          updates.emailVerifiedAt = null;
+        }
+      }
       await db.update(users).set(updates).where(eq(users.id, req.userId!));
+      if (emailChanged) {
+        await storage.invalidateEmailVerifications(req.userId!);
+      }
       const [refreshed] = await db
         .select({
           email: users.email,
@@ -1942,18 +1960,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // TODO: Wire up email service for email verification flow
-  app.post("/api/auth/verify-email", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      // TODO: When email service is wired up:
-      // 1. Accept verification token from email link
-      // 2. Validate token and check expiration
-      // 3. Mark user's email as verified in the database
-      res.status(501).json({ error: "Email verification is not yet available." });
-    } catch (error) {
-      console.error("Error in verify-email:", error);
-      res.status(500).json({ error: "Failed to process request" });
-    }
+  // ========== Email Verification ==========
+  app.post(
+    "/api/auth/email/send-verification",
+    requireAuth,
+    rateLimited("auth:emailsend", 5, 60 * 60 * 1000),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const user = await storage.getUser(req.userId!);
+        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user.email) {
+          return res.status(400).json({ error: "Bad Request", message: "Add an email address before requesting verification." });
+        }
+        if (user.emailVerifiedAt) {
+          return res.json({ ok: true, alreadyVerified: true });
+        }
+        const { token } = await storage.createEmailVerification(user.id, user.email);
+        const { sendEmail, buildVerificationEmail } = await import("./lib/mailer");
+        const baseUrl =
+          process.env.PUBLIC_APP_URL ||
+          process.env.APP_URL ||
+          (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) ||
+          `${req.protocol}://${req.get("host")}`;
+        const verifyUrl = `${baseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
+        const { subject, html, text } = buildVerificationEmail(verifyUrl, user.email);
+        const result = await sendEmail({ to: user.email, subject, html, text });
+        if (!result.ok) {
+          console.error("Failed to send verification email:", result.error);
+          return res.status(502).json({ error: "Mailer error", message: "Could not send verification email. Try again later." });
+        }
+        res.json({ ok: true, provider: result.provider });
+      } catch (error) {
+        console.error("Error sending verification email:", error);
+        res.status(500).json({ error: "Failed to send verification email" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/auth/email/verify",
+    rateLimited("auth:emailverify", 10, 15 * 60 * 1000),
+    async (req: Request, res: Response) => {
+      try {
+        const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+        if (!token) {
+          return res.status(400).json({ error: "Bad Request", message: "Verification token is required." });
+        }
+        const result = await storage.consumeEmailVerification(token);
+        if (!result) {
+          return res.status(400).json({ error: "Invalid token", message: "This verification link is invalid, expired, or already used." });
+        }
+        res.json({ ok: true, email: result.email });
+      } catch (error) {
+        console.error("Error verifying email:", error);
+        res.status(500).json({ error: "Failed to verify email" });
+      }
+    },
+  );
+
+  app.get("/verify-email", (_req: Request, res: Response) => {
+    res.sendFile(path.resolve(process.cwd(), "server", "templates", "verify-email.html"));
   });
 
   // ========== Saved Items Routes ==========

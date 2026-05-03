@@ -37,8 +37,23 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 200 }),
   expoPushToken: varchar("expo_push_token", { length: 200 }),
   notificationsEnabled: boolean("notifications_enabled").default(true),
+  emailVerifiedAt: timestamp("email_verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const emailVerifications = pgTable("email_verifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 200 }).notNull(),
+  tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("email_verifications_token_hash_idx").on(t.tokenHash),
+]);
+
+export type EmailVerification = typeof emailVerifications.$inferSelect;
 
 export const REMINDER_CHANNELS = ["push", "email", "none"] as const;
 export type ReminderChannel = typeof REMINDER_CHANNELS[number];

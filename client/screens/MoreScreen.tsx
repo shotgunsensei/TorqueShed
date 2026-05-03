@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
@@ -95,6 +96,7 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
       { label: "Subscription", icon: "star", action: "stack", screen: "Subscription", description: "Plans, billing, and premium features" },
       { label: "Billing", icon: "credit-card", action: "stack", screen: "Billing", description: "Invoices, payment method, and Stripe portal" },
       { label: "Notifications", icon: "bell", action: "stack", screen: "NotificationSettings", description: "Maintenance reminders by push or email" },
+      { label: "Verify Email", icon: "mail", action: "stack", screen: "VerifyEmail", description: "Confirm your email to receive notices" },
       { label: "Help", icon: "help-circle", action: "toast", toastMessage: "Help center is coming soon.", description: "FAQs, support, and contact" },
     ],
   },
@@ -114,6 +116,10 @@ export default function MoreScreen() {
     enabled: leadCaptureEnabled,
     refetchInterval: 60_000,
   });
+  const { data: me } = useQuery<{ email: string | null; emailVerifiedAt: string | null }>({
+    queryKey: ["/api/users/me"],
+  });
+  const showVerifyBanner = !!me?.email && !me?.emailVerifiedAt;
   const badgeCounts: Partial<Record<NonNullable<MenuItem["badgeKey"]>, number>> = {
     leads: unreadLeads?.count ?? 0,
   };
@@ -179,6 +185,30 @@ export default function MoreScreen() {
         </View>
         <Feather name="chevron-right" size={20} color={theme.textMuted} />
       </Pressable>
+
+      {showVerifyBanner ? (
+        <Card
+          style={[styles.verifyBanner, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "40" }]}
+          testID="banner-verify-email"
+        >
+          <View style={styles.verifyRow}>
+            <Feather name="mail" size={22} color={theme.primary} />
+            <View style={styles.verifyText}>
+              <ThemedText type="h4">Verify your email</ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Confirm {me?.email} so we can deliver maintenance reminders and account notices.
+              </ThemedText>
+            </View>
+          </View>
+          <Button
+            onPress={() => navigation.navigate("VerifyEmail")}
+            style={styles.verifyBtn}
+            testID="button-banner-verify-email"
+          >
+            Verify now
+          </Button>
+        </Card>
+      ) : null}
 
       {[...MENU_GROUPS, { title: "Shotgun Ninjas Ecosystem", items: ECOSYSTEM_ITEMS }].map((group) => (
         <View key={group.title} style={styles.group}>
@@ -281,6 +311,22 @@ const styles = StyleSheet.create({
   menuText: {
     flex: 1,
     marginLeft: Spacing.md,
+  },
+  verifyBanner: {
+    padding: Spacing.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  verifyRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  verifyText: {
+    flex: 1,
+    marginLeft: Spacing.md,
+  },
+  verifyBtn: {
+    marginTop: Spacing.md,
   },
   badge: {
     minWidth: 22,
