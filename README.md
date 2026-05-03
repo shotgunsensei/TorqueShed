@@ -93,6 +93,26 @@ npm run server:dev    # backend on :5000
 npm run expo:dev      # frontend on :8081
 ```
 
+### Keeping the database schema in sync
+
+The Drizzle schema lives in `shared/schema.ts`. After pulling changes from
+`main` (or any time you add/rename a column), run:
+
+```bash
+npm run db:push
+```
+
+The dev backend (`npm run server:dev`) refuses to start when it detects that
+the database is missing tables or columns declared in the schema, and prints
+the exact missing tables/columns plus the command to fix them. This prevents
+silent 500s like the Cases tab POST failure caused by `shop_services.stripe_price_id`
+existing in `shared/schema.ts` but never being pushed to the DB.
+
+To bypass the check temporarily (e.g. when working offline against a snapshot
+DB you don't intend to migrate), set `SKIP_SCHEMA_CHECK=1`. The check is
+skipped automatically in production (`NODE_ENV=production`); production
+schemas are managed via your deployment migration workflow.
+
 ## Project Structure
 
 ```

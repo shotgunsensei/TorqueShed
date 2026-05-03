@@ -14,6 +14,7 @@ import { ZodError } from "zod";
 import { WebhookHandlers } from "./webhookHandlers";
 import { getStripeSync, isStripeConfigured } from "./stripeClient";
 import { reconcileWebhookPayload, syncAllLocalSubscriptions } from "./stripeBilling";
+import { assertSchemaInSync } from "./schemaCheck";
 import type Stripe from "stripe";
 
 const app = express();
@@ -825,6 +826,12 @@ async function initStripe(): Promise<void> {
 
   // Expo and landing page routing
   configureExpoAndLanding(app);
+
+  // Verify Drizzle schema matches the live database before serving traffic.
+  // Skip in production (migrations are applied separately) and when explicitly disabled.
+  if (process.env.NODE_ENV !== "production" && process.env.SKIP_SCHEMA_CHECK !== "1") {
+    await assertSchemaInSync();
+  }
 
   // API routes
   const server = await registerRoutes(app);
