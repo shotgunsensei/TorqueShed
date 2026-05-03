@@ -176,14 +176,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    const userVehicles = await db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, id));
-    for (const vehicle of userVehicles) {
-      await db.delete(vehicleNotes).where(eq(vehicleNotes.vehicleId, vehicle.id));
-    }
-    await db.delete(vehicles).where(eq(vehicles.userId, id));
-    await db.delete(garageMembers).where(eq(garageMembers.userId, id));
-    await db.delete(reports).where(eq(reports.reporterId, id));
-    await db.delete(users).where(eq(users.id, id));
+    // Wrap the cascade in a single transaction so a mid-delete failure leaves
+    // the account intact instead of orphaning rows. Ordering preserved.
+    await db.transaction(async (tx) => {
+      const userVehicles = await tx
+        .select({ id: vehicles.id })
+        .from(vehicles)
+        .where(eq(vehicles.userId, id));
+      for (const vehicle of userVehicles) {
+        await tx.delete(vehicleNotes).where(eq(vehicleNotes.vehicleId, vehicle.id));
+      }
+      await tx.delete(vehicles).where(eq(vehicles.userId, id));
+      await tx.delete(garageMembers).where(eq(garageMembers.userId, id));
+      await tx.delete(reports).where(eq(reports.reporterId, id));
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 
   async getPublicProfile(id: string): Promise<PublicProfile | undefined> {

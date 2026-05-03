@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { storage } from "../storage";
 
@@ -14,14 +15,40 @@ export interface JWTPayload {
   iat?: number;
 }
 
-const JWT_SECRET_KEY = "APP_JWT_SECRET";
+const JWT_ENV_VAR = "APP_JWT_SECRET";
+
+// Fail fast in production: refuse to boot without a real secret. There is NO
+// hardcoded fallback. In development a per-process ephemeral secret is
+// generated so dev tokens just rotate on restart.
+if (process.env.NODE_ENV === "production" && !process.env[JWT_ENV_VAR]) {
+  throw new Error(
+    `[auth] ${JWT_ENV_VAR} must be set in production. Refusing to start with an insecure default.`,
+  );
+}
+
+let cachedSecret: string | null = null;
+let warnedEphemeral = false;
 
 function getJwtSecret(): string | null {
-  const secret = process.env[JWT_SECRET_KEY];
-  if (!secret) {
+  if (cachedSecret) return cachedSecret;
+  const fromEnv = process.env[JWT_ENV_VAR];
+  if (fromEnv && fromEnv.length > 0) {
+    cachedSecret = fromEnv;
+    return cachedSecret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    // Defensive — module-load check above should have already prevented this.
     return null;
   }
-  return secret;
+  cachedSecret = crypto.randomBytes(48).toString("hex");
+  if (!warnedEphemeral) {
+    warnedEphemeral = true;
+    console.warn(
+      `[auth] ${JWT_ENV_VAR} not set — generated an ephemeral secret for this process. ` +
+        `Tokens will be invalidated on every restart. Set ${JWT_ENV_VAR} for stable dev sessions.`,
+    );
+  }
+  return cachedSecret;
 }
 
 function extractToken(req: Request): string | null {

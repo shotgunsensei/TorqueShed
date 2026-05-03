@@ -51,6 +51,7 @@ import {
   type ExpertServiceLevel,
 } from "@shared/schema";
 import { requireAuth, requireAdmin, optionalAuth, signJWT, type AuthenticatedRequest } from "./middleware/auth";
+import { rateLimited } from "./lib/rateLimit";
 import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
@@ -71,7 +72,20 @@ import PDFDocument from "pdfkit";
 const BCRYPT_ROUNDS = 12;
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+  // ── Public POST sweep (Task #46) ────────────────────────────────────────────
+  // The following endpoints accept user-supplied bodies without requiring auth
+  // and are protected by the `rateLimited` middleware below:
+  //   • POST /api/auth/signup            — 5  / 60 min
+  //   • POST /api/auth/login             — 10 / 15 min
+  //   • POST /api/auth/forgot-password   — 5  / 60 min
+  //   • POST /api/auth/reset-password    — 10 / 15 min
+  //   • POST /api/products/:id/click     — 60 / 1  min  (cheap counter, abuse-prone)
+  //   • POST /api/torque-assist          — pre-existing limiter inside handler
+  //   • POST /api/public/shops/:slug/leads — pre-existing limiter inside handler
+  // All other mutating routes are gated by requireAuth / requireAdmin.
+  // ────────────────────────────────────────────────────────────────────────────
+
+  app.post("/api/auth/signup", rateLimited("auth:signup", 5, 60 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { username, password } = signupSchema.parse(req.body);
 
@@ -118,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  app.post("/api/auth/login", rateLimited("auth:login", 10, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { username, password } = loginSchema.parse(req.body);
 
@@ -643,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products/:id/click", async (req: Request, res: Response) => {
+  app.post("/api/products/:id/click", rateLimited("public:product-click", 60, 60 * 1000), async (req: Request, res: Response) => {
     try {
       const product = await storage.getProduct(req.params.id);
       if (!product) {
@@ -1901,7 +1915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // TODO: Wire up email service for password reset flow
-  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+  app.post("/api/auth/forgot-password", rateLimited("auth:forgot", 5, 60 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { username } = req.body;
       if (!username) {
@@ -1920,7 +1934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // TODO: Wire up email service for password reset flow
-  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+  app.post("/api/auth/reset-password", rateLimited("auth:reset", 10, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { token, newPassword } = req.body;
       if (!token || !newPassword) {
