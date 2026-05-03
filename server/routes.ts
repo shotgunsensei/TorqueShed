@@ -438,10 +438,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: users.email,
           expoPushToken: users.expoPushToken,
           notificationsEnabled: users.notificationsEnabled,
+          emailVerifiedAt: users.emailVerifiedAt,
         })
         .from(users)
         .where(eq(users.id, req.userId!));
-      res.json(refreshed ?? {});
+      res.json(
+        refreshed
+          ? {
+              ...refreshed,
+              emailVerifiedAt: refreshed.emailVerifiedAt
+                ? refreshed.emailVerifiedAt.toISOString()
+                : null,
+            }
+          : {},
+      );
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
