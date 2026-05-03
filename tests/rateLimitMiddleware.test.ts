@@ -1,6 +1,22 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
+
+// After the routes split (task #51), individual endpoints live in per-feature
+// modules under server/routes/. The static wiring guards below scan the
+// orchestrator + every per-feature module so the regression coverage survives
+// the refactor.
+function readRoutesSource(): string {
+  const root = path.resolve(__dirname, "..", "server");
+  const parts: string[] = [readFileSync(path.join(root, "routes.ts"), "utf8")];
+  const dir = path.join(root, "routes");
+  if (existsSync(dir)) {
+    for (const entry of readdirSync(dir)) {
+      if (entry.endsWith(".ts")) parts.push(readFileSync(path.join(dir, entry), "utf8"));
+    }
+  }
+  return parts.join("\n");
+}
 import express from "express";
 import request from "supertest";
 import { rateLimited, _resetRateLimits } from "../server/lib/rateLimit";
@@ -76,14 +92,14 @@ describe("/api/auth/login rate limiting (in-process)", () => {
 // in-process test alone can't.
 describe("/api/auth/login route wiring (static)", () => {
   it("registers rateLimited('auth:login', ...) on the login route in server/routes.ts", () => {
-    const src = readFileSync(path.resolve(__dirname, "..", "server", "routes.ts"), "utf8");
+    const src = readRoutesSource();
     expect(src).toMatch(
       /app\.post\(\s*["']\/api\/auth\/login["']\s*,\s*rateLimited\(\s*["']auth:login["']/,
     );
   });
 
   it("registers rateLimited on every unauthenticated mutating endpoint in the sweep", () => {
-    const src = readFileSync(path.resolve(__dirname, "..", "server", "routes.ts"), "utf8");
+    const src = readRoutesSource();
     const expectations: Array<[string, RegExp]> = [
       ["/api/auth/signup", /\/api\/auth\/signup["']\s*,\s*rateLimited\(/],
       ["/api/auth/forgot-password", /\/api\/auth\/forgot-password["']\s*,\s*rateLimited\(/],
