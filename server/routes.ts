@@ -2916,6 +2916,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   app.get(
+    "/api/shop-leads/export.csv",
+    requireAuth,
+    requireFeature("lead_capture"),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        if (await isUserBillingDelinquent(req.userId!)) {
+          return res.status(402).json({
+            error: "Your last payment failed. Update your billing to continue using premium features.",
+            billingPastDue: true,
+            feature: "lead_capture",
+          });
+        }
+        const leads = await storage.listShopLeads(req.userId!);
+        const header = [
+          "created_at",
+          "name",
+          "email",
+          "phone",
+          "vehicle",
+          "issue",
+          "preferred_contact",
+          "read",
+        ];
+        // Neutralize spreadsheet formula injection: leads come from a public
+        // form, so values starting with =, +, -, @, tab or CR/LF could be
+        // interpreted as formulas by Excel/Sheets. Prefix with a single quote
+        // before normal CSV quoting per OWASP guidance.
+        const FORMULA_TRIGGER = /^[=+\-@\t\r\n]/;
+        const escape = (v: unknown): string => {
+          if (v === null || v === undefined) return "";
+          let s = String(v);
+          if (FORMULA_TRIGGER.test(s)) s = "'" + s;
+          if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+          return s;
+        };
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="shop-leads-${new Date().toISOString().slice(0, 10)}.csv"`,
+        );
+        res.write(header.join(",") + "\r\n");
+        for (const l of leads) {
+          const row = [
+            l.createdAt ? new Date(l.createdAt).toISOString() : "",
+            l.customerName,
+            l.email ?? "",
+            l.phone ?? "",
+            l.vehicle ?? "",
+            l.issue,
+            l.preferredContact ?? "",
+            l.isRead ? "yes" : "no",
+          ];
+          res.write(row.map(escape).join(",") + "\r\n");
+        }
+        res.end();
+      } catch (error) {
+        console.error("Error exporting leads CSV:", error);
+        if (!res.headersSent) res.status(500).json({ error: "Failed to export leads" });
+        else res.end();
+      }
+    },
+  );
+
+  app.get(
     "/api/shop-leads",
     requireAuth,
     requireFeatureOrTeam("lead_capture"),

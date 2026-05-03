@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useLayoutEffect, useState } from "react";
 import { View, StyleSheet, FlatList, Pressable, Linking, Switch, Platform } from "react-native";
-import { useHeaderHeight } from "@react-navigation/elements";
+import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import * as Print from "expo-print";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
@@ -14,7 +17,19 @@ import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useEntitlements } from "@/lib/entitlements";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import * as SecureStore from "expo-secure-store";
+
+const TOKEN_KEY = "torqueshed_auth_token";
+
+async function getToken(): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") return localStorage.getItem(TOKEN_KEY);
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
 
 interface MeResponse {
   id: string;
@@ -47,6 +62,68 @@ interface TeamMembership {
   ownerHasCustomerSummaries: boolean;
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      default: return "&#39;";
+    }
+  });
+}
+
+function formatDate(s: string) {
+  try {
+    const d = new Date(s);
+    const now = Date.now();
+    const diff = (now - d.getTime()) / 1000;
+    if (diff < 60) return "now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`;
+    return d.toLocaleDateString();
+  } catch {
+    return "";
+  }
+}
+
+function buildLeadsHtml(leads: ShopLead[]): string {
+  const generated = new Date().toLocaleString();
+  const rows = leads.map((l) => `
+    <tr>
+      <td>${escapeHtml(new Date(l.createdAt).toLocaleString())}</td>
+      <td>${escapeHtml(l.customerName)}</td>
+      <td>${escapeHtml(l.vehicle ?? "")}</td>
+      <td>${escapeHtml(l.phone ?? "")}<br/>${escapeHtml(l.email ?? "")}</td>
+      <td>${escapeHtml(l.preferredContact ?? "")}</td>
+      <td>${escapeHtml(l.issue)}</td>
+    </tr>
+  `).join("");
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; margin: 24px; }
+  h1 { margin: 0 0 4px 0; font-size: 22px; }
+  .meta { color: #555; font-size: 12px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; }
+  tr:nth-child(even) td { background: #fafafa; }
+</style></head>
+<body>
+  <h1>TorqueShed — Customer Leads</h1>
+  <div class="meta">Generated ${escapeHtml(generated)} · ${leads.length} lead${leads.length === 1 ? "" : "s"}</div>
+  <table>
+    <thead><tr>
+      <th>Received</th><th>Name</th><th>Vehicle</th><th>Contact</th><th>Prefers</th><th>Issue</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body></html>`;
+}
+
 export default function ShopLeadsScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
@@ -56,6 +133,8 @@ export default function ShopLeadsScreen() {
   const toast = useToast();
   const { hasFeature } = useEntitlements();
   const ownsLeadCapture = hasFeature("lead_capture");
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const { data: membershipData } = useQuery<{ memberships: TeamMembership[] }>({
     queryKey: ["/api/shop-team/memberships"],
@@ -100,6 +179,118 @@ export default function ShopLeadsScreen() {
     },
   });
 
+  // Owner-only export: leads belonging to the signed-in owner.
+  const ownerLeads = (data ?? []).filter((l) => l.ownerUserId === me.data?.id);
+  const hasOwnerLeads = ownsLeadCapture && ownerLeads.length > 0;
+
+  const exportCsv = async () => {
+    if (exportingCsv) return;
+    setExportingCsv(true);
+    try {
+      const url = new URL("/api/shop-leads/export.csv", getApiUrl()).toString();
+      if (Platform.OS === "web") {
+        // Browsers attach session cookies automatically; for token auth we fetch
+        // and trigger a Blob download so the Authorization header is honored.
+        const token = await getToken();
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = `shop-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        toast.show("CSV downloaded", "success");
+        return;
+      }
+      const token = await getToken();
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      const csv = await res.text();
+      const fileUri = `${FileSystem.cacheDirectory}shop-leads-${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: "Customer Leads" });
+      } else {
+        toast.show(`CSV saved to ${fileUri}`, "success");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to export CSV";
+      toast.show(msg, "error");
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    if (exportingPdf) return;
+    if (ownerLeads.length === 0) return;
+    setExportingPdf(true);
+    try {
+      const html = buildLeadsHtml(ownerLeads);
+      if (Platform.OS === "web") {
+        // expo-print on web opens a print dialog with the rendered HTML.
+        await Print.printAsync({ html });
+        return;
+      }
+      const { uri } = await Print.printToFileAsync({ html });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Customer Leads" });
+      } else {
+        toast.show(`PDF saved to ${uri}`, "success");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to export PDF";
+      toast.show(msg, "error");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () =>
+        hasOwnerLeads ? (
+          <View style={{ flexDirection: "row" }}>
+            <HeaderButton
+              onPress={exportCsv}
+              disabled={exportingCsv}
+              testID="button-export-csv"
+              accessibilityLabel="Export leads as CSV"
+            >
+              <Feather
+                name="download"
+                size={18}
+                color={exportingCsv ? theme.textMuted : theme.primary}
+              />
+            </HeaderButton>
+            <HeaderButton
+              onPress={exportPdf}
+              disabled={exportingPdf}
+              testID="button-export-pdf"
+              accessibilityLabel="Export leads as PDF"
+            >
+              <Feather
+                name="file-text"
+                size={18}
+                color={exportingPdf ? theme.textMuted : theme.primary}
+              />
+            </HeaderButton>
+          </View>
+        ) : undefined,
+    });
+  }, [navigation, hasOwnerLeads, exportingCsv, exportingPdf, theme.primary, theme.textMuted, ownerLeads.length]);
+
   if (!canUse) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.backgroundRoot, paddingTop: headerHeight + Spacing.lg, paddingHorizontal: Spacing.lg }}>
@@ -120,7 +311,7 @@ export default function ShopLeadsScreen() {
 
   const renderItem = ({ item }: { item: ShopLead }) => {
     const teamCtx = ownerByUserId.get(item.ownerUserId);
-    const isTeamView = !!teamCtx; // appears only when this lead belongs to an owner you team for
+    const isTeamView = !!teamCtx;
     return (
     <Pressable
       onPress={() => { if (!item.isRead && !isTeamView) markRead.mutate(item.id); }}
@@ -207,6 +398,32 @@ export default function ShopLeadsScreen() {
                 disabled={updatePrefs.isPending || !me.data}
               />
             </Card>
+            {hasOwnerLeads ? (
+              <View style={styles.exportRow}>
+                <Pressable
+                  onPress={exportCsv}
+                  disabled={exportingCsv}
+                  style={[styles.exportBtn, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundSecondary, opacity: exportingCsv ? 0.6 : 1 }]}
+                  testID="button-export-csv-inline"
+                >
+                  <Feather name="download" size={14} color={theme.primary} />
+                  <ThemedText type="small" style={{ marginLeft: 6, color: theme.text }}>
+                    {exportingCsv ? "Exporting…" : "Export CSV"}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={exportPdf}
+                  disabled={exportingPdf}
+                  style={[styles.exportBtn, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundSecondary, opacity: exportingPdf ? 0.6 : 1 }]}
+                  testID="button-export-pdf-inline"
+                >
+                  <Feather name="file-text" size={14} color={theme.primary} />
+                  <ThemedText type="small" style={{ marginLeft: 6, color: theme.text }}>
+                    {exportingPdf ? "Building…" : "Export PDF"}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -220,21 +437,6 @@ export default function ShopLeadsScreen() {
       />
     </View>
   );
-}
-
-function formatDate(s: string) {
-  try {
-    const d = new Date(s);
-    const now = Date.now();
-    const diff = (now - d.getTime()) / 1000;
-    if (diff < 60) return "now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`;
-    return d.toLocaleDateString();
-  } catch {
-    return "";
-  }
 }
 
 const styles = StyleSheet.create({
@@ -253,6 +455,15 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginTop: Spacing.md,
     borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  exportRow: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.md },
+  exportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
   },
 });
