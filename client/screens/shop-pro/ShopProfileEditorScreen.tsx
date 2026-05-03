@@ -5,6 +5,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
@@ -119,7 +120,7 @@ export default function ShopProfileEditorScreen() {
     },
   });
 
-  const publicUrl = useMemo(() => {
+  const draftPublicUrl = useMemo(() => {
     if (!slug) return "";
     try {
       return new URL(`/shops/${slug}`, getApiUrl()).toString();
@@ -128,10 +129,38 @@ export default function ShopProfileEditorScreen() {
     }
   }, [slug]);
 
+  const savedSlug = data?.profile?.slug ?? null;
+  const savedIsPublic = !!data?.profile?.isPublic;
+  const livePublicUrl = useMemo(() => {
+    if (!savedSlug) return "";
+    try {
+      return new URL(`/shops/${savedSlug}`, getApiUrl()).toString();
+    } catch {
+      return "";
+    }
+  }, [savedSlug]);
+
+  const canPreview = !!savedSlug && savedIsPublic && !!livePublicUrl;
+  const previewHint = !savedSlug
+    ? "Save a slug to enable preview."
+    : !savedIsPublic
+    ? "Turn on Publish profile and save to enable preview."
+    : "";
+
   const onCopyLink = async () => {
-    if (!publicUrl) return;
-    await Clipboard.setStringAsync(publicUrl);
+    const url = livePublicUrl || draftPublicUrl;
+    if (!url) return;
+    await Clipboard.setStringAsync(url);
     toast.show("Link copied", "success");
+  };
+
+  const onPreview = async () => {
+    if (!canPreview) return;
+    try {
+      await WebBrowser.openBrowserAsync(livePublicUrl);
+    } catch {
+      toast.show("Could not open preview", "error");
+    }
   };
 
   if (!canUse) {
@@ -175,10 +204,10 @@ export default function ShopProfileEditorScreen() {
         </Field>
         <Field label="Slug (used in your link)">
           <Input value={slug} onChangeText={(t) => setSlug(t.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="northgate-auto" autoCapitalize="none" testID="input-shop-slug" />
-          {publicUrl ? (
+          {draftPublicUrl ? (
             <Pressable onPress={onCopyLink} style={styles.linkRow} testID="button-copy-shop-link">
               <Feather name="link" size={14} color={theme.primary} />
-              <ThemedText type="small" style={{ color: theme.primary, marginLeft: 6 }}>{publicUrl}</ThemedText>
+              <ThemedText type="small" style={{ color: theme.primary, marginLeft: 6 }}>{livePublicUrl || draftPublicUrl}</ThemedText>
             </Pressable>
           ) : null}
         </Field>
@@ -238,6 +267,32 @@ export default function ShopProfileEditorScreen() {
             testID="switch-shop-public"
           />
         </View>
+
+        <View style={styles.previewActions}>
+          <Button
+            variant="outline"
+            onPress={onPreview}
+            disabled={!canPreview}
+            style={styles.previewButton}
+            testID="button-preview-shop-page"
+          >
+            Preview public page
+          </Button>
+          <Button
+            variant="outline"
+            onPress={onCopyLink}
+            disabled={!draftPublicUrl}
+            style={styles.previewButton}
+            testID="button-copy-shop-link-action"
+          >
+            Copy link
+          </Button>
+        </View>
+        {previewHint ? (
+          <ThemedText type="small" style={{ color: theme.textMuted, marginTop: Spacing.xs }} testID="text-preview-hint">
+            {previewHint}
+          </ThemedText>
+        ) : null}
       </Card>
 
       <Button onPress={() => save.mutate()} disabled={save.isPending} testID="button-save-shop-profile">
@@ -266,4 +321,6 @@ const styles = StyleSheet.create({
   card: { padding: Spacing.lg, marginBottom: Spacing.md, borderRadius: BorderRadius.xl },
   linkRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   publicRow: { flexDirection: "row", alignItems: "center" },
+  previewActions: { flexDirection: "row", marginTop: Spacing.md, gap: Spacing.sm },
+  previewButton: { flex: 1 },
 });
