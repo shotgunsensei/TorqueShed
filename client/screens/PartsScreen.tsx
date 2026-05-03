@@ -19,6 +19,7 @@ import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { useTheme } from "@/hooks/useTheme";
+import { SimilarCasesCard } from "@/components/SimilarCasesCard";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import {
@@ -757,6 +758,42 @@ export default function PartsScreen() {
             </View>
           ))}
         </View>
+
+        {(() => {
+          const matchedVehicle = userVehicles?.find(
+            v =>
+              v.make === session.vehicle.make &&
+              v.model === session.vehicle.model &&
+              (!session.vehicle.year || v.year === session.vehicle.year),
+          );
+          const symptomList = category
+            ? category.questions
+                .map(q => {
+                  const answer = session.answers[q.id];
+                  if (!answer) return null;
+                  const opt = q.options.find(o => o.value === answer);
+                  return opt ? `${q.text} -- ${opt.label}` : null;
+                })
+                .filter((s): s is string => Boolean(s))
+            : [];
+          return (
+            <SimilarCasesCard
+              preview={{
+                vehicleId: matchedVehicle?.id ?? null,
+                vehicleName: vehicleLabel || null,
+                obdCodes: session.dtcCodes,
+                symptoms: symptomList,
+                systemCategory: category?.id ?? null,
+              }}
+              onUpgrade={() =>
+                navigation.navigate("Main", {
+                  screen: "MoreTab",
+                  params: { screen: "Subscription" },
+                })
+              }
+            />
+          );
+        })()}
 
         {assessment.nextTest ? (
           <View style={[styles.dashCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.primary + "40" }]}>
