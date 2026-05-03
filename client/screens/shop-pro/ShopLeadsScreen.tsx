@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, FlatList, Pressable, Linking } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, Linking, Switch, Platform } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +15,15 @@ import { useToast } from "@/components/Toast";
 import { useEntitlements } from "@/lib/entitlements";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+
+interface MeResponse {
+  id: string;
+  username: string;
+  role: string;
+  onboardingCompleted: boolean;
+  onboardingGoals: string[];
+  notificationsEnabled: boolean;
+}
 
 interface ShopLead {
   id: string;
@@ -59,6 +68,26 @@ export default function ShopLeadsScreen() {
   const { data, isLoading, isError, refetch } = useQuery<ShopLead[]>({
     queryKey: ["/api/shop-leads"],
     enabled: canUse,
+  });
+
+  const me = useQuery<MeResponse>({
+    queryKey: ["/api/users/me"],
+    enabled: canUse,
+  });
+
+  const updatePrefs = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("PATCH", "/api/users/me/notifications", {
+        notificationsEnabled: enabled,
+      });
+      return (await res.json()) as { notificationsEnabled: boolean };
+    },
+    onSuccess: (next) => {
+      queryClient.setQueryData<MeResponse>(["/api/users/me"], (prev) =>
+        prev ? { ...prev, notificationsEnabled: next.notificationsEnabled } : prev,
+      );
+    },
+    onError: () => toast.show("Couldn't update notifications", "error"),
   });
 
   const markRead = useMutation({
@@ -159,6 +188,25 @@ export default function ShopLeadsScreen() {
           <View style={{ marginBottom: Spacing.md }}>
             <ThemedText type="h2">Customer leads</ThemedText>
             <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.xxs }}>Inquiries from your public shop page.</ThemedText>
+            <Card elevation={1} style={[styles.prefsRow, { borderColor: theme.cardBorder }]}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Feather name="bell" size={16} color={theme.primary} />
+                  <ThemedText type="body" style={{ color: theme.text }}>Notify me of new leads</ThemedText>
+                </View>
+                <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 2 }}>
+                  {Platform.OS === "web"
+                    ? "Open TorqueShed in Expo Go on your phone to receive push alerts."
+                    : "Get a push notification the moment a customer submits."}
+                </ThemedText>
+              </View>
+              <Switch
+                testID="switch-lead-notifications"
+                value={me.data?.notificationsEnabled ?? true}
+                onValueChange={(v) => updatePrefs.mutate(v)}
+                disabled={updatePrefs.isPending || !me.data}
+              />
+            </Card>
           </View>
         }
         ListEmptyComponent={
@@ -198,4 +246,13 @@ const styles = StyleSheet.create({
   contactBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: 8, borderWidth: 1, maxWidth: 200 },
   teamBadge: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1 },
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  prefsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
 });

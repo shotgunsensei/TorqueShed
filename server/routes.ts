@@ -3662,6 +3662,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const created = await storage.createShopLead(profile.userId, parsed);
       res.status(201).json({ ok: true, id: created.id });
+      void (async () => {
+        try {
+          const { notifyOwnerAndTeamOfNewLead } = await import("./notifications");
+          await notifyOwnerAndTeamOfNewLead({
+            ownerUserId: profile.userId,
+            customerName: parsed.customerName,
+            issue: parsed.issue,
+            vehicle: parsed.vehicle ?? null,
+            leadId: created.id,
+          });
+        } catch (err) {
+          console.warn("[notifications] lead notify failed", err);
+        }
+      })();
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: error.errors.map((e) => e.message).join(", ") });
