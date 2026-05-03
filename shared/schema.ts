@@ -37,6 +37,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 200 }),
   expoPushToken: varchar("expo_push_token", { length: 200 }),
   notificationsEnabled: boolean("notifications_enabled").default(true),
+  dailyLeadDigestEnabled: boolean("daily_lead_digest_enabled").default(false),
   emailVerifiedAt: timestamp("email_verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -817,10 +818,23 @@ export const updateNotificationPrefsSchema = z.object({
   email: z.string().email().nullable().optional().or(z.literal("")),
   expoPushToken: z.string().max(200).nullable().optional().or(z.literal("")),
   notificationsEnabled: z.boolean().optional(),
+  dailyLeadDigestEnabled: z.boolean().optional(),
 });
 export type UpdateNotificationPrefsInput = z.infer<typeof updateNotificationPrefsSchema>;
 
 export type MaintenanceReminder = typeof maintenanceReminders.$inferSelect;
+
+export const leadDigests = pgTable("lead_digests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  digestDate: varchar("digest_date", { length: 10 }).notNull(),
+  leadsCount: integer("leads_count").notNull().default(0),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("lead_digests_user_date_unique").on(t.userId, t.digestDate),
+]);
+
+export type LeadDigest = typeof leadDigests.$inferSelect;
 
 export const insertReportSchema = createInsertSchema(reports).pick({
   reporterId: true,

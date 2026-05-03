@@ -17,6 +17,7 @@ import { assertSchemaInSync } from "./schemaCheck";
 import { setupStripeWebhook } from "./stripeWebhookRoute";
 import { detectPublicWebhookUrl } from "./stripeWebhookUrl";
 import { startMaintenanceReminderScheduler } from "./maintenance-reminders";
+import { startLeadDigestScheduler } from "./lead-digest";
 
 const app = express();
 const log = console.log;
@@ -814,6 +815,9 @@ async function initStripe(): Promise<void> {
 
   // Daily maintenance reminders for Garage Pro / Shop Pro users
   startMaintenanceReminderScheduler();
+
+  // Daily lead digest email for Shop Pro owners who opt in
+  startLeadDigestScheduler();
 
   // Error handler (must be last)
   setupErrorHandler(app);

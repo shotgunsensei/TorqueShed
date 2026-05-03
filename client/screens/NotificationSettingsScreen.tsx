@@ -16,6 +16,8 @@ interface NotificationPrefs {
   email: string | null;
   expoPushToken: string | null;
   notificationsEnabled: boolean;
+  dailyLeadDigestEnabled?: boolean;
+  canUseLeadDigest?: boolean;
 }
 
 export default function NotificationSettingsScreen() {
@@ -30,11 +32,13 @@ export default function NotificationSettingsScreen() {
 
   const [email, setEmail] = useState("");
   const [enabled, setEnabled] = useState(true);
+  const [digestEnabled, setDigestEnabled] = useState(false);
 
   useEffect(() => {
     if (data) {
       setEmail(data.email ?? "");
       setEnabled(data.notificationsEnabled ?? true);
+      setDigestEnabled(data.dailyLeadDigestEnabled ?? false);
     }
   }, [data]);
 
@@ -63,6 +67,11 @@ export default function NotificationSettingsScreen() {
   const onToggle = (next: boolean) => {
     setEnabled(next);
     mutation.mutate({ notificationsEnabled: next });
+  };
+
+  const onToggleDigest = (next: boolean) => {
+    setDigestEnabled(next);
+    mutation.mutate({ dailyLeadDigestEnabled: next });
   };
 
   const pushStatus = data?.expoPushToken
@@ -128,6 +137,27 @@ export default function NotificationSettingsScreen() {
           {mutation.isPending ? "Saving…" : "Save"}
         </Button>
       </Card>
+
+      {data?.canUseLeadDigest ? (
+        <Card style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <ThemedText type="h4">Daily lead digest email</ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Get yesterday's leads emailed each morning as a CSV the front
+                desk can use to run the call list. Requires Shop Pro and a
+                saved email above.
+              </ThemedText>
+            </View>
+            <Switch
+              value={digestEnabled}
+              onValueChange={onToggleDigest}
+              disabled={isLoading || mutation.isPending || !enabled || !(data?.email)}
+              testID="switch-daily-lead-digest"
+            />
+          </View>
+        </Card>
+      ) : null}
 
       <Card style={styles.card}>
         <ThemedText type="h4">Push device</ThemedText>

@@ -7,6 +7,7 @@ import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../middlew
 import { db } from "../db";
 import { users, threadReplies } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { getUserTier } from "../entitlements";
 
 export function register(app: Express): void {
   app.get("/api/users/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -24,6 +25,7 @@ export function register(app: Express): void {
         email: user.email ?? null,
         emailVerifiedAt: user.emailVerifiedAt ? user.emailVerifiedAt.toISOString() : null,
         notificationsEnabled: user.notificationsEnabled ?? true,
+        dailyLeadDigestEnabled: user.dailyLeadDigestEnabled ?? false,
       });
     } catch (error) {
       console.error("Error fetching current user:", error);
@@ -103,6 +105,31 @@ export function register(app: Express): void {
     }
   });
 
+  app.get("/api/users/me/notifications", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const [row] = await db
+        .select({
+          email: users.email,
+          expoPushToken: users.expoPushToken,
+          notificationsEnabled: users.notificationsEnabled,
+          dailyLeadDigestEnabled: users.dailyLeadDigestEnabled,
+          emailVerifiedAt: users.emailVerifiedAt,
+        })
+        .from(users)
+        .where(eq(users.id, req.userId!));
+      if (!row) return res.status(404).json({ error: "User not found" });
+      const tier = await getUserTier(req.userId!);
+      res.json({
+        ...row,
+        emailVerifiedAt: row.emailVerifiedAt ? row.emailVerifiedAt.toISOString() : null,
+        canUseLeadDigest: tier === "shop_pro",
+      });
+    } catch (error) {
+      console.error("Error loading notification prefs:", error);
+      res.status(500).json({ error: "Failed to load notification preferences" });
+    }
+  });
+
   app.patch("/api/users/me/notifications", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const parsed = updateNotificationPrefsSchema.parse(req.body);
@@ -115,6 +142,7 @@ export function register(app: Express): void {
       }
       if (parsed.expoPushToken !== undefined) updates.expoPushToken = parsed.expoPushToken === "" ? null : parsed.expoPushToken;
       if (parsed.notificationsEnabled !== undefined) updates.notificationsEnabled = parsed.notificationsEnabled;
+      if (parsed.dailyLeadDigestEnabled !== undefined) updates.dailyLeadDigestEnabled = parsed.dailyLeadDigestEnabled;
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No valid updates provided" });
       }
@@ -136,6 +164,7 @@ export function register(app: Express): void {
           email: users.email,
           expoPushToken: users.expoPushToken,
           notificationsEnabled: users.notificationsEnabled,
+          dailyLeadDigestEnabled: users.dailyLeadDigestEnabled,
         })
         .from(users)
         .where(eq(users.id, req.userId!));
@@ -157,6 +186,17 @@ export function register(app: Express): void {
     } catch (error) {
       console.error("Error running maintenance reminders:", error);
       res.status(500).json({ error: "Failed to run reminders" });
+    }
+  });
+
+  app.post("/api/admin/lead-digest/run", requireAuth, requireAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { runLeadDigestOnce } = await import("../lead-digest");
+      const stats = await runLeadDigestOnce();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error running lead digest:", error);
+      res.status(500).json({ error: "Failed to run lead digest" });
     }
   });
 

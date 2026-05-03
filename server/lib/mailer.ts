@@ -1,10 +1,17 @@
 type EmailProvider = "resend" | "postmark" | "log";
 
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
+}
+
 export interface SendEmailInput {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface SendEmailResult {
@@ -55,6 +62,10 @@ async function sendViaResend(input: SendEmailInput, apiKey: string): Promise<Sen
       subject: input.subject,
       html: input.html,
       text: input.text,
+      attachments: input.attachments?.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content, "utf8").toString("base64"),
+      })),
     }),
   });
   if (!res.ok) {
@@ -80,6 +91,11 @@ async function sendViaPostmark(input: SendEmailInput, apiKey: string): Promise<S
       HtmlBody: input.html,
       TextBody: input.text,
       MessageStream: process.env.POSTMARK_STREAM || "outbound",
+      Attachments: input.attachments?.map((a) => ({
+        Name: a.filename,
+        Content: Buffer.from(a.content, "utf8").toString("base64"),
+        ContentType: a.contentType || "application/octet-stream",
+      })),
     }),
   });
   if (!res.ok) {
