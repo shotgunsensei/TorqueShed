@@ -2788,6 +2788,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // ========== Shop Pro: Team ==========
+  // Lightweight endpoint so clients can detect whether the current user is a
+  // member of any Shop Pro team (and which features the owner unlocks for them).
+  app.get(
+    "/api/shop-team/memberships",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const owners = await storage.getOwnersForTeamMember(req.userId!);
+        const enriched = await Promise.all(
+          owners.map(async (o) => ({
+            ownerUserId: o.ownerUserId,
+            role: o.role,
+            ownerHasTeamAccess: await userHasFeature(o.ownerUserId, "team_access"),
+            ownerHasLeadCapture: await userHasFeature(o.ownerUserId, "lead_capture"),
+            ownerHasCustomerSummaries: await userHasFeature(
+              o.ownerUserId,
+              "customer_diagnostic_summaries",
+            ),
+          })),
+        );
+        res.json({ memberships: enriched });
+      } catch (error) {
+        console.error("Error listing memberships:", error);
+        res.status(500).json({ error: "Failed to load memberships" });
+      }
+    },
+  );
+
   app.get(
     "/api/shop-team",
     requireAuth,
@@ -2852,17 +2880,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     userId: string,
     allowedTeamRoles: ("owner" | "admin" | "technician" | "viewer")[] = ["owner", "admin", "technician", "viewer"],
   ): Promise<{ thread: NonNullable<Awaited<ReturnType<typeof storage.getThread>>>; ownerUserId: string } | null> {
+    const access = await storage.getThreadAccessOwner(caseId, userId);
+    if (!access) return null;
     const thread = await storage.getThread(caseId);
     if (!thread) return null;
-    const threadOwnerId = thread.userId;
-    if (!threadOwnerId) return null;
-    if (threadOwnerId === userId) return { thread, ownerUserId: threadOwnerId };
-    const role = await storage.getTeamRole(threadOwnerId, userId);
-    if (role && (allowedTeamRoles as string[]).includes(role)) {
+    if (access.isAuthor) return { thread, ownerUserId: access.ownerUserId };
+    if (access.role && (allowedTeamRoles as string[]).includes(access.role)) {
       // Mirror hasThreadAccess: team membership only counts when the case
       // owner currently has the team_access feature.
-      if (await userHasFeature(threadOwnerId, "team_access")) {
-        return { thread, ownerUserId: threadOwnerId };
+      if (await userHasFeature(access.ownerUserId, "team_access")) {
+        return { thread, ownerUserId: access.ownerUserId };
       }
     }
     return null;

@@ -182,6 +182,18 @@ export default function ThreadDetailScreen() {
     enabled: !!currentUser,
   });
 
+  const { data: viewerAccess } = useQuery<{
+    isAuthor: boolean;
+    teamRole: string | null;
+    canManageSummary: boolean;
+    canViewSummary: boolean;
+  }>({
+    queryKey: [`/api/threads/${threadId}/viewer-access`],
+    enabled: !!currentUser,
+  });
+  const isTeamMemberView =
+    !!viewerAccess && !viewerAccess.isAuthor && !!viewerAccess.teamRole;
+
   const isSaved = savedThreadIds.includes(threadId);
   const { hasFeature } = useEntitlements();
   const hasUnlimitedSaves = hasFeature("unlimited_saved_cases");
@@ -799,6 +811,17 @@ export default function ThreadDetailScreen() {
         {renderSolvedSummary()}
 
         <Card style={styles.threadCard}>
+          {isTeamMemberView ? (
+            <View
+              style={[styles.readOnlyBadge, { backgroundColor: theme.primary + "18", borderColor: theme.primary + "55" }]}
+              testID="badge-team-readonly"
+            >
+              <Feather name="eye" size={11} color={theme.primary} />
+              <Text style={[styles.readOnlyBadgeText, { color: theme.primary }]}>
+                Read-only · viewing as team {viewerAccess?.teamRole}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.threadHeader}>
             <ThemedText type="h3" style={styles.threadTitle}>
               {thread.title}
@@ -1212,6 +1235,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.full,
+  },
+  readOnlyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+    gap: 4,
+  },
+  readOnlyBadgeText: {
+    ...Typography.caption,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   solvedSummary: {
     padding: Spacing.lg,

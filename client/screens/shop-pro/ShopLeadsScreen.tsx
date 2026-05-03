@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/query-client";
 
 interface ShopLead {
   id: string;
+  ownerUserId: string;
   customerName: string;
   email: string | null;
   phone: string | null;
@@ -29,6 +30,14 @@ interface ShopLead {
   createdAt: string;
 }
 
+interface TeamMembership {
+  ownerUserId: string;
+  role: "owner" | "admin" | "technician" | "viewer";
+  ownerHasTeamAccess: boolean;
+  ownerHasLeadCapture: boolean;
+  ownerHasCustomerSummaries: boolean;
+}
+
 export default function ShopLeadsScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
@@ -37,7 +46,15 @@ export default function ShopLeadsScreen() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasFeature } = useEntitlements();
-  const canUse = hasFeature("lead_capture");
+  const ownsLeadCapture = hasFeature("lead_capture");
+
+  const { data: membershipData } = useQuery<{ memberships: TeamMembership[] }>({
+    queryKey: ["/api/shop-team/memberships"],
+  });
+  const memberships = membershipData?.memberships ?? [];
+  const teamLeadAccess = memberships.some((m) => m.ownerHasLeadCapture);
+  const canUse = ownsLeadCapture || teamLeadAccess;
+  const ownerByUserId = new Map(memberships.map((m) => [m.ownerUserId, m]));
 
   const { data, isLoading, isError, refetch } = useQuery<ShopLead[]>({
     queryKey: ["/api/shop-leads"],
@@ -72,9 +89,12 @@ export default function ShopLeadsScreen() {
     Linking.openURL(url).catch(() => toast.show("Couldn't open contact app", "error"));
   };
 
-  const renderItem = ({ item }: { item: ShopLead }) => (
+  const renderItem = ({ item }: { item: ShopLead }) => {
+    const teamCtx = ownerByUserId.get(item.ownerUserId);
+    const isTeamView = !!teamCtx; // appears only when this lead belongs to an owner you team for
+    return (
     <Pressable
-      onPress={() => { if (!item.isRead) markRead.mutate(item.id); }}
+      onPress={() => { if (!item.isRead && !isTeamView) markRead.mutate(item.id); }}
       testID={`lead-${item.id}`}
     >
       <Card elevation={2} style={styles.row}>
@@ -86,6 +106,17 @@ export default function ShopLeadsScreen() {
             </View>
             {item.vehicle ? (
               <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>{item.vehicle}</ThemedText>
+            ) : null}
+            {isTeamView ? (
+              <View
+                style={[styles.teamBadge, { backgroundColor: theme.primary + "18", borderColor: theme.primary + "55" }]}
+                testID={`badge-team-lead-${item.id}`}
+              >
+                <Feather name="eye" size={10} color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4, fontWeight: "600", fontSize: 10 }}>
+                  Read-only · viewing as team {teamCtx?.role}
+                </ThemedText>
+              </View>
             ) : null}
           </View>
           <ThemedText type="caption" style={{ color: theme.textMuted }}>{formatDate(item.createdAt)}</ThemedText>
@@ -112,7 +143,8 @@ export default function ShopLeadsScreen() {
         </View>
       </Card>
     </Pressable>
-  );
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
@@ -164,5 +196,6 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   contactRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm, marginTop: Spacing.sm },
   contactBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: 8, borderWidth: 1, maxWidth: 200 },
+  teamBadge: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1 },
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
 });

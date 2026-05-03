@@ -1733,6 +1733,23 @@ export class DatabaseStorage implements IStorage {
     return (row?.role as ShopTeamRole | undefined) ?? null;
   }
 
+  async getThreadAccessOwner(
+    threadId: string,
+    userId: string,
+  ): Promise<{ ownerUserId: string; isAuthor: boolean; role: ShopTeamRole | null } | null> {
+    const thread = await this.getThread(threadId);
+    if (!thread || !thread.userId) return null;
+    const ownerUserId = thread.userId;
+    if (ownerUserId === userId) {
+      return { ownerUserId, isAuthor: true, role: null };
+    }
+    const role = await this.getTeamRole(ownerUserId, userId);
+    if (role) {
+      return { ownerUserId, isAuthor: false, role };
+    }
+    return null;
+  }
+
   async getOwnersForTeamMember(memberUserId: string): Promise<{ ownerUserId: string; role: ShopTeamRole }[]> {
     const rows = await db
       .select({ ownerUserId: shopTeamMembers.ownerUserId, role: shopTeamMembers.role })
