@@ -63,7 +63,7 @@ import {
   type RepairPlanExportType,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, or, isNull, isNotNull, gt, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull, isNotNull, gt, inArray, type SQL } from "drizzle-orm";
 
 export interface ProfileUpdate {
   bio?: string;
@@ -692,7 +692,61 @@ export class DatabaseStorage implements IStorage {
     return allThreads as (Thread & { userName: string; yearsWrenching: number | null; focusAreas: string[]; solutionCountTotal: number; vehicleName: string | null })[];
   }
 
-  async getSolvedThreads(): Promise<(Thread & { vehicleName: string | null })[]> {
+  async getSolvedThreads(filter?: {
+    obdCodes?: string[] | null;
+    vehicleMake?: string | null;
+    systemCategory?: string | null;
+    limit?: number;
+  }): Promise<(Thread & { vehicleName: string | null })[]> {
+    const codes = (filter?.obdCodes ?? [])
+      .map((c) => (c ?? "").toString().toUpperCase().trim())
+      .filter(Boolean);
+    const make = (filter?.vehicleMake ?? "").toString().trim();
+    const systemCategory = (filter?.systemCategory ?? "").toString().trim();
+    const limit = filter?.limit ?? 500;
+
+    const solvedCondition = or(
+      eq(threads.hasSolution, true),
+      eq(threads.status, "solved"),
+      isNotNull(threads.finalFix),
+    );
+
+    const orParts: SQL[] = [];
+    const codesArraySql = codes.length > 0
+      ? sql`ARRAY[${sql.join(codes.map((c) => sql`${c}`), sql`, `)}]::text[]`
+      : null;
+    const dtcOverlapExpr: SQL | null = codesArraySql
+      ? sql`((${threads.obdCodes})::jsonb) ?| ${codesArraySql}`
+      : null;
+    const makeMatchExpr: SQL | null = make
+      ? sql`EXISTS (SELECT 1 FROM ${vehicles} v WHERE v.id = ${threads.vehicleId} AND lower(v.make) = lower(${make}))`
+      : null;
+    const systemMatchExpr: SQL | null = systemCategory
+      ? sql`${threads.systemCategory} = ${systemCategory}`
+      : null;
+
+    if (dtcOverlapExpr) orParts.push(dtcOverlapExpr);
+    if (makeMatchExpr) orParts.push(makeMatchExpr);
+    if (systemMatchExpr) orParts.push(systemMatchExpr);
+
+    const whereExpr: SQL = orParts.length > 0
+      ? (and(solvedCondition!, or(...orParts)!) as SQL)
+      : (solvedCondition as SQL);
+
+    // Rough SQL scoring so the LIMIT keeps the highest-signal candidates,
+    // not just the most recent ones. DTC overlap dominates, then make,
+    // then system category. Tie-break by recency.
+    const dtcCountExpr: SQL = codesArraySql
+      ? sql`COALESCE((SELECT count(*) FROM jsonb_array_elements_text(((${threads.obdCodes})::jsonb)) e WHERE upper(e) = ANY(${codesArraySql})), 0)`
+      : sql`0`;
+    const makeScoreExpr: SQL = makeMatchExpr
+      ? sql`CASE WHEN ${makeMatchExpr} THEN 25 ELSE 0 END`
+      : sql`0`;
+    const systemScoreExpr: SQL = systemMatchExpr
+      ? sql`CASE WHEN ${systemMatchExpr} THEN 5 ELSE 0 END`
+      : sql`0`;
+    const roughScoreExpr: SQL = sql`((${dtcCountExpr}) * 100 + ${makeScoreExpr} + ${systemScoreExpr})`;
+
     const rows = await db
       .select({
         id: threads.id,
@@ -729,14 +783,9 @@ export class DatabaseStorage implements IStorage {
         vehicleName: sql<string | null>`(SELECT CONCAT(${vehicles.year}, ' ', ${vehicles.make}, ' ', ${vehicles.model}) FROM ${vehicles} WHERE ${vehicles.id} = ${threads.vehicleId})`,
       })
       .from(threads)
-      .where(
-        or(
-          eq(threads.hasSolution, true),
-          eq(threads.status, "solved"),
-          isNotNull(threads.finalFix),
-        ),
-      )
-      .orderBy(desc(threads.lastActivityAt));
+      .where(whereExpr)
+      .orderBy(sql`${roughScoreExpr} DESC`, desc(threads.lastActivityAt))
+      .limit(limit);
     return rows as (Thread & { vehicleName: string | null })[];
   }
 

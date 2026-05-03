@@ -38,7 +38,7 @@ export interface SimilarCasesResult {
 const MAX_RESULTS = 5;
 const PREVIEW_RESULTS = 1;
 
-function parseVehicle(name: string | null | undefined): { make: string; model: string } {
+export function parseVehicle(name: string | null | undefined): { make: string; model: string } {
   const tokens = (name ?? "").toLowerCase().split(/\s+/).filter(Boolean);
   const yearIdx = tokens.findIndex((t) => /^(19|20)\d{2}$/.test(t));
   const afterYear = yearIdx >= 0 ? tokens.slice(yearIdx + 1) : tokens;

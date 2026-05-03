@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -259,7 +259,15 @@ export const threads = pgTable("threads", {
   lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ([
+  index("threads_solved_status_idx").on(table.hasSolution, table.status),
+  index("threads_solved_partial_idx")
+    .on(table.lastActivityAt)
+    .where(sql`${table.hasSolution} = true OR ${table.status} = 'solved' OR ${table.finalFix} IS NOT NULL`),
+  index("threads_obd_codes_gin_idx").using("gin", sql`((${table.obdCodes})::jsonb)`),
+  index("threads_system_category_idx").on(table.systemCategory),
+  index("threads_vehicle_id_idx").on(table.vehicleId),
+]));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
   user: one(users, { fields: [threads.userId], references: [users.id] }),

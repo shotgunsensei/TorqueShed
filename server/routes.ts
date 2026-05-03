@@ -54,7 +54,7 @@ import { db } from "./db";
 import { users, garageMembers, threads, garages, vehicles, vehicleNotes, swapShopListings, savedThreads, savedListings, threadReplies, reports } from "@shared/schema";
 import { eq, and, gte, desc, sql, ilike, or } from "drizzle-orm";
 import { getContextRecommendations, summarizeCostRange } from "./case-recommendations";
-import { buildSimilarCasesResult } from "./similar-cases";
+import { buildSimilarCasesResult, parseVehicle } from "./similar-cases";
 import { getUserTier, tierHasFeature, userHasFeature, minimumTierFor, tierLabel, requireFeature, requireFeatureOrTeam, isUserBillingDelinquent } from "./entitlements";
 import {
   createSubscriptionCheckoutSession,
@@ -3303,7 +3303,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ cases: [], hiddenCount: 0, totalAvailable: 0, hasFeature: hasFull });
       }
 
-      const candidates = await storage.getSolvedThreads();
+      const { make } = parseVehicle(vehicleName);
+      const candidates = await storage.getSolvedThreads({
+        obdCodes,
+        vehicleMake: make || null,
+        systemCategory,
+      });
       const result = buildSimilarCasesResult(
         { vehicleName, obdCodes, symptoms, systemCategory, excludeId },
         candidates,
@@ -3324,7 +3329,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tier = await getUserTier(req.userId!);
       const hasFull = tierHasFeature(tier, "similar_solved_matching");
 
-      const candidates = await storage.getSolvedThreads();
+      const { make } = parseVehicle(thread.vehicleName);
+      const candidates = await storage.getSolvedThreads({
+        obdCodes: thread.obdCodes ?? [],
+        vehicleMake: make || null,
+        systemCategory: thread.systemCategory,
+      });
       const result = buildSimilarCasesResult(
         {
           vehicleName: thread.vehicleName,
