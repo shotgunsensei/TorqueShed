@@ -549,6 +549,9 @@ export default function ThreadDetailScreen() {
             style={[styles.solutionButton, { borderColor: theme.success }]}
             onPress={() => openFinalFix(item.id)}
             testID={`button-mark-solution-${item.id}`}
+            accessibilityRole="button"
+            accessibilityLabel="Mark this reply as the solution"
+            accessibilityHint="Open the form to record what fixed it"
           >
             <Feather name="check" size={14} color={theme.success} />
             <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4 }}>
@@ -717,7 +720,13 @@ export default function ThreadDetailScreen() {
       <View style={[styles.solutionForm, { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border }]}>
         <View style={styles.solutionFormHeader}>
           <ThemedText type="h4">Mark Case Solved</ThemedText>
-          <Pressable onPress={() => setShowFinalFix(false)} testID="button-close-finalfix">
+          <Pressable
+            onPress={() => setShowFinalFix(false)}
+            testID="button-close-finalfix"
+            accessibilityRole="button"
+            accessibilityLabel="Close mark solved form"
+            hitSlop={8}
+          >
             <Feather name="x" size={20} color={theme.textSecondary} />
           </Pressable>
         </View>
@@ -733,6 +742,8 @@ export default function ThreadDetailScreen() {
           multiline
           numberOfLines={2}
           leftIcon="search"
+          testID="input-root-cause"
+          accessibilityLabel="Root cause, required"
         />
         <Input
           label="Final fix *"
@@ -742,6 +753,8 @@ export default function ThreadDetailScreen() {
           multiline
           numberOfLines={3}
           leftIcon="check-circle"
+          testID="input-final-fix"
+          accessibilityLabel="Final fix, required"
         />
         <Input
           label="Parts used"
@@ -749,6 +762,8 @@ export default function ThreadDetailScreen() {
           value={partsUsedText}
           onChangeText={setPartsUsedText}
           leftIcon="package"
+          testID="input-parts-used"
+          accessibilityLabel="Parts used, comma separated"
         />
         <Input
           label="Tools used"
@@ -756,6 +771,8 @@ export default function ThreadDetailScreen() {
           value={toolsUsedText}
           onChangeText={setToolsUsedText}
           leftIcon="tool"
+          testID="input-tools-used"
+          accessibilityLabel="Tools used, comma separated"
         />
         <Input
           label="Total cost"
@@ -764,6 +781,8 @@ export default function ThreadDetailScreen() {
           onChangeText={setSolvedCost}
           leftIcon="dollar-sign"
           keyboardType="decimal-pad"
+          testID="input-total-cost"
+          accessibilityLabel="Total cost in dollars"
         />
         <Input
           label="Labor minutes"
@@ -772,6 +791,8 @@ export default function ThreadDetailScreen() {
           onChangeText={setLaborMin}
           leftIcon="clock"
           keyboardType="number-pad"
+          testID="input-labor-minutes"
+          accessibilityLabel="Labor minutes"
         />
         <Input
           label="Verification notes"
@@ -781,6 +802,8 @@ export default function ThreadDetailScreen() {
           multiline
           numberOfLines={2}
           leftIcon="shield"
+          testID="input-verification-notes"
+          accessibilityLabel="Verification notes"
         />
 
         <View style={styles.solutionFormButtons}>
@@ -788,11 +811,18 @@ export default function ThreadDetailScreen() {
             onPress={() => setShowFinalFix(false)}
             style={[styles.secondaryBtn, { borderColor: theme.border, flex: 1 }]}
             testID="button-cancel-finalfix"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            accessibilityHint="Discard changes and close the form"
           >
             <ThemedText type="body" style={{ fontWeight: "600" }}>Cancel</ThemedText>
           </Pressable>
           <View style={{ width: Spacing.sm }} />
           <Button
+            testID="button-submit-finalfix"
+            accessibilityLabel={markSolvedMutation.isPending ? "Saving solution" : "Mark solved"}
+            accessibilityHint="Save the root cause and final fix"
+            accessibilityState={{ busy: markSolvedMutation.isPending }}
             onPress={handleConfirmSolved}
             disabled={markSolvedMutation.isPending}
             style={{ flex: 1 }}
@@ -880,6 +910,9 @@ export default function ThreadDetailScreen() {
                         },
                       ]}
                       testID={`button-status-${opt.key}`}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`Status: ${opt.label}`}
+                      accessibilityState={{ selected: active, disabled: updateStatusMutation.isPending || active }}
                     >
                       <Feather name={opt.icon} size={12} color={active ? theme.primary : theme.textSecondary} />
                       <Text style={[styles.statusOptionText, { color: active ? theme.primary : theme.textSecondary }]}>
@@ -893,6 +926,9 @@ export default function ThreadDetailScreen() {
                 onPress={() => openFinalFix(null)}
                 style={[styles.markSolvedBtn, { backgroundColor: theme.success }]}
                 testID="button-mark-case-solved"
+                accessibilityRole="button"
+                accessibilityLabel="Mark case solved"
+                accessibilityHint="Open the form to record what fixed this case"
               >
                 <Feather name="check-circle" size={14} color="#fff" />
                 <Text style={styles.markSolvedBtnText}>Mark Case Solved</Text>
@@ -915,6 +951,15 @@ export default function ThreadDetailScreen() {
                   },
                 ]}
                 testID="button-bookmark-thread"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  atSaveCap
+                    ? "Save case (upgrade required)"
+                    : isSaved
+                      ? "Saved, double tap to remove"
+                      : "Save this case"
+                }
+                accessibilityState={{ selected: isSaved, disabled: toggleSaveMutation.isPending }}
               >
                 <Feather
                   name={atSaveCap ? "lock" : "bookmark"}
@@ -950,6 +995,11 @@ export default function ThreadDetailScreen() {
                 onPress={handleDeleteThread}
                 disabled={deleteThreadMutation.isPending}
                 style={[styles.deleteThreadButton, { borderColor: theme.error }]}
+                testID="button-delete-thread"
+                accessibilityRole="button"
+                accessibilityLabel={deleteThreadMutation.isPending ? "Deleting thread" : "Delete thread"}
+                accessibilityHint="Permanently delete this thread"
+                accessibilityState={{ disabled: deleteThreadMutation.isPending, busy: deleteThreadMutation.isPending }}
               >
                 <Feather name="trash-2" size={14} color={theme.error} />
                 <ThemedText type="caption" style={{ color: theme.error, marginLeft: 4 }}>
@@ -1070,6 +1120,9 @@ export default function ThreadDetailScreen() {
                     },
                   ]}
                   testID={`button-reply-type-${t}`}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`Reply type: ${meta.label}`}
+                  accessibilityState={{ selected: active }}
                 >
                   <Feather name={meta.icon} size={11} color={active ? meta.color : theme.textSecondary} />
                   <Text style={[styles.typePickerText, { color: active ? meta.color : theme.textSecondary }]}>
@@ -1106,6 +1159,8 @@ export default function ThreadDetailScreen() {
               onFocus={() => setIsComposing(true)}
               onBlur={() => setIsComposing(false)}
               testID="input-reply"
+              accessibilityLabel={`${REPLY_TYPE_META[replyType].label} reply, ${replyText.length} of 2000 characters`}
+              accessibilityHint="Type your reply, up to 2000 characters"
             />
             <Pressable
               style={[
@@ -1115,6 +1170,12 @@ export default function ThreadDetailScreen() {
               onPress={handleSubmitReply}
               disabled={!replyText.trim() || createReplyMutation.isPending}
               testID="button-send-reply"
+              accessibilityRole="button"
+              accessibilityLabel={createReplyMutation.isPending ? "Sending reply" : "Send reply"}
+              accessibilityState={{
+                disabled: !replyText.trim() || createReplyMutation.isPending,
+                busy: createReplyMutation.isPending,
+              }}
             >
               {createReplyMutation.isPending ? (
                 <ActivityIndicator size="small" color="#fff" />

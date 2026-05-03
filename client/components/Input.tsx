@@ -94,7 +94,12 @@ export function Input({
       </View>
 
       {error ? (
-        <ThemedText type="caption" style={[styles.error, { color: theme.error }]}>
+        <ThemedText
+          type="caption"
+          style={[styles.error, { color: theme.error }]}
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+        >
           {error}
         </ThemedText>
       ) : null}

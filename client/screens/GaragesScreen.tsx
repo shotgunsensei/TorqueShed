@@ -70,6 +70,9 @@ function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void })
         },
       ]}
       testID={`garage-card-${item.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name} bay${latestActivity ? `, last activity ${latestActivity}` : ""}`}
+      accessibilityHint="Open this bay to see threads"
     >
       <LinearGradient
         colors={[brandColor, brandColor + "00"]}

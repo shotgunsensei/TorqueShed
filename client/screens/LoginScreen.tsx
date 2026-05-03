@@ -64,8 +64,14 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       }}
     >
       <View style={styles.header}>
-        <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
-        <ThemedText type="h1" style={styles.title}>TorqueShed</ThemedText>
+        <Image
+          source={logoImage}
+          style={styles.logoImage}
+          resizeMode="contain"
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+        <ThemedText type="h1" style={styles.title} accessibilityRole="header">TorqueShed</ThemedText>
         <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
           The Garage for Real People
         </ThemedText>
@@ -73,7 +79,13 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
       <View style={styles.form}>
         {error ? (
-          <View style={[styles.errorContainer, { backgroundColor: theme.error + "20" }]}>
+          <View
+            style={[styles.errorContainer, { backgroundColor: theme.error + "20" }]}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={`Error: ${error}`}
+            testID="text-login-error"
+          >
             <ThemedText type="caption" style={{ color: theme.error }}>
               {error}
             </ThemedText>
@@ -88,6 +100,11 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           leftIcon="user"
           autoCapitalize="none"
           autoCorrect={false}
+          accessibilityLabel="Username"
+          accessibilityHint="Enter your account username"
+          testID="input-username"
+          textContentType="username"
+          autoComplete="username"
         />
 
         <Input
@@ -97,9 +114,20 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           onChangeText={setPassword}
           leftIcon="lock"
           secureTextEntry
+          accessibilityLabel="Password"
+          accessibilityHint="Enter your account password"
+          testID="input-password"
+          textContentType="password"
+          autoComplete="current-password"
         />
 
-        <Button onPress={handleLogin} disabled={isLoading}>
+        <Button
+          onPress={handleLogin}
+          disabled={isLoading}
+          testID="button-login"
+          accessibilityLabel={isLoading ? "Logging in" : "Log in"}
+          accessibilityHint="Sign in to your TorqueShed account"
+        >
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
@@ -112,7 +140,13 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         <ThemedText type="body" style={{ color: theme.textSecondary }}>
           Don't have an account?
         </ThemedText>
-        <Pressable onPress={() => navigation.navigate("Signup")}>
+        <Pressable
+          onPress={() => navigation.navigate("Signup")}
+          accessibilityRole="link"
+          accessibilityLabel="Sign up"
+          accessibilityHint="Go to the create account screen"
+          testID="link-signup"
+        >
           <ThemedText type="body" style={[styles.link, { color: theme.primary }]}>
             Sign Up
           </ThemedText>

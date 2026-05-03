@@ -1,5 +1,14 @@
 import React from "react";
-import { StyleSheet, Pressable, ViewStyle, StyleProp } from "react-native";
+import {
+  StyleSheet,
+  Pressable,
+  ViewStyle,
+  StyleProp,
+  AccessibilityRole,
+  AccessibilityState,
+  AccessibilityActionEvent,
+  AccessibilityActionInfo,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -19,6 +28,20 @@ interface CardProps {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
+  /**
+   * Override the default screen-reader grouping. Pressable defaults to
+   * `accessible={true}`, which groups child controls into a single VoiceOver
+   * focus node. Set this to `false` on cards that contain nested interactive
+   * children (e.g. a report button) so each child remains individually
+   * focusable.
+   */
+  accessible?: boolean;
+  accessibilityActions?: ReadonlyArray<AccessibilityActionInfo>;
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }
 
 const springConfig: WithSpringConfig = {
@@ -55,6 +78,13 @@ export function Card({
   onPress,
   style,
   testID,
+  accessibilityLabel,
+  accessibilityHint,
+  accessibilityRole,
+  accessibilityState,
+  accessible,
+  accessibilityActions,
+  onAccessibilityAction,
 }: CardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -79,6 +109,13 @@ export function Card({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       testID={testID}
+      accessible={accessible}
+      accessibilityRole={onPress ? accessibilityRole ?? "button" : accessibilityRole}
+      accessibilityLabel={onPress ? accessibilityLabel ?? title : accessibilityLabel}
+      accessibilityHint={onPress ? accessibilityHint : undefined}
+      accessibilityState={onPress ? accessibilityState : undefined}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       style={[
         styles.card,
         {

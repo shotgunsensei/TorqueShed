@@ -139,6 +139,12 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
       onPress={() => onPress(item)}
       style={styles.card}
       testID={`swap-item-${item.id}`}
+      accessibilityLabel={`${item.title}, ${item.price}, condition ${item.condition}, by ${item.seller.name}`}
+      accessibilityHint="Open listing. Use the report action to flag this listing."
+      accessibilityActions={[{ name: "report", label: "Report listing" }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === "report") handleReport();
+      }}
     >
       <View style={styles.cardContent}>
         <View style={[styles.imagePlaceholder, { backgroundColor: theme.backgroundTertiary }]}>
@@ -148,9 +154,17 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
                 source={{ uri: resolveImageUri(item.coverImageUrl) || undefined }}
                 style={styles.coverImage}
                 testID={`swap-cover-${item.id}`}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                accessible={false}
+                alt=""
               />
               {item.extraImageCount > 0 ? (
-                <View style={styles.extraCountBadge}>
+                <View
+                  style={styles.extraCountBadge}
+                  accessibilityLabel={`${item.extraImageCount} more photos`}
+                  accessible
+                >
                   <Text style={styles.extraCountText}>+{item.extraImageCount}</Text>
                 </View>
               ) : null}
@@ -164,7 +178,13 @@ function SwapItemCard({ item, onReport, onPress }: { item: SwapItem; onReport: (
             <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
               {item.title}
             </Text>
-            <Pressable onPress={handleReport} hitSlop={8} testID={`report-${item.id}`}>
+            <Pressable
+              onPress={handleReport}
+              hitSlop={8}
+              testID={`report-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Report listing ${item.title}`}
+            >
               <Feather name="flag" size={14} color={theme.textMuted} />
             </Pressable>
           </View>
@@ -382,6 +402,8 @@ export default function SwapShopScreen() {
                 returnKeyType="search"
                 clearButtonMode="while-editing"
                 testID="input-search-listings"
+                accessibilityLabel="Search listings"
+                accessibilityHint="Search by title, seller, or location"
               />
             </View>
             <Pressable
@@ -391,6 +413,13 @@ export default function SwapShopScreen() {
               ]}
               onPress={handlePostItem}
               testID="button-post-item"
+              accessibilityRole="button"
+              accessibilityLabel={
+                atListingLimit
+                  ? `Upgrade required, ${myActiveCount} of ${FREE_LISTING_LIMIT} listings used`
+                  : "Post an item"
+              }
+              accessibilityHint={atListingLimit ? "Open the upgrade screen" : "Open the new listing form"}
             >
               <Feather
                 name={atListingLimit ? "lock" : "plus"}
@@ -427,7 +456,13 @@ export default function SwapShopScreen() {
               <Text style={[styles.modalTitle, { color: theme.text }]}>
                 Report Listing
               </Text>
-              <Pressable onPress={() => setReportModalVisible(false)} hitSlop={8}>
+              <Pressable
+                onPress={() => setReportModalVisible(false)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Close report dialog"
+                testID="button-close-report-modal"
+              >
                 <Feather name="x" size={24} color={theme.textMuted} />
               </Pressable>
             </View>
@@ -458,6 +493,9 @@ export default function SwapShopScreen() {
                     setSelectedReason(reason.id);
                   }}
                   testID={`reason-${reason.id}`}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`Reason: ${reason.label}`}
+                  accessibilityState={{ selected: selectedReason === reason.id }}
                 >
                   <View style={[
                     styles.radioCircle,
@@ -487,6 +525,9 @@ export default function SwapShopScreen() {
               onPress={handleSubmitReport}
               disabled={!selectedReason}
               testID="button-submit-report"
+              accessibilityRole="button"
+              accessibilityLabel="Submit report"
+              accessibilityState={{ disabled: !selectedReason }}
             >
               <Text style={[styles.submitButtonText, { color: selectedReason ? "#FFFFFF" : theme.textMuted }]}>
                 Submit Report

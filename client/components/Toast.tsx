@@ -82,12 +82,22 @@ function ToastItem({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () =>
         },
         animatedStyle,
       ]}
+      accessibilityLiveRegion="polite"
+      accessibilityRole={toast.type === "error" ? "alert" : "text"}
+      accessibilityLabel={`${toast.type}: ${toast.message}`}
+      testID={`toast-${toast.type}`}
     >
       <Feather name={icon} size={18} color={iconColor} />
       <ThemedText type="small" style={styles.toastText} numberOfLines={2}>
         {toast.message}
       </ThemedText>
-      <Pressable onPress={onDismiss} hitSlop={8}>
+      <Pressable
+        onPress={onDismiss}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss notification"
+        testID="button-dismiss-toast"
+      >
         <Feather name="x" size={16} color={theme.textMuted} />
       </Pressable>
     </Animated.View>

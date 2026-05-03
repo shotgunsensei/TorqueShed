@@ -138,7 +138,18 @@ function SwapCard({ item, onPress, onReport }: { item: SwapListing; onPress: () 
   const condColor = CONDITION_COLORS[item.condition] || theme.textMuted;
 
   return (
-    <Card elevation={2} onPress={onPress} style={s.swapCard} testID={`swap-item-${item.id}`}>
+    <Card
+      elevation={2}
+      onPress={onPress}
+      style={s.swapCard}
+      testID={`swap-item-${item.id}`}
+      accessibilityLabel={`${item.title}, ${item.price}, condition ${item.condition}, by ${item.userName}`}
+      accessibilityHint="Open listing. Use the report action to flag this listing."
+      accessibilityActions={[{ name: "report", label: "Report listing" }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === "report") onReport();
+      }}
+    >
       <View style={[s.swapImageArea, { backgroundColor: theme.backgroundTertiary }]}>
         {item.imageUrl ? (
           <Feather name="image" size={28} color={theme.textMuted} />
@@ -190,6 +201,8 @@ function SwapCard({ item, onPress, onReport }: { item: SwapListing; onPress: () 
             hitSlop={8}
             style={s.reportBtn}
             testID={`report-listing-${item.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Report listing ${item.title}`}
           >
             <Feather name="flag" size={14} color={theme.textMuted} />
           </Pressable>
@@ -264,6 +277,9 @@ function ProductCard({ item }: { item: Product }) {
             onPress={handleViewDeal}
             style={({ pressed }) => [s.viewDealBtn, { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 }]}
             testID={`view-deal-${item.id}`}
+            accessibilityRole="link"
+            accessibilityLabel={`View deal for ${item.title}${item.vendor ? ` at ${item.vendor}` : ""}`}
+            accessibilityHint="Opens the vendor's website in your browser"
           >
             <Text style={s.viewDealText}>{microcopy.viewDeal}</Text>
             <Feather name="external-link" size={13} color="#FFFFFF" />
@@ -327,6 +343,10 @@ function ShopSection() {
                 key={cat}
                 onPress={() => setSelectedCategory(cat)}
                 style={[s.categoryPill, { backgroundColor: active ? theme.primary : theme.backgroundSecondary, borderColor: active ? theme.primary : theme.cardBorder }]}
+                accessibilityRole="radio"
+                accessibilityLabel={`Category: ${cat}`}
+                accessibilityState={{ selected: active }}
+                testID={`chip-product-category-${cat.toLowerCase().replace(/\s+/g, "-")}`}
               >
                 <Text style={[s.categoryPillText, { color: active ? "#FFFFFF" : theme.textSecondary }]}>{cat}</Text>
               </Pressable>
@@ -433,6 +453,8 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
                 returnKeyType="search"
                 clearButtonMode="while-editing"
                 testID="input-search-listings"
+                accessibilityLabel="Search listings"
+                accessibilityHint="Search by title, seller, or location"
               />
             </View>
           </View>
@@ -460,7 +482,13 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
           <View style={[s.modalContent, { backgroundColor: theme.backgroundDefault, paddingBottom: insets.bottom + Spacing.lg }]}>
             <View style={s.modalHeader}>
               <Text style={[s.modalTitle, { color: theme.text }]}>Report Listing</Text>
-              <Pressable onPress={() => setReportModalVisible(false)} hitSlop={8}>
+              <Pressable
+                onPress={() => setReportModalVisible(false)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Close report dialog"
+                testID="button-close-report"
+              >
                 <Feather name="x" size={24} color={theme.textMuted} />
               </Pressable>
             </View>
@@ -474,6 +502,10 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
                   key={reason.id}
                   style={[s.reasonOption, { backgroundColor: selectedReason === reason.id ? theme.primary + "15" : theme.backgroundSecondary, borderColor: selectedReason === reason.id ? theme.primary : theme.cardBorder }]}
                   onPress={() => { Haptics.selectionAsync(); setSelectedReason(reason.id); }}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`Reason: ${reason.label}`}
+                  accessibilityState={{ selected: selectedReason === reason.id }}
+                  testID={`reason-${reason.id}`}
                 >
                   <View style={[s.radioCircle, { borderColor: selectedReason === reason.id ? theme.primary : theme.textMuted, backgroundColor: selectedReason === reason.id ? theme.primary : "transparent" }]}>
                     {selectedReason === reason.id ? <View style={s.radioInner} /> : null}
@@ -482,7 +514,15 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
                 </Pressable>
               ))}
             </View>
-            <Pressable style={[s.submitBtn, { backgroundColor: selectedReason ? theme.error : theme.backgroundTertiary }]} onPress={handleSubmitReport} disabled={!selectedReason}>
+            <Pressable
+              style={[s.submitBtn, { backgroundColor: selectedReason ? theme.error : theme.backgroundTertiary }]}
+              onPress={handleSubmitReport}
+              disabled={!selectedReason}
+              accessibilityRole="button"
+              accessibilityLabel="Submit report"
+              accessibilityState={{ disabled: !selectedReason }}
+              testID="button-submit-report"
+            >
               <Text style={[s.submitBtnText, { color: selectedReason ? "#FFFFFF" : theme.textMuted }]}>Submit Report</Text>
             </Pressable>
           </View>
@@ -577,6 +617,10 @@ function FindPartsSection() {
                   key={v.id}
                   onPress={() => setSelectedVehicleId(active ? null : v.id)}
                   style={[s.vehicleChip, { backgroundColor: active ? theme.primary + "20" : theme.backgroundSecondary, borderColor: active ? theme.primary : theme.cardBorder }]}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={`Vehicle: ${vehicleLabel(v)}`}
+                  accessibilityState={{ checked: active }}
+                  testID={`chip-find-vehicle-${v.id}`}
                 >
                   <Feather name="truck" size={12} color={active ? theme.primary : theme.textMuted} />
                   <Text style={[s.vehicleChipText, { color: active ? theme.primary : theme.text }]}>{vehicleLabel(v)}</Text>
@@ -607,9 +651,17 @@ function FindPartsSection() {
             onChangeText={setPartQuery}
             returnKeyType="search"
             testID="input-part-search"
+            accessibilityLabel="Part name"
+            accessibilityHint="Type a part to search vendor sites"
           />
           {partQuery.length > 0 ? (
-            <Pressable onPress={() => setPartQuery("")} hitSlop={8}>
+            <Pressable
+              onPress={() => setPartQuery("")}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear part search"
+              testID="button-clear-part-search"
+            >
               <Feather name="x" size={16} color={theme.textMuted} />
             </Pressable>
           ) : null}
@@ -620,7 +672,13 @@ function FindPartsSection() {
         <View style={{ marginBottom: Spacing.lg }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.sm }}>
             <Text style={[s.findLabel, { color: theme.textSecondary, marginBottom: 0 }]}>Recent Searches</Text>
-            <Pressable onPress={clearHistory} hitSlop={8}>
+            <Pressable
+              onPress={clearHistory}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search history"
+              testID="button-clear-history"
+            >
               <Text style={[s.clearHistoryText, { color: theme.textMuted }]}>Clear</Text>
             </Pressable>
           </View>
@@ -630,6 +688,9 @@ function FindPartsSection() {
                 key={term}
                 onPress={() => setPartQuery(term)}
                 style={[s.historyChip, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Search again: ${term}`}
+                testID={`button-history-${term.toLowerCase().replace(/\s+/g, "-")}`}
               >
                 <Feather name="clock" size={12} color={theme.textMuted} />
                 <Text style={[s.historyChipText, { color: theme.text }]}>{term}</Text>
@@ -657,6 +718,9 @@ function FindPartsSection() {
               ]}
               onPress={() => handleVendorPress(vendor.buildUrl(searchText))}
               testID={`vendor-${vendor.id}`}
+              accessibilityRole="link"
+              accessibilityLabel={`Search ${searchText} on ${vendor.name}`}
+              accessibilityHint="Opens the vendor's site in your browser"
             >
               <View style={[s.vendorIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name={vendor.icon} size={18} color={theme.primary} />
@@ -711,6 +775,9 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
                 active ? { borderBottomColor: theme.primary, borderBottomWidth: 3 } : { borderBottomWidth: 3, borderBottomColor: "transparent" },
               ]}
               testID={`segment-${seg.key}`}
+              accessibilityRole="tab"
+              accessibilityLabel={seg.label}
+              accessibilityState={{ selected: active }}
             >
               <Feather name={seg.icon} size={16} color={active ? theme.primary : theme.textMuted} />
               <Text style={[s.segmentText, { color: active ? theme.primary : theme.textMuted, fontWeight: active ? "600" : "500" }]}>{seg.label}</Text>
@@ -734,6 +801,9 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
             style={[s.fab, { backgroundColor: theme.primary, bottom: tabBarHeight + Spacing.lg }]}
             onPress={() => navigation.navigate("AddListing")}
             testID="button-add-listing"
+            accessibilityRole="button"
+            accessibilityLabel="Add a listing"
+            accessibilityHint="Open the new listing form"
           >
             <Feather name="plus" size={24} color="#FFFFFF" />
           </Pressable>

@@ -216,6 +216,9 @@ export default function VehicleDetailScreen() {
                 : { borderColor: "transparent" },
             ]}
             testID={`tab-${tab.key}`}
+            accessibilityRole="tab"
+            accessibilityLabel={`${tab.label}${count !== null ? `, ${count}` : ""}`}
+            accessibilityState={{ selected: isActive }}
           >
             <Feather
               name={tab.icon as any}
@@ -501,6 +504,9 @@ export default function VehicleDetailScreen() {
               <Pressable
                 onPress={() => setActiveTab("all")}
                 style={styles.viewAllRow}
+                accessibilityRole="link"
+                accessibilityLabel={`View all ${notes.length} entries`}
+                testID="link-view-all-entries"
               >
                 <Text style={[styles.viewAllText, { color: theme.primary }]}>
                   View all {notes.length} entries
@@ -593,7 +599,14 @@ export default function VehicleDetailScreen() {
   return (
     <>
       {activeTab === "overview" ? renderOverviewTab() : renderNotesTab()}
-      <FAB icon="plus" onPress={handleAddNote} bottom={insets.bottom + 20} />
+      <FAB
+        icon="plus"
+        onPress={handleAddNote}
+        bottom={insets.bottom + 20}
+        testID="fab-add-note"
+        accessibilityLabel="Add a note"
+        accessibilityHint="Record a maintenance or service note for this vehicle"
+      />
     </>
   );
 }

@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { StyleSheet, Pressable, ViewStyle, StyleProp } from "react-native";
+import { StyleSheet, Pressable, ViewStyle, StyleProp, AccessibilityProps } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -20,6 +20,10 @@ interface ButtonProps {
   disabled?: boolean;
   testID?: string;
   variant?: ButtonVariant;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityRole?: AccessibilityProps["accessibilityRole"];
+  accessibilityState?: AccessibilityProps["accessibilityState"];
 }
 
 const springConfig: WithSpringConfig = {
@@ -39,6 +43,10 @@ export function Button({
   disabled = false,
   testID,
   variant = "primary",
+  accessibilityLabel,
+  accessibilityHint,
+  accessibilityRole,
+  accessibilityState,
 }: ButtonProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -84,6 +92,12 @@ export function Button({
       onPressOut={handlePressOut}
       disabled={disabled}
       testID={testID}
+      accessibilityRole={accessibilityRole ?? "button"}
+      accessibilityLabel={
+        accessibilityLabel ?? (typeof children === "string" ? children : undefined)
+      }
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled, ...(accessibilityState ?? {}) }}
       style={[
         styles.button,
         variantStyle,

@@ -189,6 +189,10 @@ export default function MoreScreen() {
             parent.navigate("Profile");
           }
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`View profile for ${currentUser?.username || "guest"}`}
+        accessibilityHint="Open your profile settings"
+        testID="button-open-profile"
       >
         <UserAvatar user={currentUser} size="md" />
         <View style={styles.profileInfo}>
@@ -229,6 +233,11 @@ export default function MoreScreen() {
             disabled={sendVerifyMutation.isPending}
             style={styles.verifyBtn}
             testID="button-banner-verify-email"
+            accessibilityLabel={
+              sendVerifyMutation.isPending ? "Sending verification email" : "Send verification email"
+            }
+            accessibilityHint="We'll email you a link to confirm your address"
+            accessibilityState={{ busy: sendVerifyMutation.isPending }}
           >
             {sendVerifyMutation.isPending ? "Sending…" : "Send verification email"}
           </Button>
@@ -246,6 +255,8 @@ export default function MoreScreen() {
                   key={item.label}
                   onPress={() => handleMenuPress(item)}
                   testID={`menu-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  accessibilityLabel={item.label}
+                  accessibilityHint={`Open ${item.label}`}
                 >
                   <View style={styles.menuItem}>
                     <View style={[styles.menuIcon, { backgroundColor: theme.primary + "15" }]}>

@@ -175,6 +175,10 @@ export function MediaPickerRow({
           disabled={disabled || busy}
           style={[styles.actionBtn, { borderColor: theme.cardBorder, opacity: disabled || busy ? 0.6 : 1 }]}
           testID={`${testIDPrefix}-add-photo`}
+          accessibilityRole="button"
+          accessibilityLabel="Add photo"
+          accessibilityHint={`Pick a photo from your library. ${photoPaths.length} of ${MAX_PHOTOS} attached.`}
+          accessibilityState={{ disabled: !!disabled || busy, busy }}
         >
           <Feather name="camera" size={16} color={theme.text} />
           <ThemedText type="caption">Add photo</ThemedText>
@@ -184,6 +188,10 @@ export function MediaPickerRow({
           disabled={disabled || busy}
           style={[styles.actionBtn, { borderColor: theme.cardBorder, opacity: disabled || busy ? 0.6 : 1 }]}
           testID={`${testIDPrefix}-add-video`}
+          accessibilityRole="button"
+          accessibilityLabel="Add video"
+          accessibilityHint={`Pick a video up to 30 seconds. ${videoPaths.length} of ${MAX_VIDEOS} attached.`}
+          accessibilityState={{ disabled: !!disabled || busy, busy }}
         >
           <Feather name="video" size={16} color={theme.text} />
           <ThemedText type="caption">Add video (≤30s)</ThemedText>
@@ -195,11 +203,21 @@ export function MediaPickerRow({
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
           {photoPaths.map((p, i) => (
             <View key={`p-${i}-${p}`} style={[styles.thumb, { borderColor: theme.cardBorder }]}>
-              <Image source={{ uri: resolveMediaUrl(p) }} style={styles.thumbImg} testID={`${testIDPrefix}-photo-${i}`} />
+              <Image
+                source={{ uri: resolveMediaUrl(p) }}
+                style={styles.thumbImg}
+                testID={`${testIDPrefix}-photo-${i}`}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                accessible={false}
+                alt=""
+              />
               <Pressable
                 onPress={() => removePhoto(i)}
                 style={[styles.removeBtn, { backgroundColor: theme.backgroundDefault }]}
                 testID={`${testIDPrefix}-remove-photo-${i}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove photo ${i + 1}`}
               >
                 <Feather name="x" size={12} color={theme.text} />
               </Pressable>
@@ -213,6 +231,8 @@ export function MediaPickerRow({
                 onPress={() => removeVideo(i)}
                 style={[styles.removeBtn, { backgroundColor: theme.backgroundDefault }]}
                 testID={`${testIDPrefix}-remove-video-${i}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove video ${i + 1}`}
               >
                 <Feather name="x" size={12} color={theme.text} />
               </Pressable>

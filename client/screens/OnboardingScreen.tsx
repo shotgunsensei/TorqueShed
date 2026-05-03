@@ -267,6 +267,8 @@ export default function OnboardingScreen() {
               autoCapitalize="characters"
               maxLength={17}
               testID="input-onboarding-vin"
+              accessibilityLabel="VIN, 17 characters"
+              accessibilityHint="Enter your Vehicle Identification Number to auto-fill year, make, and model"
             />
             {vinDecoding ? (
               <View style={[styles.vinStatus, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
@@ -318,6 +320,7 @@ export default function OnboardingScreen() {
               keyboardType="number-pad"
               maxLength={4}
               testID="input-onboarding-year"
+              accessibilityLabel="Vehicle year"
             />
             <Input
               label="Make"
@@ -326,6 +329,7 @@ export default function OnboardingScreen() {
               onChangeText={setMake}
               leftIcon="truck"
               testID="input-onboarding-make"
+              accessibilityLabel="Vehicle make"
             />
             <Input
               label="Model"
@@ -334,6 +338,7 @@ export default function OnboardingScreen() {
               onChangeText={setModel}
               leftIcon="tag"
               testID="input-onboarding-model"
+              accessibilityLabel="Vehicle model"
             />
           </>
         )}
@@ -344,6 +349,7 @@ export default function OnboardingScreen() {
           onChangeText={setNickname}
           leftIcon="heart"
           testID="input-onboarding-nickname"
+          accessibilityLabel="Vehicle nickname"
         />
       </View>
     </Animated.View>
@@ -361,6 +367,10 @@ export default function OnboardingScreen() {
               key={bay.id}
               testID={`button-bay-${bay.id}`}
               onPress={() => toggleBay(bay.id)}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`${bay.name} bay`}
+              accessibilityState={{ checked: selected }}
+              accessibilityHint="Double tap to follow this brand community"
               style={[
                 styles.bayCard,
                 {
@@ -406,6 +416,10 @@ export default function OnboardingScreen() {
               key={goal.id}
               testID={`button-goal-${goal.id}`}
               onPress={() => toggleGoal(goal.id)}
+              accessibilityRole="checkbox"
+              accessibilityLabel={goal.label}
+              accessibilityState={{ checked: selected }}
+              accessibilityHint="Double tap to toggle this goal"
               style={[
                 styles.goalCard,
                 {
@@ -477,6 +491,10 @@ export default function OnboardingScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setSelectedAction(action.id);
               }}
+              accessibilityRole="radio"
+              accessibilityLabel={action.label}
+              accessibilityState={{ selected }}
+              accessibilityHint={action.description}
               style={[
                 styles.goalCard,
                 {
@@ -551,6 +569,9 @@ export default function OnboardingScreen() {
             onPress={() => setStep(step - 1)}
             style={styles.backButton}
             testID="button-onboarding-back"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Return to the previous onboarding step"
           >
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
@@ -565,6 +586,9 @@ export default function OnboardingScreen() {
             onPress={handleSkip}
             style={styles.skipButton}
             testID="button-onboarding-skip"
+            accessibilityRole="button"
+            accessibilityLabel="Skip"
+            accessibilityHint="Skip the rest of onboarding and go to the home screen"
           >
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
               Skip
@@ -601,6 +625,14 @@ export default function OnboardingScreen() {
           onPress={handleNext}
           disabled={!canProceed() || submitting}
           testID="button-onboarding-next"
+          accessibilityLabel={
+            submitting
+              ? "Setting up your account"
+              : step === TOTAL_STEPS - 1
+              ? "Finish onboarding"
+              : "Continue to next step"
+          }
+          accessibilityState={{ disabled: !canProceed() || submitting, busy: submitting }}
         >
           {submitting
             ? "Setting up..."

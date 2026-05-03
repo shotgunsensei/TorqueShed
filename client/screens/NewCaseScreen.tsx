@@ -326,7 +326,13 @@ export default function NewCaseScreen() {
           <ThemedText type="body" style={{ marginTop: Spacing.sm }}>
             No vehicles in your garage yet.
           </ThemedText>
-          <Button onPress={() => navigation.navigate("AddVehicle")} style={{ marginTop: Spacing.md }}>
+          <Button
+            onPress={() => navigation.navigate("AddVehicle")}
+            style={{ marginTop: Spacing.md }}
+            testID="button-empty-add-vehicle"
+            accessibilityLabel="Add a vehicle"
+            accessibilityHint="Open the add-vehicle screen"
+          >
             Add a vehicle
           </Button>
         </View>
@@ -344,6 +350,9 @@ export default function NewCaseScreen() {
                   if (v.mileage) setMileage(String(v.mileage));
                   Haptics.selectionAsync();
                 }}
+                accessibilityRole="radio"
+                accessibilityLabel={`Vehicle: ${label}`}
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.vehicleRow,
                   {
@@ -368,6 +377,10 @@ export default function NewCaseScreen() {
           <Pressable
             onPress={() => navigation.navigate("AddVehicle")}
             style={[styles.addNewRow, { borderColor: theme.cardBorder }]}
+            accessibilityRole="button"
+            accessibilityLabel="Add a new vehicle"
+            accessibilityHint="Open the add-vehicle screen"
+            testID="button-add-vehicle"
           >
             <Feather name="plus" size={16} color={theme.text} />
             <Text style={{ color: theme.text }}>Add a new vehicle</Text>
@@ -382,6 +395,8 @@ export default function NewCaseScreen() {
         onChangeText={setMileage}
         keyboardType="number-pad"
         leftIcon="hash"
+        testID="input-mileage"
+        accessibilityLabel="Current mileage in miles, optional"
       />
     </View>
   );
@@ -399,6 +414,9 @@ export default function NewCaseScreen() {
         value={title}
         onChangeText={setTitle}
         leftIcon="edit-3"
+        testID="input-case-title"
+        accessibilityLabel="Case title"
+        accessibilityHint="A short summary of the problem"
       />
 
       <Text style={[styles.sectionLabel, { color: theme.text }]}>System category</Text>
@@ -413,6 +431,9 @@ export default function NewCaseScreen() {
                 setSystemCategory(s.key);
                 Haptics.selectionAsync();
               }}
+              accessibilityRole="radio"
+              accessibilityLabel={`System: ${s.label}`}
+              accessibilityState={{ selected: active }}
               style={[
                 styles.pickChip,
                 {
@@ -445,6 +466,10 @@ export default function NewCaseScreen() {
                   borderColor: active ? theme.primary : theme.cardBorder,
                 },
               ]}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`Symptom: ${s}`}
+              accessibilityState={{ checked: active }}
+              testID={`chip-symptom-${s.toLowerCase().replace(/\s+/g, "-")}`}
             >
               <Text style={[styles.pickChipText, { color: active ? "#fff" : theme.text }]}>{s}</Text>
             </Pressable>
@@ -464,8 +489,17 @@ export default function NewCaseScreen() {
           autoCapitalize="characters"
           onSubmitEditing={() => addCode(codeInput)}
           returnKeyType="done"
+          testID="input-obd-code"
+          accessibilityLabel="OBD-II code"
+          accessibilityHint="Enter a diagnostic trouble code, then tap add"
         />
-        <Pressable onPress={() => addCode(codeInput)} hitSlop={8}>
+        <Pressable
+          onPress={() => addCode(codeInput)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Add OBD code"
+          testID="button-add-obd-code"
+        >
           <Feather name="plus-circle" size={18} color={theme.primary} />
         </Pressable>
       </View>
@@ -476,6 +510,9 @@ export default function NewCaseScreen() {
               key={c.code}
               onPress={() => addCode(c.code)}
               style={[styles.suggestionRow, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundSecondary }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Add code ${c.code}: ${c.description}`}
+              testID={`suggestion-code-${c.code}`}
             >
               <Text style={[styles.suggestionCode, { color: theme.primary }]}>{c.code}</Text>
               <Text style={[styles.suggestionDesc, { color: theme.textSecondary }]} numberOfLines={1}>
@@ -503,7 +540,13 @@ export default function NewCaseScreen() {
                     {info.description.slice(0, 36)}
                   </Text>
                 ) : null}
-                <Pressable onPress={() => setObdCodes(obdCodes.filter((c) => c !== code))} hitSlop={8}>
+                <Pressable
+                  onPress={() => setObdCodes(obdCodes.filter((c) => c !== code))}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove code ${code}`}
+                  testID={`button-remove-code-${code}`}
+                >
                   <Feather name="x" size={12} color={theme.textMuted} />
                 </Pressable>
               </View>
@@ -518,6 +561,8 @@ export default function NewCaseScreen() {
         value={whenItHappens}
         onChangeText={setWhenItHappens}
         leftIcon="clock"
+        testID="input-when-it-happens"
+        accessibilityLabel="When does the problem happen"
       />
 
       <Input
@@ -542,6 +587,9 @@ export default function NewCaseScreen() {
                 setUrgency(u.key);
                 Haptics.selectionAsync();
               }}
+              accessibilityRole="radio"
+              accessibilityLabel={`Urgency ${u.label}: ${u.description}`}
+              accessibilityState={{ selected: active }}
               style={[
                 styles.urgencyRow,
                 {
@@ -568,6 +616,8 @@ export default function NewCaseScreen() {
         value={budget}
         onChangeText={setBudget}
         leftIcon="dollar-sign"
+        testID="input-budget"
+        accessibilityLabel="Repair budget, optional"
       />
 
       <Text style={[styles.sectionLabel, { color: theme.text }]}>Tools available</Text>
@@ -585,6 +635,10 @@ export default function NewCaseScreen() {
                   borderColor: active ? theme.primary : theme.cardBorder,
                 },
               ]}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`Tool available: ${t}`}
+              accessibilityState={{ checked: active }}
+              testID={`chip-tool-${t.toLowerCase().replace(/\s+/g, "-")}`}
             >
               <Text style={[styles.pickChipText, { color: active ? "#fff" : theme.text }]}>{t}</Text>
             </Pressable>
@@ -600,6 +654,8 @@ export default function NewCaseScreen() {
         multiline
         numberOfLines={4}
         leftIcon="message-circle"
+        testID="input-extra-details"
+        accessibilityLabel="Extra details for mechanics, optional"
       />
 
       <MediaPickerRow
@@ -768,6 +824,9 @@ export default function NewCaseScreen() {
               { borderColor: theme.cardBorder, backgroundColor: theme.backgroundSecondary },
             ]}
             testID="button-prev-step"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Return to the previous step"
           >
             <Text style={[styles.secondaryBtnText, { color: theme.text }]}>Back</Text>
           </Pressable>
@@ -775,7 +834,13 @@ export default function NewCaseScreen() {
           <View style={styles.footerBtn} />
         )}
         {step < STEP_TITLES.length - 1 ? (
-          <Button onPress={goNext} style={styles.footerBtn} testID="button-next-step">
+          <Button
+            onPress={goNext}
+            style={styles.footerBtn}
+            testID="button-next-step"
+            accessibilityLabel="Next step"
+            accessibilityHint="Continue to the next step of the case form"
+          >
             Next
           </Button>
         ) : (
@@ -783,6 +848,10 @@ export default function NewCaseScreen() {
             onPress={() => createMutation.mutate()}
             disabled={createMutation.isPending}
             style={styles.footerBtn}
+            testID="button-open-case"
+            accessibilityLabel={createMutation.isPending ? "Opening case" : "Open case"}
+            accessibilityHint="Submit this case for help"
+            accessibilityState={{ busy: createMutation.isPending }}
           >
             {createMutation.isPending ? "Opening..." : "Open Case"}
           </Button>

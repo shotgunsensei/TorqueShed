@@ -152,7 +152,13 @@ function SectionHeader({
         </ThemedText>
       </View>
       {onSeeAll ? (
-        <Pressable onPress={onSeeAll} hitSlop={8}>
+        <Pressable
+          onPress={onSeeAll}
+          hitSlop={8}
+          accessibilityRole="link"
+          accessibilityLabel={`See all ${title}`}
+          testID={`link-see-all-${title.toLowerCase().replace(/\s+/g, "-")}`}
+        >
           <ThemedText type="link" style={{ color: theme.primary, fontSize: 13 }}>
             See All
           </ThemedText>
@@ -175,6 +181,8 @@ function VehicleCard({
       style={[styles.horizontalCard, { minWidth: 200 }]}
       onPress={onPress}
       testID={`card-vehicle-${vehicle.id}`}
+      accessibilityLabel={`Vehicle ${vehicle.nickname || "Unnamed"}, ${[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "no details"}, ${vehicle.notesCount} ${vehicle.notesCount === 1 ? "note" : "notes"}`}
+      accessibilityHint="Open this vehicle to add a note"
     >
       <View style={[styles.vehicleIcon, { backgroundColor: theme.primary + "15" }]}>
         <Feather name="truck" size={22} color={theme.primary} />
@@ -217,6 +225,8 @@ function ThreadCard({
       style={[styles.horizontalCard, { minWidth: 260 }]}
       onPress={onPress}
       testID={`card-thread-${thread.id}`}
+      accessibilityLabel={`${thread.title}. By ${thread.userName}. ${thread.replyCount || 0} ${(thread.replyCount || 0) === 1 ? "reply" : "replies"}.${thread.hasSolution ? " Solved." : ""}${isNew ? " New." : ""}${garageInfo ? ` In ${garageInfo.name}.` : ""}${timeAgo ? ` Last activity ${timeAgo}.` : ""}`}
+      accessibilityHint="Open thread"
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs }}>
         {garageInfo ? (
@@ -235,9 +245,17 @@ function ThreadCard({
               source={{ uri: resolveMediaUrl(coverPhoto) }}
               style={styles.threadThumb}
               testID={`thread-thumb-${thread.id}`}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              accessible={false}
+              alt=""
             />
             {extraCount > 0 ? (
-              <View style={styles.thumbCountBadge}>
+              <View
+                style={styles.thumbCountBadge}
+                accessible
+                accessibilityLabel={`${extraCount} more ${extraCount === 1 ? "photo" : "photos"}`}
+              >
                 <ThemedText style={styles.thumbCountText}>+{extraCount}</ThemedText>
               </View>
             ) : null}
@@ -314,6 +332,8 @@ function ListingCard({
       style={[styles.horizontalCard, { minWidth: 180 }]}
       onPress={onPress}
       testID={`card-listing-${listing.id}`}
+      accessibilityLabel={`${listing.title}, ${formatPrice(listing.price)}, condition ${listing.condition}, by ${listing.userName}${listingTimeAgo ? `, ${listingTimeAgo}` : ""}${listingIsNew ? ", new" : ""}`}
+      accessibilityHint="Open listing"
     >
       {listing.imageUrl ? (
         <View style={[styles.listingCover, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundTertiary }]}>
@@ -321,9 +341,17 @@ function ListingCard({
             source={{ uri: resolveImageUri(listing.imageUrl) || undefined }}
             style={styles.listingCoverImage}
             testID={`listing-cover-${listing.id}`}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            accessible={false}
+            alt=""
           />
           {extraCount > 0 ? (
-            <View style={styles.thumbCountBadge}>
+            <View
+              style={styles.thumbCountBadge}
+              accessible
+              accessibilityLabel={`${extraCount} more ${extraCount === 1 ? "photo" : "photos"}`}
+            >
               <ThemedText style={styles.thumbCountText}>+{extraCount}</ThemedText>
             </View>
           ) : null}
@@ -444,6 +472,8 @@ export default function HomeScreen() {
             style={styles.promptCard}
             onPress={() => navigation.navigate("AddVehicle")}
             testID="button-add-vehicle-prompt"
+            accessibilityLabel="Add your first vehicle"
+            accessibilityHint="Open the add vehicle screen"
           >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
@@ -483,7 +513,13 @@ export default function HomeScreen() {
             contentContainerStyle={styles.horizontalList}
           />
         ) : (
-          <Card style={styles.promptCard} onPress={() => navigateToTab("GaragesTab")}>
+          <Card
+            style={styles.promptCard}
+            onPress={() => navigateToTab("GaragesTab")}
+            testID="card-prompt-join-bay"
+            accessibilityLabel="Join a Bay"
+            accessibilityHint="Browse community bays to join"
+          >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="message-circle" size={24} color={theme.primary} />
@@ -522,7 +558,11 @@ export default function HomeScreen() {
             contentContainerStyle={styles.horizontalList}
           />
         ) : (
-          <Card style={styles.promptCard}>
+          <Card
+            style={styles.promptCard}
+            testID="card-empty-solved-threads"
+            accessibilityLabel="No solved threads yet. Solved threads matching your vehicles will appear here."
+          >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="check-circle" size={24} color={theme.primary} />
@@ -560,7 +600,13 @@ export default function HomeScreen() {
             contentContainerStyle={styles.horizontalList}
           />
         ) : (
-          <Card style={styles.promptCard} onPress={() => navigateToTab("SourceTab", { screen: "Source", params: { segment: "swap" } })}>
+          <Card
+            style={styles.promptCard}
+            onPress={() => navigateToTab("SourceTab", { screen: "Source", params: { segment: "swap" } })}
+            testID="card-prompt-browse-swap"
+            accessibilityLabel="Browse the Swap Shop"
+            accessibilityHint="Find parts or list something for sale"
+          >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="shopping-bag" size={24} color={theme.primary} />
@@ -608,6 +654,9 @@ export default function HomeScreen() {
             onPress={() => navigation.navigate("AskForHelp")}
             style={[styles.helpButton, { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}
             testID="button-ask-help"
+            accessibilityRole="button"
+            accessibilityLabel="Ask for help"
+            accessibilityHint="Open the assistant to get troubleshooting help"
           >
             <Feather name="help-circle" size={16} color={theme.primary} />
             <ThemedText type="caption" style={{ color: theme.primary, fontFamily: "Inter_500Medium", marginLeft: 4 }}>
@@ -631,6 +680,8 @@ export default function HomeScreen() {
                 style={styles.activityCard}
                 onPress={() => navigation.navigate("ThreadDetail", { threadId: t.id })}
                 testID={`card-continue-thread-${t.id}`}
+                accessibilityLabel={`Unsolved thread: ${t.title}, ${t.replyCount || 0} ${(t.replyCount || 0) === 1 ? "reply" : "replies"}${formatTimeAgo(t.lastActivityAt || t.createdAt) ? `, ${formatTimeAgo(t.lastActivityAt || t.createdAt)}` : ""}`}
+                accessibilityHint="Open thread"
               >
                 <View style={styles.promptContent}>
                   {tCover ? (
@@ -639,9 +690,17 @@ export default function HomeScreen() {
                         source={{ uri: resolveMediaUrl(tCover) }}
                         style={styles.threadThumb}
                         testID={`continue-thread-thumb-${t.id}`}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        accessible={false}
+                        alt=""
                       />
                       {tExtra > 0 ? (
-                        <View style={styles.thumbCountBadge}>
+                        <View
+                          style={styles.thumbCountBadge}
+                          accessible
+                          accessibilityLabel={`${tExtra} more ${tExtra === 1 ? "photo" : "photos"}`}
+                        >
                           <ThemedText style={styles.thumbCountText}>+{tExtra}</ThemedText>
                         </View>
                       ) : null}
@@ -674,6 +733,8 @@ export default function HomeScreen() {
                 style={styles.activityCard}
                 onPress={() => navigation.navigate("ListingDetail", { listingId: l.id })}
                 testID={`card-continue-listing-${l.id}`}
+                accessibilityLabel={`Active listing: ${l.title}, $${l.price}, ${l.condition}`}
+                accessibilityHint="Open listing"
               >
                 <View style={styles.promptContent}>
                   {l.imageUrl ? (
@@ -682,9 +743,17 @@ export default function HomeScreen() {
                         source={{ uri: resolveImageUri(l.imageUrl) || undefined }}
                         style={styles.threadThumb}
                         testID={`continue-listing-thumb-${l.id}`}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        accessible={false}
+                        alt=""
                       />
                       {lExtra > 0 ? (
-                        <View style={styles.thumbCountBadge}>
+                        <View
+                          style={styles.thumbCountBadge}
+                          accessible
+                          accessibilityLabel={`${lExtra} more ${lExtra === 1 ? "photo" : "photos"}`}
+                        >
                           <ThemedText style={styles.thumbCountText}>+{lExtra}</ThemedText>
                         </View>
                       ) : null}
@@ -748,6 +817,8 @@ export default function HomeScreen() {
                 style={styles.activityCard}
                 onPress={() => navigation.navigate("GarageDetail", { garageId: bay.id, garageName: bay.name })}
                 testID={`card-recommended-bay-${bay.id}`}
+                accessibilityLabel={`${bay.name}, ${bay.memberCount} ${bay.memberCount === 1 ? "member" : "members"}${bay.description ? `. ${bay.description}` : ""}`}
+                accessibilityHint="Open this bay"
               >
                 <View style={styles.promptContent}>
                   <View style={[styles.promptIcon, { backgroundColor: color + "15", width: 40, height: 40, borderRadius: 20 }]}>

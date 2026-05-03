@@ -77,8 +77,14 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       }}
     >
       <View style={styles.header}>
-        <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
-        <ThemedText type="h1" style={styles.title}>Join TorqueShed</ThemedText>
+        <Image
+          source={logoImage}
+          style={styles.logoImage}
+          resizeMode="contain"
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+        <ThemedText type="h1" style={styles.title} accessibilityRole="header">Join TorqueShed</ThemedText>
         <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
           Create your account and join the community
         </ThemedText>
@@ -86,7 +92,13 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
       <View style={styles.form}>
         {error ? (
-          <View style={[styles.errorContainer, { backgroundColor: theme.error + "20" }]}>
+          <View
+            style={[styles.errorContainer, { backgroundColor: theme.error + "20" }]}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={`Error: ${error}`}
+            testID="text-signup-error"
+          >
             <ThemedText type="caption" style={{ color: theme.error }}>
               {error}
             </ThemedText>
@@ -101,6 +113,11 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           leftIcon="user"
           autoCapitalize="none"
           autoCorrect={false}
+          accessibilityLabel="Username"
+          accessibilityHint="Choose a username, at least three characters"
+          testID="input-signup-username"
+          textContentType="username"
+          autoComplete="username-new"
         />
 
         <Input
@@ -110,6 +127,11 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           onChangeText={setPassword}
           leftIcon="lock"
           secureTextEntry
+          accessibilityLabel="Password"
+          accessibilityHint="Create a password, at least eight characters"
+          testID="input-signup-password"
+          textContentType="newPassword"
+          autoComplete="new-password"
         />
 
         <Input
@@ -119,9 +141,20 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           onChangeText={setConfirmPassword}
           leftIcon="lock"
           secureTextEntry
+          accessibilityLabel="Confirm password"
+          accessibilityHint="Re-enter the password you just created"
+          testID="input-signup-confirm-password"
+          textContentType="newPassword"
+          autoComplete="new-password"
         />
 
-        <Button onPress={handleSignup} disabled={isLoading}>
+        <Button
+          onPress={handleSignup}
+          disabled={isLoading}
+          testID="button-create-account"
+          accessibilityLabel={isLoading ? "Creating account" : "Create account"}
+          accessibilityHint="Sign up for a new TorqueShed account"
+        >
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
@@ -134,7 +167,13 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         <ThemedText type="body" style={{ color: theme.textSecondary }}>
           Already have an account?
         </ThemedText>
-        <Pressable onPress={() => navigation.goBack()}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          accessibilityRole="link"
+          accessibilityLabel="Log in"
+          accessibilityHint="Return to the log in screen"
+          testID="link-login"
+        >
           <ThemedText type="body" style={[styles.link, { color: theme.primary }]}>
             Log In
           </ThemedText>

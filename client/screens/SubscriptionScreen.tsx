@@ -326,6 +326,9 @@ export default function SubscriptionScreen() {
                   active && { backgroundColor: theme.primary },
                 ]}
                 testID={`toggle-interval-${opt}`}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={opt === "month" ? "Monthly billing" : "Annual billing, 2 months free"}
               >
                 <ThemedText
                   type="small"
@@ -406,6 +409,10 @@ export default function SubscriptionScreen() {
             onPress={() => portalMutation.mutate()}
             disabled={portalMutation.isPending}
             testID="button-manage-billing"
+            accessibilityRole="button"
+            accessibilityLabel={portalMutation.isPending ? "Opening billing portal" : "Manage billing and invoices"}
+            accessibilityHint="Open the Stripe billing portal in your browser"
+            accessibilityState={{ disabled: portalMutation.isPending, busy: portalMutation.isPending }}
           >
             <Feather name="credit-card" size={16} color={theme.text} style={{ marginRight: Spacing.sm }} />
             <ThemedText type="body" style={{ color: theme.text, fontWeight: "600" }}>
@@ -510,6 +517,10 @@ export default function SubscriptionScreen() {
                 onPress={onPress}
                 disabled={disabled}
                 testID={`button-tier-${t.tier}`}
+                accessibilityRole="button"
+                accessibilityLabel={`${cta}, ${t.name} plan, ${interval === "year" && t.annual ? t.annual : t.monthly}`}
+                accessibilityHint={isCurrent ? "This is your current plan" : `Switch your plan to ${t.name}`}
+                accessibilityState={{ disabled, selected: isCurrent, busy: busyTier === t.tier }}
               >
                 {busyTier === t.tier ? (
                   <ActivityIndicator color={muted ? theme.text : "#0D0F12"} />
@@ -529,6 +540,9 @@ export default function SubscriptionScreen() {
           onPress={() => navigation.navigate("Billing")}
           style={[styles.manageLink, { borderColor: theme.cardBorder }]}
           testID="button-open-billing"
+          accessibilityRole="link"
+          accessibilityLabel="Manage billing and invoices"
+          accessibilityHint="Open the billing screen"
         >
           <Feather name="credit-card" size={16} color={theme.primary} />
           <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
@@ -578,7 +592,13 @@ function BillingBanner({
         <ThemedText type="small" style={{ color: palette.fg, fontWeight: "700" }}>{title}</ThemedText>
         <ThemedText type="small" style={{ color: theme.text, marginTop: 2 }}>{body}</ThemedText>
         {action ? (
-          <Pressable onPress={action.onPress} style={{ marginTop: Spacing.xs }}>
+          <Pressable
+            onPress={action.onPress}
+            style={{ marginTop: Spacing.xs }}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            testID={`button-banner-${tone}-action`}
+          >
             <ThemedText type="small" style={{ color: palette.fg, fontWeight: "700" }}>
               {action.label} ›
             </ThemedText>

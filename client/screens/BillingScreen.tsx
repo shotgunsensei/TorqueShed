@@ -140,6 +140,10 @@ export default function BillingScreen() {
           disabled={busy !== null}
           style={[styles.primaryBtn, { backgroundColor: theme.primary, opacity: busy ? 0.6 : 1 }]}
           testID="button-open-portal"
+          accessibilityRole="button"
+          accessibilityLabel={busy === "portal" ? "Opening Stripe billing portal" : "Open Stripe billing portal"}
+          accessibilityHint="Manage your card and invoices in Stripe"
+          accessibilityState={{ disabled: busy !== null, busy: busy === "portal" }}
         >
           {busy === "portal" ? (
             <ActivityIndicator color="#0D0F12" />
@@ -156,6 +160,10 @@ export default function BillingScreen() {
         <Pressable
           onPress={handleCheckoutDiy}
           disabled={busy !== null || stripeMode === "missing_config"}
+          accessibilityRole="button"
+          accessibilityLabel={busy === "checkout" ? "Starting checkout" : "Subscribe to DIY Pro"}
+          accessibilityHint="Start a Stripe checkout for the DIY Pro plan"
+          accessibilityState={{ disabled: busy !== null || stripeMode === "missing_config", busy: busy === "checkout" }}
           style={[
             styles.primaryBtn,
             {
@@ -182,6 +190,9 @@ export default function BillingScreen() {
         onPress={() => navigation.navigate("Subscription")}
         style={[styles.secondaryBtn, { borderColor: theme.cardBorder }]}
         testID="button-compare-plans"
+        accessibilityRole="link"
+        accessibilityLabel="Compare all plans"
+        accessibilityHint="Open the subscription tiers comparison screen"
       >
         <ThemedText type="small" style={{ color: theme.text, fontWeight: "600" }}>
           Compare all plans

@@ -15,11 +15,21 @@ interface FABProps {
   icon: keyof typeof Feather.glyphMap;
   onPress: () => void;
   bottom?: number;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function FAB({ icon, onPress, bottom = 100 }: FABProps) {
+export function FAB({
+  icon,
+  onPress,
+  bottom = 100,
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
+}: FABProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -54,7 +64,10 @@ export function FAB({ icon, onPress, bottom = 100 }: FABProps) {
         Shadows.large,
         animatedStyle,
       ]}
-      testID="fab-button"
+      testID={testID ?? "fab-button"}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? `${icon} action`}
+      accessibilityHint={accessibilityHint}
     >
       <Feather name={icon} size={24} color="#FFFFFF" />
     </AnimatedPressable>
