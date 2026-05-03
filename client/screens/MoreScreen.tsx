@@ -1,6 +1,7 @@
 import React from "react";
 import { View, ScrollView, StyleSheet, Pressable, Linking } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/query-client";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -116,10 +117,30 @@ export default function MoreScreen() {
     enabled: leadCaptureEnabled,
     refetchInterval: 60_000,
   });
+  const queryClient = useQueryClient();
   const { data: me } = useQuery<{ email: string | null; emailVerifiedAt: string | null }>({
     queryKey: ["/api/users/me"],
   });
   const showVerifyBanner = !!me?.email && !me?.emailVerifiedAt;
+  const sendVerifyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/auth/email/send-verification", {});
+      return res.json();
+    },
+    onSuccess: (body: { alreadyVerified?: boolean }) => {
+      if (body?.alreadyVerified) {
+        toast.show("Email already verified", "success");
+        queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      } else {
+        toast.show("Verification email sent. Check your inbox.", "success");
+      }
+    },
+    onError: (err: Error) => {
+      const msg = err?.message || "";
+      if (msg.includes("429")) toast.show("Too many requests. Try again later.", "error");
+      else toast.show("Failed to send verification email", "error");
+    },
+  });
   const badgeCounts: Partial<Record<NonNullable<MenuItem["badgeKey"]>, number>> = {
     leads: unreadLeads?.count ?? 0,
   };
@@ -201,11 +222,12 @@ export default function MoreScreen() {
             </View>
           </View>
           <Button
-            onPress={() => navigation.navigate("VerifyEmail")}
+            onPress={() => sendVerifyMutation.mutate()}
+            disabled={sendVerifyMutation.isPending}
             style={styles.verifyBtn}
             testID="button-banner-verify-email"
           >
-            Verify now
+            {sendVerifyMutation.isPending ? "Sending…" : "Send verification email"}
           </Button>
         </Card>
       ) : null}

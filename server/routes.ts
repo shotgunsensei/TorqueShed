@@ -391,7 +391,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let emailChanged = false;
       let normalizedEmail: string | null | undefined = undefined;
       if (parsed.email !== undefined) {
-        normalizedEmail = parsed.email === "" ? null : parsed.email.toLowerCase().trim();
+        if (parsed.email === null || parsed.email === "") {
+          normalizedEmail = null;
+        } else {
+          normalizedEmail = parsed.email.toLowerCase().trim();
+        }
         updates.email = normalizedEmail;
       }
       if (parsed.expoPushToken !== undefined) updates.expoPushToken = parsed.expoPushToken === "" ? null : parsed.expoPushToken;
@@ -411,6 +415,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.update(users).set(updates).where(eq(users.id, req.userId!));
       if (emailChanged) {
         await storage.invalidateEmailVerifications(req.userId!);
+        // If the new email is non-null, immediately issue a fresh verification token
+        // and send the link so the user does not have to take a second action.
+        if (normalizedEmail) {
+          try {
+            const { token } = await storage.createEmailVerification(req.userId!, normalizedEmail);
+            const { sendEmail, buildVerificationEmail } = await import("./lib/mailer");
+            const baseUrl = getVerifyBaseUrl(req);
+            const verifyUrl = `${baseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
+            const { subject, html, text } = buildVerificationEmail(verifyUrl, normalizedEmail);
+            const result = await sendEmail({ to: normalizedEmail, subject, html, text });
+            if (!result.ok) {
+              console.error("[email-verify] auto-send after email change failed:", result.error);
+            }
+          } catch (err) {
+            console.error("[email-verify] auto-send after email change threw:", err);
+          }
+        }
       }
       const [refreshed] = await db
         .select({
@@ -1961,6 +1982,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== Email Verification ==========
+  function getVerifyBaseUrl(req: Request): string {
+    const explicitDomain = process.env.PUBLIC_APP_URL || process.env.APP_URL;
+    if (explicitDomain) {
+      return explicitDomain.startsWith("http") ? explicitDomain : `https://${explicitDomain}`;
+    }
+    const expoDomain = process.env.EXPO_PUBLIC_DOMAIN || process.env.PUBLIC_BASE_URL;
+    if (expoDomain) {
+      // EXPO_PUBLIC_DOMAIN is shared with the client (e.g. host:5000). Strip a port
+      // suffix so the public verify URL targets the front-door domain.
+      const cleaned = expoDomain.replace(/:\d+$/, "");
+      return cleaned.startsWith("http") ? cleaned : `https://${cleaned}`;
+    }
+    if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    return `${req.protocol}://${req.get("host")}`;
+  }
+
   app.post(
     "/api/auth/email/send-verification",
     requireAuth,
@@ -1977,11 +2014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         const { token } = await storage.createEmailVerification(user.id, user.email);
         const { sendEmail, buildVerificationEmail } = await import("./lib/mailer");
-        const baseUrl =
-          process.env.PUBLIC_APP_URL ||
-          process.env.APP_URL ||
-          (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) ||
-          `${req.protocol}://${req.get("host")}`;
+        const baseUrl = getVerifyBaseUrl(req);
         const verifyUrl = `${baseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
         const { subject, html, text } = buildVerificationEmail(verifyUrl, user.email);
         const result = await sendEmail({ to: user.email, subject, html, text });
@@ -2010,7 +2043,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!result) {
           return res.status(400).json({ error: "Invalid token", message: "This verification link is invalid, expired, or already used." });
         }
-        res.json({ ok: true, email: result.email });
+        const user = await storage.getUser(result.userId);
+        res.json({
+          ok: true,
+          email: result.email,
+          user: user
+            ? {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                onboardingCompleted: user.onboardingCompleted ?? true,
+                onboardingGoals: user.onboardingGoals ?? [],
+                email: user.email ?? null,
+                emailVerifiedAt: user.emailVerifiedAt ? user.emailVerifiedAt.toISOString() : null,
+                notificationsEnabled: user.notificationsEnabled ?? true,
+              }
+            : null,
+        });
       } catch (error) {
         console.error("Error verifying email:", error);
         res.status(500).json({ error: "Failed to verify email" });
