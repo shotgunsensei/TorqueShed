@@ -14,7 +14,8 @@
     "lint:fix": "npx expo lint --fix",
     "check:types": "tsc --noEmit",
     "check:format": "prettier --check \"**/*.{js,ts,tsx,css,json}\"",
-    "format": "prettier --write \"**/*.{js,ts,tsx,css,json}\""
+    "format": "prettier --write \"**/*.{js,ts,tsx,css,json}\"",
+    "test": "vitest run"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
