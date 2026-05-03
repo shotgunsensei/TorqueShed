@@ -11,11 +11,10 @@ import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { ZodError } from "zod";
-import { WebhookHandlers } from "./webhookHandlers";
 import { getStripeSync, isStripeConfigured } from "./stripeClient";
-import { reconcileWebhookPayload, syncAllLocalSubscriptions } from "./stripeBilling";
+import { syncAllLocalSubscriptions } from "./stripeBilling";
 import { assertSchemaInSync } from "./schemaCheck";
-import type Stripe from "stripe";
+import { setupStripeWebhook } from "./stripeWebhookRoute";
 
 const app = express();
 const log = console.log;
@@ -148,88 +147,6 @@ function setupCors(app: express.Application) {
   });
 }
 
-async function handleExpertEscalationEvent(payload: Buffer): Promise<void> {
-  let event: Stripe.Event;
-  try {
-    event = JSON.parse(payload.toString("utf8")) as Stripe.Event;
-  } catch {
-    return;
-  }
-
-  if (
-    event.type !== "checkout.session.completed" &&
-    event.type !== "checkout.session.expired" &&
-    event.type !== "checkout.session.async_payment_failed"
-  ) {
-    return;
-  }
-
-  const session = event.data?.object as Stripe.Checkout.Session | undefined;
-  if (!session || session.metadata?.kind !== "expert_escalation") return;
-
-  const reviewId = session.metadata?.reviewId;
-  if (!reviewId) return;
-
-  try {
-    if (event.type === "checkout.session.completed") {
-      const paymentIntentId =
-        typeof session.payment_intent === "string"
-          ? session.payment_intent
-          : session.payment_intent?.id ?? null;
-      await storage.markExpertReviewPaid(reviewId, paymentIntentId);
-    } else {
-      await storage.markExpertReviewFailed(reviewId);
-    }
-  } catch (err) {
-    console.error(
-      `[stripe] Failed handling expert-escalation event ${event.type} for review ${reviewId}:`,
-      err,
-    );
-  }
-}
-
-function setupStripeWebhook(app: express.Application) {
-  // CRITICAL: this route must be registered BEFORE express.json() so the body
-  // arrives as a raw Buffer for Stripe signature verification.
-  app.post(
-    "/api/stripe/webhook",
-    express.raw({ type: "application/json" }),
-    async (req: Request, res: Response) => {
-      const signature = req.headers["stripe-signature"];
-      if (!signature) {
-        return res.status(400).json({ error: "Missing stripe-signature header" });
-      }
-      const sig = Array.isArray(signature) ? signature[0] : signature;
-
-      try {
-        if (!Buffer.isBuffer(req.body)) {
-          console.error(
-            "STRIPE WEBHOOK ERROR: req.body is not a Buffer. " +
-              "express.json() likely ran before this route. " +
-              "Ensure setupStripeWebhook() is called BEFORE setupBodyParsing()."
-          );
-          return res.status(500).json({ error: "Webhook processing error" });
-        }
-
-        const buf = req.body as Buffer;
-        await WebhookHandlers.processWebhook(buf, sig);
-        // After the stripe schema is updated, propagate the change to our local
-        // subscriptions table so getUserTier() reflects the new state.
-        await reconcileWebhookPayload(buf);
-        // One-time expert-escalation checkouts aren't subscriptions, so the
-        // reconcile above does nothing for them. Handle them here.
-        await handleExpertEscalationEvent(buf);
-
-        res.status(200).json({ received: true });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "unknown";
-        console.error("Stripe webhook error:", message);
-        res.status(400).json({ error: "Webhook processing error" });
-      }
-    },
-  );
-  log("Stripe webhook route registered at /api/stripe/webhook");
-}
 
 function setupBodyParsing(app: express.Application) {
   app.use(
