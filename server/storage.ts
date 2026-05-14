@@ -214,29 +214,50 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updated;
     }
-    // Lazily provision. Username must be unique; derive a stable, collision-resistant
-    // value from the OperatorOS sub. Password hash is set to a non-loginable sentinel
-    // so the local password flow can never match.
+    // Lazily provision. Username must be unique; derive a stable base from the
+    // OperatorOS sub and retry with a numeric suffix on collision. Password hash
+    // uses the SSO sentinel prefix; `server/routes/auth.ts` short-circuits any
+    // local-password attempt against accounts whose hash starts with `!sso:`.
     const baseHandle = (claims.email?.split("@")[0] || "user")
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, "")
       .slice(0, 24) || "user";
-    const username = `${baseHandle}-${claims.sub.slice(0, 8)}`;
-    const [created] = await db
-      .insert(users)
-      .values({
-        username,
-        passwordHash: "!operatoros-sso!",
-        email: claims.email?.toLowerCase() ?? null,
-        operatorOsUserId: claims.sub,
-        operatorOsEmail: claims.email ?? null,
-        operatorOsRole: claims.role ?? null,
-        operatorOsPlanSlug: claims.planSlug ?? null,
-        operatorOsOrganizationId: claims.organizationId ?? null,
-        operatorOsLastSeenAt: now,
-      })
-      .returning();
-    return created;
+    const baseUsername = `${baseHandle}-${claims.sub.slice(0, 12)}`;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = attempt === 0 ? baseUsername : `${baseUsername}-${attempt}`;
+      try {
+        const [created] = await db
+          .insert(users)
+          .values({
+            username: candidate,
+            passwordHash: "!sso:operatoros",
+            email: claims.email?.toLowerCase() ?? null,
+            operatorOsUserId: claims.sub,
+            operatorOsEmail: claims.email ?? null,
+            operatorOsRole: claims.role ?? null,
+            operatorOsPlanSlug: claims.planSlug ?? null,
+            operatorOsOrganizationId: claims.organizationId ?? null,
+            operatorOsLastSeenAt: now,
+          })
+          .returning();
+        return created;
+      } catch (e) {
+        const msg = (e as { message?: string }).message || "";
+        // 23505 = Postgres unique_violation. Retry on either username or
+        // operator_os_user_id collision (latter only happens if a parallel
+        // request raced us to provision the same sub — re-select afterwards).
+        if (!msg.includes("duplicate key") && !msg.includes("23505")) throw e;
+        const [racer] = await db
+          .select()
+          .from(users)
+          .where(eq(users.operatorOsUserId, claims.sub));
+        if (racer) return racer;
+        // Otherwise it was the username collision — loop and try the next suffix.
+      }
+    }
+    throw new Error(
+      `[operatoros-sso] failed to provision unique username for sub=${claims.sub}`,
+    );
   }
 
   async createEmailVerification(userId: string, email: string): Promise<{ token: string; expiresAt: Date }> {

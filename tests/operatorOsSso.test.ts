@@ -1,0 +1,193 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import jwt from "jsonwebtoken";
+import { verifyLaunchToken } from "../server/lib/operatorOsSso";
+
+const SECRET = "test-secret-please-do-not-use-in-prod";
+const ISSUER = "https://operatoros.test";
+const AUDIENCE = "torqueshed";
+const ENV = "dev";
+const API = "https://api.operatoros.test";
+
+const baseClaims = () => ({
+  iss: ISSUER,
+  aud: AUDIENCE,
+  env: ENV,
+  sub: "user_abc123",
+  user_id: "user_abc123",
+  email: "driver@example.com",
+  role: "member",
+  module_slug: AUDIENCE,
+  plan_slug: "garage_pro",
+  organization_id: "org_xyz",
+  jti: "jti_one",
+});
+
+function sign(claims: Record<string, unknown>, opts: jwt.SignOptions = {}) {
+  return jwt.sign(claims, SECRET, { algorithm: "HS256", expiresIn: "60s", ...opts });
+}
+
+const okConsume = async () => ({ status: 200, body: null });
+
+describe("operatorOsSso.verifyLaunchToken", () => {
+  beforeEach(() => {
+    process.env.MODULE_SSO_SECRET = SECRET;
+    process.env.OPERATOROS_BASE_URL = ISSUER;
+    process.env.OPERATOROS_SSO_AUDIENCE = AUDIENCE;
+    process.env.OPERATOROS_SSO_ENV = ENV;
+    process.env.OPERATOROS_API_URL = API;
+  });
+  afterEach(() => {
+    delete process.env.MODULE_SSO_SECRET;
+    delete process.env.OPERATOROS_BASE_URL;
+    delete process.env.OPERATOROS_SSO_AUDIENCE;
+    delete process.env.OPERATOROS_SSO_ENV;
+    delete process.env.OPERATOROS_API_URL;
+  });
+
+  it("accepts a valid token after consume succeeds", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.claims.sub).toBe("user_abc123");
+      expect(res.claims.module_slug).toBe(AUDIENCE);
+    }
+  });
+
+  it("rejects an empty token", async () => {
+    const res = await verifyLaunchToken("", { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 400, code: "missing_token" });
+  });
+
+  it("rejects a bad signature", async () => {
+    const token = jwt.sign(baseClaims(), "wrong-secret", { algorithm: "HS256", expiresIn: "60s" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "signature_invalid" });
+  });
+
+  it("rejects mismatched issuer", async () => {
+    const token = sign({ ...baseClaims(), iss: "https://evil.example" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "issuer_mismatch" });
+  });
+
+  it("rejects mismatched audience", async () => {
+    const token = sign({ ...baseClaims(), aud: "other", module_slug: "other" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "audience_mismatch" });
+  });
+
+  it("rejects mismatched module_slug even when aud matches", async () => {
+    const token = sign({ ...baseClaims(), module_slug: "another" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "audience_mismatch" });
+  });
+
+  it("rejects mismatched env", async () => {
+    const token = sign({ ...baseClaims(), env: "prod" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "env_mismatch" });
+  });
+
+  it("rejects an expired token", async () => {
+    const token = sign(baseClaims(), { expiresIn: "-1s" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "expired" });
+  });
+
+  it("rejects a token older than 90s even if exp is in the future", async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const token = jwt.sign(
+      { ...baseClaims(), iat: nowSec - 200, exp: nowSec + 600 },
+      SECRET,
+      { algorithm: "HS256" },
+    );
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "expired" });
+  });
+
+  it("rejects when iat is too far in the future (clock skew)", async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const token = jwt.sign(
+      { ...baseClaims(), iat: nowSec + 60, exp: nowSec + 600 },
+      SECRET,
+      { algorithm: "HS256" },
+    );
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 401, code: "clock_skew" });
+  });
+
+  it("maps consume TOKEN_REPLAYED to consume_failed", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => ({ status: 409, body: { code: "TOKEN_REPLAYED" } }),
+    });
+    expect(res).toEqual({ ok: false, status: 401, code: "consume_failed" });
+  });
+
+  it("maps consume TOKEN_UNKNOWN to consume_failed", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => ({ status: 404, body: { code: "TOKEN_UNKNOWN" } }),
+    });
+    expect(res).toEqual({ ok: false, status: 401, code: "consume_failed" });
+  });
+
+  it("maps consume TOKEN_EXPIRED to expired", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => ({ status: 410, body: { code: "TOKEN_EXPIRED" } }),
+    });
+    expect(res).toEqual({ ok: false, status: 401, code: "expired" });
+  });
+
+  it("maps consume AUDIENCE_MISMATCH to audience_mismatch", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => ({ status: 401, body: { code: "AUDIENCE_MISMATCH" } }),
+    });
+    expect(res).toEqual({ ok: false, status: 401, code: "audience_mismatch" });
+  });
+
+  it("maps consume ENV_MISMATCH to env_mismatch", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => ({ status: 401, body: { code: "ENV_MISMATCH" } }),
+    });
+    expect(res).toEqual({ ok: false, status: 401, code: "env_mismatch" });
+  });
+
+  it("maps consume 5xx to sso_consume_unavailable", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => ({ status: 503, body: null }),
+    });
+    expect(res).toEqual({ ok: false, status: 502, code: "sso_consume_unavailable" });
+  });
+
+  it("maps consume network error to sso_consume_unavailable", async () => {
+    const token = sign(baseClaims());
+    const res = await verifyLaunchToken(token, {
+      consume: async () => {
+        throw new Error("network down");
+      },
+    });
+    expect(res).toEqual({ ok: false, status: 502, code: "sso_consume_unavailable" });
+  });
+
+  it("rejects an RS256-signed token (HS256-only)", async () => {
+    // Build a header.payload.sig structure that *claims* RS256 but is signed with our HS256 secret.
+    // jsonwebtoken's verify with algorithms:["HS256"] should reject any other alg in the header.
+    const token = jwt.sign(baseClaims(), SECRET, { algorithm: "HS256", expiresIn: "60s" });
+    const [headerB64, payloadB64, sig] = token.split(".");
+    const header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8"));
+    header.alg = "RS256";
+    const tamperedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+    const tampered = `${tamperedHeader}.${payloadB64}.${sig}`;
+    const res = await verifyLaunchToken(tampered, { consume: okConsume });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(["signature_invalid", "bad_request"]).toContain(res.code);
+    }
+  });
+});

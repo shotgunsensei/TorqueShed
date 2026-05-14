@@ -68,10 +68,21 @@
     </div>
     <script>
       (function () {
+        // Only forward to internal, same-origin paths. Anything that doesn't
+        // start with a single "/" (and crucially, not "//" or a backslash, both
+        // of which browsers can interpret as protocol-relative URLs to another
+        // host) is rejected and we fall back to the app root. This prevents
+        // /sso/bridge from being abused as an open redirect.
+        function safeRedirect(value) {
+          if (typeof value !== "string" || value.length === 0) return "/";
+          if (value[0] !== "/") return "/";
+          if (value[1] === "/" || value[1] === "\\") return "/";
+          return value;
+        }
         try {
           var params = new URLSearchParams(window.location.search);
           var token = params.get("token");
-          var redirect = params.get("redirect") || "/";
+          var redirect = safeRedirect(params.get("redirect"));
           if (token) {
             try { localStorage.setItem("torqueshed_auth_token", token); } catch (_) {}
           }

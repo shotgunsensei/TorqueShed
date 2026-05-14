@@ -56,7 +56,8 @@ export function register(app: Express): void {
       // Hand the session token to the bridge page, which writes it into
       // localStorage under the same key AuthContext already reads, then
       // forwards the browser to the app root with the token stripped from
-      // the address bar.
+      // the address bar. The bridge sanitises its redirect param to internal
+      // paths only, so this string is the only route the user can land on.
       res.redirect(
         302,
         `/sso/bridge?token=${encodeURIComponent(sessionToken)}&redirect=%2F`,

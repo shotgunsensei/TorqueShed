@@ -112,6 +112,16 @@ export function register(app: Express): void {
         return await recordFailure();
       }
 
+      // SSO-provisioned accounts have a sentinel password hash that is not a
+      // valid bcrypt string. Short-circuit so bcrypt.compare can't throw and
+      // so we surface a clear "use SSO" message instead of a generic 500.
+      if (user.passwordHash.startsWith("!sso:")) {
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "This account signs in via OperatorOS — please launch TorqueShed from there.",
+        });
+      }
+
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       if (!isValidPassword) {
         return await recordFailure();
