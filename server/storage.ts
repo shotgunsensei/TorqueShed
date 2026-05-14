@@ -134,6 +134,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  findOrCreateUserByOperatorOsId(claims: {
+    sub: string;
+    email?: string | null;
+    role?: string | null;
+    planSlug?: string | null;
+    organizationId?: string | null;
+  }): Promise<User>;
   deleteUser(id: string): Promise<void>;
   getPublicProfile(id: string): Promise<PublicProfile | undefined>;
   updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined>;
