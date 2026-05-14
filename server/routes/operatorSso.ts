@@ -44,7 +44,10 @@ export function register(app: Express): void {
         console.error(
           `[operatoros-sso] failed to mint session token jti=${result.claims.jti}`,
         );
-        return reject(res, 500, "consume_failed", result.claims.jti);
+        // Distinct from `consume_failed` (which is reserved for the documented
+        // 401 mapping when the OperatorOS consume endpoint rejects the jti);
+        // this is purely an internal mint failure on our side.
+        return reject(res, 500, "internal_error", result.claims.jti);
       }
 
       console.log(
@@ -67,7 +70,7 @@ export function register(app: Express): void {
       console.error(
         `[operatoros-sso] provisioning error jti=${result.claims.jti}: ${(e as Error).message}`,
       );
-      reject(res, 500, "consume_failed", result.claims.jti);
+      reject(res, 500, "internal_error", result.claims.jti);
     }
   });
 

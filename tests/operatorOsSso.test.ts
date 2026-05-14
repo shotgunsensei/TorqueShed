@@ -59,6 +59,17 @@ describe("operatorOsSso.verifyLaunchToken", () => {
     expect(res).toEqual({ ok: false, status: 400, code: "missing_token" });
   });
 
+  it("rejects a token missing required claims with bad_request", async () => {
+    // Sign a payload that is structurally a valid HS256 JWT but lacks the
+    // mandatory sub/jti/iat/exp set the verifier requires.
+    const token = jwt.sign({ iss: ISSUER, aud: AUDIENCE, env: ENV }, SECRET, {
+      algorithm: "HS256",
+      noTimestamp: true,
+    });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res).toEqual({ ok: false, status: 400, code: "bad_request" });
+  });
+
   it("rejects a bad signature", async () => {
     const token = jwt.sign(baseClaims(), "wrong-secret", { algorithm: "HS256", expiresIn: "60s" });
     const res = await verifyLaunchToken(token, { consume: okConsume });

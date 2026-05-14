@@ -26,7 +26,8 @@ export type OperatorOsRejectCode =
   | "expired"
   | "clock_skew"
   | "consume_failed"
-  | "sso_consume_unavailable";
+  | "sso_consume_unavailable"
+  | "internal_error";
 
 export interface OperatorOsVerifyOk {
   ok: true;
