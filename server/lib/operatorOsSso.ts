@@ -118,7 +118,15 @@ export async function verifyLaunchToken(
 
   let claims: OperatorOsClaims;
   try {
-    claims = jwt.verify(token, cfg.secret, { algorithms: ["HS256"] }) as OperatorOsClaims;
+    // Allow ±5s of clock drift between OperatorOS and TorqueShed at the JWT
+    // library level so a token whose `exp` is a couple of seconds in the past
+    // is still accepted (matching the documented skew tolerance). All other
+    // time checks are then enforced explicitly below from a single `now`
+    // reading so the verifier behaves deterministically.
+    claims = jwt.verify(token, cfg.secret, {
+      algorithms: ["HS256"],
+      clockTolerance: CLOCK_SKEW_SECONDS,
+    }) as OperatorOsClaims;
   } catch (e) {
     const name = (e as { name?: string }).name;
     if (name === "TokenExpiredError") return err(401, "expired");
@@ -140,8 +148,11 @@ export async function verifyLaunchToken(
 
   const nowSeconds = Math.floor((opts.now ? opts.now() : Date.now()) / 1000);
   if (claims.iat - nowSeconds > CLOCK_SKEW_SECONDS) return err(401, "clock_skew");
-  if (claims.exp + CLOCK_SKEW_SECONDS < nowSeconds) return err(401, "expired");
-  if (nowSeconds - claims.iat > TOKEN_MAX_AGE_SECONDS) return err(401, "expired");
+  // 90s max age is enforced from `iat`, with the same ±5s tolerance applied so
+  // a token issued exactly 90s ago isn't rejected over a sub-second drift.
+  if (nowSeconds - claims.iat > TOKEN_MAX_AGE_SECONDS + CLOCK_SKEW_SECONDS) {
+    return err(401, "expired");
+  }
 
   if (!cfg.apiUrl) {
     // Without the consume URL we cannot enforce single-use — treat as

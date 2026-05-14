@@ -44,29 +44,30 @@ export function register(app: Express): void {
         console.error(
           `[operatoros-sso] failed to mint session token jti=${result.claims.jti}`,
         );
-        return res
-          .status(500)
-          .json({ code: "consume_failed", message: "Failed to mint session" });
+        return reject(res, 500, "consume_failed", result.claims.jti);
       }
 
       console.log(
         `[operatoros-sso] launch ok jti=${result.claims.jti} sub=${result.claims.sub}`,
       );
 
-      // Hand the session token to the bridge page, which writes it into
-      // localStorage under the same key AuthContext already reads, then
-      // forwards the browser to the app root with the token stripped from
-      // the address bar. The bridge sanitises its redirect param to internal
-      // paths only, so this string is the only route the user can land on.
+      // Hand the session token to the bridge page. The bridge:
+      //   1. Writes the token to localStorage under `torqueshed_auth_token`.
+      //   2. Attempts a `torqueshed://sso?token=...` deep link so a user who
+      //      arrived in a mobile browser is bounced into the native app.
+      //   3. Falls back to `/?ssoToken=<token>` so AuthContext's web pickup
+      //      path persists the token and strips it from the URL.
+      // The bridge sanitises its `redirect` param to internal paths only,
+      // closing the open-redirect vector.
       res.redirect(
         302,
-        `/sso/bridge?token=${encodeURIComponent(sessionToken)}&redirect=%2F`,
+        `/sso/bridge?token=${encodeURIComponent(sessionToken)}`,
       );
     } catch (e) {
       console.error(
         `[operatoros-sso] provisioning error jti=${result.claims.jti}: ${(e as Error).message}`,
       );
-      res.status(500).json({ code: "consume_failed", message: "Failed to provision user" });
+      reject(res, 500, "consume_failed", result.claims.jti);
     }
   });
 

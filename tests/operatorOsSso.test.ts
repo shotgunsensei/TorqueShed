@@ -89,10 +89,16 @@ describe("operatorOsSso.verifyLaunchToken", () => {
     expect(res).toEqual({ ok: false, status: 401, code: "env_mismatch" });
   });
 
-  it("rejects an expired token", async () => {
-    const token = sign(baseClaims(), { expiresIn: "-1s" });
+  it("rejects an expired token (beyond skew tolerance)", async () => {
+    const token = sign(baseClaims(), { expiresIn: "-30s" });
     const res = await verifyLaunchToken(token, { consume: okConsume });
     expect(res).toEqual({ ok: false, status: 401, code: "expired" });
+  });
+
+  it("accepts a token expired by less than 5s (clock skew tolerance)", async () => {
+    const token = sign(baseClaims(), { expiresIn: "-2s" });
+    const res = await verifyLaunchToken(token, { consume: okConsume });
+    expect(res.ok).toBe(true);
   });
 
   it("rejects a token older than 90s even if exp is in the future", async () => {

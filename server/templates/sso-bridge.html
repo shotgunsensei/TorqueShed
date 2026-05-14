@@ -74,20 +74,39 @@
         // host) is rejected and we fall back to the app root. This prevents
         // /sso/bridge from being abused as an open redirect.
         function safeRedirect(value) {
-          if (typeof value !== "string" || value.length === 0) return "/";
-          if (value[0] !== "/") return "/";
-          if (value[1] === "/" || value[1] === "\\") return "/";
+          if (typeof value !== "string" || value.length === 0) return null;
+          if (value[0] !== "/") return null;
+          if (value[1] === "/" || value[1] === "\\") return null;
           return value;
         }
         try {
           var params = new URLSearchParams(window.location.search);
           var token = params.get("token");
           var redirect = safeRedirect(params.get("redirect"));
-          if (token) {
-            try { localStorage.setItem("torqueshed_auth_token", token); } catch (_) {}
+          if (!token) {
+            window.location.replace(redirect || "/");
+            return;
           }
-          // Strip the token from the URL before forwarding the user.
-          window.location.replace(redirect);
+          // Persist for the web app — AuthContext also reads this key, so a
+          // user who lands on the web build is signed in immediately.
+          try { localStorage.setItem("torqueshed_auth_token", token); } catch (_) {}
+          // Try to bounce a mobile-browser user into the native app via the
+          // custom URL scheme. If the scheme isn't registered (desktop, web
+          // build, no native app installed) this navigation no-ops and the
+          // setTimeout fallback below forwards them to the web app with the
+          // ssoToken in the query so AuthContext can pick it up and strip it.
+          var deepLink = "torqueshed://sso?token=" + encodeURIComponent(token);
+          var webFallback =
+            (redirect || "/") +
+            ((redirect || "/").indexOf("?") === -1 ? "?" : "&") +
+            "ssoToken=" + encodeURIComponent(token);
+          var bouncedToWeb = false;
+          setTimeout(function () {
+            if (bouncedToWeb) return;
+            bouncedToWeb = true;
+            window.location.replace(webFallback);
+          }, 600);
+          try { window.location.href = deepLink; } catch (_) { /* ignored */ }
         } catch (e) {
           window.location.replace("/");
         }
