@@ -79,12 +79,20 @@
           if (value[1] === "/" || value[1] === "\\") return null;
           return value;
         }
+        // The Expo web build is served from /app in this repo (see
+        // server/index.ts) — `/` returns the marketing landing page, so a
+        // bare `/` fallback would land the user on a page where AuthContext
+        // never runs and the ssoToken would be silently dropped. Default
+        // every fallback to /app and only honour ?redirect=... when it's an
+        // internal app path.
+        var APP_ROOT = "/app";
         try {
           var params = new URLSearchParams(window.location.search);
           var token = params.get("token");
           var redirect = safeRedirect(params.get("redirect"));
+          var landing = redirect || APP_ROOT;
           if (!token) {
-            window.location.replace(redirect || "/");
+            window.location.replace(landing);
             return;
           }
           // Persist for the web app — AuthContext also reads this key, so a
@@ -97,8 +105,8 @@
           // ssoToken in the query so AuthContext can pick it up and strip it.
           var deepLink = "torqueshed://sso?token=" + encodeURIComponent(token);
           var webFallback =
-            (redirect || "/") +
-            ((redirect || "/").indexOf("?") === -1 ? "?" : "&") +
+            landing +
+            (landing.indexOf("?") === -1 ? "?" : "&") +
             "ssoToken=" + encodeURIComponent(token);
           var bouncedToWeb = false;
           setTimeout(function () {
@@ -108,7 +116,7 @@
           }, 600);
           try { window.location.href = deepLink; } catch (_) { /* ignored */ }
         } catch (e) {
-          window.location.replace("/");
+          window.location.replace(APP_ROOT);
         }
       })();
     </script>
