@@ -123,11 +123,17 @@ export function register(app: Express): void {
         shop: profile
           ? {
               displayName: profile.displayName,
-              slug: profile.slug,
+              // Slug + logo are safe identifiers used by the public summary
+              // page header. Contact fields (phone/email/website) are only
+              // surfaced when the shop has explicitly opted into a public
+              // profile — otherwise the customer just sees the diagnostic
+              // content with no way to reach the shop, matching the privacy
+              // contract enforced on /api/public/shops/:slug.
+              slug: profile.isPublic ? profile.slug : null,
               logoUrl: profile.logoUrl,
-              phone: profile.phone,
-              email: profile.email,
-              website: profile.website,
+              phone: profile.isPublic ? profile.phone : null,
+              email: profile.isPublic ? profile.email : null,
+              website: profile.isPublic ? profile.website : null,
             }
           : null,
       });

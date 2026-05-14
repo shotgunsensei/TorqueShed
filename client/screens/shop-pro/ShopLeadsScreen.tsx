@@ -420,9 +420,12 @@ export default function ShopLeadsScreen() {
   const renderItem = ({ item }: { item: ShopLead }) => {
     const teamCtx = ownerByUserId.get(item.ownerUserId);
     const isTeamView = !!teamCtx;
+    // Match the server-side role policy in server/routes/shopLeads.ts:
+    // owner + team admin/technician can mark leads read; viewer is read-only.
+    const canMarkRead = !isTeamView || teamCtx?.role === "admin" || teamCtx?.role === "technician";
     return (
     <Pressable
-      onPress={() => { if (!item.isRead && !isTeamView) markRead.mutate(item.id); }}
+      onPress={() => { if (!item.isRead && canMarkRead) markRead.mutate(item.id); }}
       testID={`lead-${item.id}`}
     >
       <Card elevation={2} style={styles.row}>
@@ -440,9 +443,9 @@ export default function ShopLeadsScreen() {
                 style={[styles.teamBadge, { backgroundColor: theme.primary + "18", borderColor: theme.primary + "55" }]}
                 testID={`badge-team-lead-${item.id}`}
               >
-                <Feather name="eye" size={10} color={theme.primary} />
+                <Feather name={canMarkRead ? "users" : "eye"} size={10} color={theme.primary} />
                 <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4, fontWeight: "600", fontSize: 10 }}>
-                  Read-only · viewing as team {teamCtx?.role}
+                  {canMarkRead ? `Team ${teamCtx?.role}` : `Read-only · viewing as team ${teamCtx?.role}`}
                 </ThemedText>
               </View>
             ) : null}
