@@ -39,6 +39,12 @@ export const users = pgTable("users", {
   notificationsEnabled: boolean("notifications_enabled").default(true),
   dailyLeadDigestEnabled: boolean("daily_lead_digest_enabled").default(false),
   emailVerifiedAt: timestamp("email_verified_at"),
+  operatorOsUserId: varchar("operator_os_user_id", { length: 64 }).unique(),
+  operatorOsEmail: varchar("operator_os_email", { length: 200 }),
+  operatorOsRole: varchar("operator_os_role", { length: 40 }),
+  operatorOsPlanSlug: varchar("operator_os_plan_slug", { length: 40 }),
+  operatorOsOrganizationId: varchar("operator_os_organization_id", { length: 64 }),
+  operatorOsLastSeenAt: timestamp("operator_os_last_seen_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

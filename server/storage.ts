@@ -185,6 +185,60 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async findOrCreateUserByOperatorOsId(claims: {
+    sub: string;
+    email?: string | null;
+    role?: string | null;
+    planSlug?: string | null;
+    organizationId?: string | null;
+  }): Promise<User> {
+    const now = new Date();
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(eq(users.operatorOsUserId, claims.sub));
+    if (existing) {
+      const [updated] = await db
+        .update(users)
+        .set({
+          operatorOsEmail: claims.email ?? null,
+          operatorOsRole: claims.role ?? null,
+          operatorOsPlanSlug: claims.planSlug ?? null,
+          operatorOsOrganizationId: claims.organizationId ?? null,
+          operatorOsLastSeenAt: now,
+          // Keep the canonical email column in sync if it isn't set yet, so
+          // existing flows (notifications, verification banner) just work.
+          ...(existing.email ? {} : { email: claims.email?.toLowerCase() ?? null }),
+        })
+        .where(eq(users.id, existing.id))
+        .returning();
+      return updated;
+    }
+    // Lazily provision. Username must be unique; derive a stable, collision-resistant
+    // value from the OperatorOS sub. Password hash is set to a non-loginable sentinel
+    // so the local password flow can never match.
+    const baseHandle = (claims.email?.split("@")[0] || "user")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "")
+      .slice(0, 24) || "user";
+    const username = `${baseHandle}-${claims.sub.slice(0, 8)}`;
+    const [created] = await db
+      .insert(users)
+      .values({
+        username,
+        passwordHash: "!operatoros-sso!",
+        email: claims.email?.toLowerCase() ?? null,
+        operatorOsUserId: claims.sub,
+        operatorOsEmail: claims.email ?? null,
+        operatorOsRole: claims.role ?? null,
+        operatorOsPlanSlug: claims.planSlug ?? null,
+        operatorOsOrganizationId: claims.organizationId ?? null,
+        operatorOsLastSeenAt: now,
+      })
+      .returning();
+    return created;
+  }
+
   async createEmailVerification(userId: string, email: string): Promise<{ token: string; expiresAt: Date }> {
     const normalizedEmail = email.toLowerCase().trim();
     const token = crypto.randomBytes(32).toString("base64url");

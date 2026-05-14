@@ -90,6 +90,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function restoreAuth() {
       try {
+        // OperatorOS SSO handoff: when the bridge page lands the browser at
+        // `/?ssoToken=...`, pick the token up, persist it, and strip it from
+        // the URL so it isn't left visible in the address bar / share targets.
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          try {
+            const params = new URLSearchParams(window.location.search);
+            const ssoToken = params.get("ssoToken");
+            if (ssoToken) {
+              await setStoredToken(ssoToken);
+              params.delete("ssoToken");
+              const cleaned =
+                window.location.pathname +
+                (params.toString() ? `?${params.toString()}` : "") +
+                window.location.hash;
+              window.history.replaceState({}, "", cleaned);
+            }
+          } catch {
+            // Ignore — fall through to the normal stored-token path.
+          }
+        }
         const token = await getStoredToken();
         if (token) {
           const user = await fetchCurrentUser(token);
