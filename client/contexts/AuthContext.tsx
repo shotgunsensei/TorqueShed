@@ -1,7 +1,26 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import * as Linking from "expo-linking";
 import { getApiUrl } from "@/lib/query-client";
+
+// Pull an OperatorOS SSO token off any URL we receive — works for both the
+// web `/?ssoToken=...` redirect and the native `torqueshed://sso?token=...`
+// deep link emitted by the bridge HTML. Returns null if no token is present.
+function extractSsoTokenFromUrl(rawUrl: string | null | undefined): string | null {
+  if (!rawUrl) return null;
+  try {
+    // Linking.parse handles both schemed (torqueshed://) and http(s) URLs and
+    // surfaces query params consistently across platforms.
+    const parsed = Linking.parse(rawUrl);
+    const qp = parsed.queryParams || {};
+    const candidate = qp.ssoToken ?? qp.token;
+    if (typeof candidate === "string" && candidate.length > 0) return candidate;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const TOKEN_KEY = "torqueshed_auth_token";
 
@@ -87,18 +106,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
-    async function restoreAuth() {
+  // Shared SSO ingestion path used by both the boot-time URL check and the
+  // runtime Linking listener (native cold/warm starts both go through here).
+  // Persists the token, refreshes the current user, and -- on web only --
+  // strips the `ssoToken` query param via history.replaceState so it doesn't
+  // sit in the address bar or get shared.
+  const ingestSsoToken = useCallback(
+    async (ssoToken: string) => {
       try {
-        // OperatorOS SSO handoff: when the bridge page lands the browser at
-        // `/?ssoToken=...`, pick the token up, persist it, and strip it from
-        // the URL so it isn't left visible in the address bar / share targets.
+        await setStoredToken(ssoToken);
+        const user = await fetchCurrentUser(ssoToken);
+        if (user) {
+          setAccessToken(ssoToken);
+          setCurrentUser(user);
+        } else {
+          // Token rejected by /api/auth/me — purge so we don't loop on it.
+          await removeStoredToken();
+        }
+      } catch (error) {
+        console.error("Failed to ingest SSO token:", error);
+      } finally {
         if (Platform.OS === "web" && typeof window !== "undefined") {
           try {
             const params = new URLSearchParams(window.location.search);
-            const ssoToken = params.get("ssoToken");
-            if (ssoToken) {
-              await setStoredToken(ssoToken);
+            if (params.has("ssoToken")) {
               params.delete("ssoToken");
               const cleaned =
                 window.location.pathname +
@@ -107,12 +138,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               window.history.replaceState({}, "", cleaned);
             }
           } catch {
-            // Ignore — fall through to the normal stored-token path.
+            // Best effort — never let a URL clean-up failure break sign-in.
           }
         }
+      }
+    },
+    [fetchCurrentUser],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreAuth() {
+      try {
+        // OperatorOS SSO handoff. Look at whichever URL the platform exposes
+        // at boot:
+        //   - Web: window.location (the bridge fallback hits /?ssoToken=...).
+        //   - Native: Linking.getInitialURL() (the bridge attempted
+        //     torqueshed://sso?token=... before the web fallback).
+        let initialUrl: string | null = null;
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          initialUrl = window.location.href;
+        } else {
+          try {
+            initialUrl = await Linking.getInitialURL();
+          } catch {
+            initialUrl = null;
+          }
+        }
+        const ssoToken = extractSsoTokenFromUrl(initialUrl);
+        if (ssoToken && !cancelled) {
+          await ingestSsoToken(ssoToken);
+          setIsLoading(false);
+          return;
+        }
+
         const token = await getStoredToken();
+        if (cancelled) return;
         if (token) {
           const user = await fetchCurrentUser(token);
+          if (cancelled) return;
           if (user) {
             setAccessToken(token);
             setCurrentUser(user);
@@ -123,11 +187,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error("Failed to restore auth:", error);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     restoreAuth();
-  }, [fetchCurrentUser]);
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCurrentUser, ingestSsoToken]);
+
+  // Also handle warm-launch SSO deep links (app already running when the user
+  // taps a torqueshed://sso?token=... link). Web handles this implicitly via
+  // the boot flow because clicking a link reloads the page.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const sub = Linking.addEventListener("url", (event) => {
+      const ssoToken = extractSsoTokenFromUrl(event.url);
+      if (ssoToken) void ingestSsoToken(ssoToken);
+    });
+    return () => sub.remove();
+  }, [ingestSsoToken]);
 
   const login = useCallback(async (username: string, password: string) => {
     const url = new URL("/api/auth/login", getApiUrl());
