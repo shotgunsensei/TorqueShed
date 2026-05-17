@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import jwt from "jsonwebtoken";
+import express from "express";
+import type { AddressInfo } from "net";
+import type { Server } from "http";
 import { verifyLaunchToken } from "../server/lib/operatorOsSso";
 
 const SECRET = "test-secret-please-do-not-use-in-prod";
@@ -190,6 +193,79 @@ describe("operatorOsSso.verifyLaunchToken", () => {
       },
     });
     expect(res).toEqual({ ok: false, status: 502, code: "sso_consume_unavailable" });
+  });
+
+  describe("defaultConsume (real fetch path)", () => {
+    let server: Server;
+    let baseUrl: string;
+    let lastRequest: {
+      method?: string;
+      path?: string;
+      contentType?: string | string[];
+      body?: unknown;
+    } = {};
+    let respond: (
+      req: express.Request,
+      res: express.Response,
+    ) => void = (_req, res) => res.status(200).json({});
+
+    beforeEach(async () => {
+      lastRequest = {};
+      const app = express();
+      app.use(express.json());
+      app.post("/v1/modules/sso/consume", (req, res) => {
+        lastRequest = {
+          method: req.method,
+          path: req.path,
+          contentType: req.headers["content-type"],
+          body: req.body,
+        };
+        respond(req, res);
+      });
+      await new Promise<void>((resolve) => {
+        server = app.listen(0, "127.0.0.1", () => resolve());
+      });
+      const { port } = server.address() as AddressInfo;
+      baseUrl = `http://127.0.0.1:${port}`;
+      process.env.OPERATOROS_API_URL = baseUrl;
+    });
+
+    afterEach(async () => {
+      await new Promise<void>((resolve, reject) =>
+        server.close((e) => (e ? reject(e) : resolve())),
+      );
+    });
+
+    it("POSTs {jti,aud,env} as JSON to /v1/modules/sso/consume and returns ok on 200", async () => {
+      respond = (_req, res) => res.status(200).json({});
+      const token = sign(baseClaims());
+      const res = await verifyLaunchToken(token);
+      expect(res.ok).toBe(true);
+      expect(lastRequest.method).toBe("POST");
+      expect(lastRequest.path).toBe("/v1/modules/sso/consume");
+      expect(String(lastRequest.contentType || "")).toMatch(/^application\/json/);
+      expect(lastRequest.body).toEqual({
+        jti: "jti_one",
+        aud: AUDIENCE,
+        env: ENV,
+      });
+    });
+
+    it("strips a trailing slash from OPERATOROS_API_URL when building the consume URL", async () => {
+      process.env.OPERATOROS_API_URL = `${baseUrl}/`;
+      respond = (_req, res) => res.status(200).json({});
+      const token = sign(baseClaims());
+      const res = await verifyLaunchToken(token);
+      expect(res.ok).toBe(true);
+      expect(lastRequest.path).toBe("/v1/modules/sso/consume");
+    });
+
+    it("maps a real 503 response from the consume endpoint to sso_consume_unavailable", async () => {
+      respond = (_req, res) => res.status(503).json({});
+      const token = sign(baseClaims());
+      const res = await verifyLaunchToken(token);
+      expect(res).toEqual({ ok: false, status: 502, code: "sso_consume_unavailable" });
+    });
   });
 
   it("rejects an RS256-signed token (HS256-only)", async () => {
