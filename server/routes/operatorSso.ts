@@ -10,6 +10,16 @@ import {
 
 assertOperatorOsSsoConfigOrThrow();
 
+// Only allow forwarding internal, same-origin paths through to the bridge.
+// Matches the bridge's own safeRedirect() so we never round-trip an
+// open-redirect through /sso. Defaults to "/" when missing or unsafe.
+function sanitizeRedirect(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length === 0) return "/";
+  if (raw[0] !== "/") return "/";
+  if (raw[1] === "/" || raw[1] === "\\") return "/";
+  return raw;
+}
+
 function reject(res: Response, status: number, code: OperatorOsRejectCode, jti?: string): void {
   // Only the jti is safe to log; never log the secret or the raw token.
   console.warn(
@@ -62,9 +72,10 @@ export function register(app: Express): void {
       //      path persists the token and strips it from the URL.
       // The bridge sanitises its `redirect` param to internal paths only,
       // closing the open-redirect vector.
+      const redirectPath = sanitizeRedirect(req.query.redirect);
       res.redirect(
         302,
-        `/sso/bridge?token=${encodeURIComponent(sessionToken)}`,
+        `/sso/bridge?token=${encodeURIComponent(sessionToken)}&redirect=${encodeURIComponent(redirectPath)}`,
       );
     } catch (e) {
       console.error(
