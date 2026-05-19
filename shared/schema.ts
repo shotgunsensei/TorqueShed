@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, primaryKey, json, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -49,7 +49,7 @@ export const users = pgTable("users", {
   // OperatorOS owns plans/entitlements. This snapshot is the source of truth
   // for tier, role, features, and module-enable; the local `subscriptions`
   // table is kept as legacy reference only. See task #68.
-  entitlementSnapshotJson: json("entitlement_snapshot_json"),
+  entitlementSnapshotJson: jsonb("entitlement_snapshot_json"),
   lastEntitlementSyncAt: timestamp("last_entitlement_sync_at"),
   name: text("name"),
   createdAt: timestamp("created_at").defaultNow(),

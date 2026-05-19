@@ -2,7 +2,7 @@
 // - GET /api/entitlements/me — returns the cached snapshot for the signed-in user.
 // - POST /api/operatoros/entitlements/sync — service-to-service push from OperatorOS.
 import type { Express, Request, Response } from "express";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
@@ -35,12 +35,15 @@ const syncBodySchema = z.object({
   name: z.string().nullish(),
 });
 
+// Length-agnostic constant-time string comparison. Hashing both inputs to a
+// fixed-length SHA-256 digest before timingSafeEqual prevents the early
+// length-mismatch short-circuit from leaking the expected token length to a
+// timing attacker.
 function constantTimeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ab.length !== bb.length) return false;
   try {
-    return timingSafeEqual(ab, bb);
+    const ah = createHash("sha256").update(a, "utf8").digest();
+    const bh = createHash("sha256").update(b, "utf8").digest();
+    return timingSafeEqual(ah, bh) && a.length === b.length;
   } catch {
     return false;
   }

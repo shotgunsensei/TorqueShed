@@ -52,7 +52,7 @@ async function openExternal(url: string) {
 export default function SubscriptionScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
-  const { tier, isLoading, manageBillingUrl, entitlements } = useEntitlements();
+  const { tier, isLoading, manageBillingUrl, entitlements, readOnly } = useEntitlements();
 
   if (isLoading) {
     return (
@@ -93,6 +93,38 @@ export default function SubscriptionScreen() {
           <ThemedText type="caption" style={{ color: theme.textMuted }}>
             OperatorOS plan slug: {planSlug}
           </ThemedText>
+        ) : null}
+        <View style={styles.detailRow}>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>Status</ThemedText>
+          <ThemedText type="small" testID="text-sub-status">
+            {(entitlements?.subscriptionStatus ?? "active").replace("_", " ")}
+          </ThemedText>
+        </View>
+        <View style={styles.detailRow}>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>Access level</ThemedText>
+          <ThemedText type="small" testID="text-access-level">
+            {entitlements?.accessLevel ?? "—"}
+            {readOnly ? " (read-only)" : ""}
+          </ThemedText>
+        </View>
+        <View style={styles.detailRow}>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>Role</ThemedText>
+          <ThemedText type="small" testID="text-role">{entitlements?.role ?? "user"}</ThemedText>
+        </View>
+        {entitlements?.features?.length ? (
+          <View style={styles.chipWrap} testID="list-features">
+            {entitlements.features.map((f) => (
+              <View
+                key={f}
+                style={[styles.chip, { backgroundColor: theme.primary + "22", borderColor: theme.primary }]}
+                testID={`chip-feature-${f}`}
+              >
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
+                  {f}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
         ) : null}
       </Card>
 
@@ -166,7 +198,25 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius["2xl"],
     gap: Spacing.xs,
     marginBottom: Spacing.lg,
-    alignItems: "flex-start",
+    alignItems: "stretch",
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: Spacing.xs,
+  },
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  chip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
   tierCard: {
     padding: Spacing.lg,
