@@ -40,19 +40,34 @@ export default function AccessDeniedScreen() {
         <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center" }} testID="text-access-denied-message">
           Access to this module is managed by OperatorOS. Contact your tenant administrator or upgrade your OperatorOS plan.
         </ThemedText>
-        {manageBillingUrl ? (
-          <Pressable
-            onPress={() => openExternal(manageBillingUrl)}
-            style={[styles.cta, { backgroundColor: theme.primary }]}
-            testID="button-return-to-operatoros"
-            accessibilityRole="link"
-            accessibilityLabel="Return to OperatorOS"
-          >
-            <Feather name="external-link" size={16} color="#0D0F12" />
-            <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
-              Return to OperatorOS
-            </ThemedText>
-          </Pressable>
+        {/* The "Return to OperatorOS" button is always rendered so users
+            always have a clear escape hatch back to OperatorOS even when the
+            server hasn't been given OPERATOROS_BASE_URL. When the URL is
+            missing the button is disabled and we surface a small hint. */}
+        <Pressable
+          onPress={() => {
+            if (manageBillingUrl) void openExternal(manageBillingUrl);
+          }}
+          disabled={!manageBillingUrl}
+          style={[
+            styles.cta,
+            { backgroundColor: manageBillingUrl ? theme.primary : theme.cardBorder },
+            !manageBillingUrl ? { opacity: 0.6 } : null,
+          ]}
+          testID="button-return-to-operatoros"
+          accessibilityRole="link"
+          accessibilityLabel="Return to OperatorOS"
+          accessibilityState={{ disabled: !manageBillingUrl }}
+        >
+          <Feather name="external-link" size={16} color="#0D0F12" />
+          <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
+            Return to OperatorOS
+          </ThemedText>
+        </Pressable>
+        {!manageBillingUrl ? (
+          <ThemedText type="caption" style={{ color: theme.textMuted, textAlign: "center" }}>
+            OperatorOS URL is not configured on the server. Contact your administrator.
+          </ThemedText>
         ) : null}
       </Card>
     </View>

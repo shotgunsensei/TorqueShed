@@ -128,9 +128,19 @@ function statusFor(raw: string | null | undefined): SubscriptionStatus {
 }
 
 export function useEntitlements() {
+  // Only fetch entitlements when a JWT is present. Before login (or after
+  // logout) there's no point hitting /api/entitlements/me — it would just
+  // 401 on every app boot. The token is written to localStorage on web and
+  // SecureStore on native by AuthContext; on native we let RN handle the
+  // window guard.
+  const hasToken =
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+      ? !!window.localStorage.getItem("torqueshed_auth_token")
+      : true;
   const query = useQuery<EntitlementsResponse>({
     queryKey: ["/api/entitlements/me"],
     staleTime: 60_000,
+    enabled: hasToken,
   });
 
   const data = query.data;

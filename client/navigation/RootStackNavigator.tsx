@@ -53,6 +53,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
   const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
+  // useEntitlements internally short-circuits the /api/entitlements/me query
+  // when no auth token is present, so this hook is cheap to call before login.
   const { moduleDisabled } = useEntitlements();
   const { theme } = useTheme();
 

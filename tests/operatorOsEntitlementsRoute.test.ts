@@ -247,6 +247,56 @@ describe("POST /api/operatoros/entitlements/sync — access flip", () => {
   });
 });
 
+describe("Feature gating from snapshot only — legacy `subscriptions` never grants features", () => {
+  it("returns 402 when snapshot omits a feature even if an active legacy subscription row exists", async () => {
+    // Use the real requireFeature gate, mounted on a fresh route, to prove
+    // that feature evaluation runs ENTIRELY off the OperatorOS snapshot.
+    // Even with an `active` row in the legacy `subscriptions` table claiming
+    // shop_pro, a snapshot whose features array does not include
+    // `shop_profile` MUST 402 — the local subscription row is non-authoritative.
+    const { requireFeature } = await import("../server/entitlements");
+    const local = express();
+    local.use(express.json());
+    local.use((req, _res, next) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      optionalAuth(req as any, _res, next);
+    });
+    local.get(
+      "/feat/shop-profile",
+      requireFeature("shop_profile"),
+      (_req, res) => res.json({ ok: true }),
+    );
+
+    const u = await seedSsoUser(uniq("sub_featgate"));
+    const auth = bearer(u.id);
+
+    // Legacy active subscription that USED to grant shop_pro features.
+    await db.insert(subscriptions).values({
+      userId: u.id,
+      tier: "shop_pro",
+      status: "active",
+    });
+
+    // Push a snapshot that is enabled but only lists DIY features — note
+    // featuresExplicit so the gate doesn't fall back to deriving from tier.
+    const push = await request(app)
+      .post("/api/operatoros/entitlements/sync")
+      .set("X-OperatorOS-Service-Token", "test-svc-token-entitlements-route")
+      .send({
+        operatoros_user_id: u.operatorOsUserId,
+        module_key: "torqueshed",
+        enabled: true,
+        access_level: "user",
+        features: ["unlimited_saved_cases"], // intentionally NO shop_profile
+      });
+    expect(push.status).toBe(200);
+
+    const denied = await request(local).get("/feat/shop-profile").set(auth);
+    expect(denied.status).toBe(402);
+    expect(denied.body.managedBy).toBe("operatoros");
+  });
+});
+
 describe("snapshotLocalRole is applied on sync", () => {
   it("module_admin role string → local users.role = admin", async () => {
     const u = await seedSsoUser(uniq("sub_admin"));
