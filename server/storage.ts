@@ -137,10 +137,16 @@ export interface IStorage {
   findOrCreateUserByOperatorOsId(claims: {
     sub: string;
     email?: string | null;
+    name?: string | null;
     role?: string | null;
     planSlug?: string | null;
     organizationId?: string | null;
+    tenantId?: string | null;
+    localRole?: "admin" | "user" | null;
+    snapshot?: unknown;
   }): Promise<User>;
+  updateUserEntitlementSnapshot(userId: string, snapshot: unknown, localRole: "admin" | "user"): Promise<User | undefined>;
+  getUserByOperatorOsId(sub: string): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
   getPublicProfile(id: string): Promise<PublicProfile | undefined>;
   updateUserProfile(id: string, updates: ProfileUpdate): Promise<User | undefined>;
@@ -195,9 +201,13 @@ export class DatabaseStorage implements IStorage {
   async findOrCreateUserByOperatorOsId(claims: {
     sub: string;
     email?: string | null;
+    name?: string | null;
     role?: string | null;
     planSlug?: string | null;
     organizationId?: string | null;
+    tenantId?: string | null;
+    localRole?: "admin" | "user" | null;
+    snapshot?: unknown;
   }): Promise<User> {
     const now = new Date();
     const [existing] = await db
@@ -212,7 +222,13 @@ export class DatabaseStorage implements IStorage {
           operatorOsRole: claims.role ?? null,
           operatorOsPlanSlug: claims.planSlug ?? null,
           operatorOsOrganizationId: claims.organizationId ?? null,
+          operatorOsTenantId: claims.tenantId ?? claims.organizationId ?? null,
           operatorOsLastSeenAt: now,
+          ...(claims.snapshot !== undefined
+            ? { entitlementSnapshotJson: claims.snapshot as object, lastEntitlementSyncAt: now }
+            : {}),
+          ...(claims.localRole ? { role: claims.localRole } : {}),
+          ...(claims.name && !existing.name ? { name: claims.name } : {}),
           // Keep the canonical email column in sync if it isn't set yet, so
           // existing flows (notifications, verification banner) just work.
           ...(existing.email ? {} : { email: claims.email?.toLowerCase() ?? null }),
@@ -239,12 +255,18 @@ export class DatabaseStorage implements IStorage {
             username: candidate,
             passwordHash: "!sso:operatoros",
             email: claims.email?.toLowerCase() ?? null,
+            name: claims.name ?? null,
+            role: claims.localRole ?? "user",
             operatorOsUserId: claims.sub,
             operatorOsEmail: claims.email ?? null,
             operatorOsRole: claims.role ?? null,
             operatorOsPlanSlug: claims.planSlug ?? null,
             operatorOsOrganizationId: claims.organizationId ?? null,
+            operatorOsTenantId: claims.tenantId ?? claims.organizationId ?? null,
             operatorOsLastSeenAt: now,
+            ...(claims.snapshot !== undefined
+              ? { entitlementSnapshotJson: claims.snapshot as object, lastEntitlementSyncAt: now }
+              : {}),
           })
           .returning();
         return created;
@@ -265,6 +287,28 @@ export class DatabaseStorage implements IStorage {
     throw new Error(
       `[operatoros-sso] failed to provision unique username for sub=${claims.sub}`,
     );
+  }
+
+  async getUserByOperatorOsId(sub: string): Promise<User | undefined> {
+    const [u] = await db.select().from(users).where(eq(users.operatorOsUserId, sub));
+    return u || undefined;
+  }
+
+  async updateUserEntitlementSnapshot(
+    userId: string,
+    snapshot: unknown,
+    localRole: "admin" | "user",
+  ): Promise<User | undefined> {
+    const [u] = await db
+      .update(users)
+      .set({
+        entitlementSnapshotJson: snapshot as object,
+        lastEntitlementSyncAt: new Date(),
+        role: localRole,
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return u || undefined;
   }
 
   async createEmailVerification(userId: string, email: string): Promise<{ token: string; expiresAt: Date }> {

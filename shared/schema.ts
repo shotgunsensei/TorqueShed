@@ -44,7 +44,14 @@ export const users = pgTable("users", {
   operatorOsRole: varchar("operator_os_role", { length: 40 }),
   operatorOsPlanSlug: varchar("operator_os_plan_slug", { length: 40 }),
   operatorOsOrganizationId: varchar("operator_os_organization_id", { length: 64 }),
+  operatorOsTenantId: varchar("operator_os_tenant_id", { length: 64 }),
   operatorOsLastSeenAt: timestamp("operator_os_last_seen_at"),
+  // OperatorOS owns plans/entitlements. This snapshot is the source of truth
+  // for tier, role, features, and module-enable; the local `subscriptions`
+  // table is kept as legacy reference only. See task #68.
+  entitlementSnapshotJson: json("entitlement_snapshot_json"),
+  lastEntitlementSyncAt: timestamp("last_entitlement_sync_at"),
+  name: text("name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

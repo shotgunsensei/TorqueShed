@@ -1,5 +1,10 @@
 import jwt from "jsonwebtoken";
 
+// OperatorOS-owned entitlement levels. Map to local SubscriptionTier in
+// server/entitlements.ts. `none` (or `target_module_enabled === false`)
+// short-circuits to the AccessDenied screen.
+export type OperatorOsAccessLevel = "none" | "viewer" | "user" | "admin" | "owner";
+
 export interface OperatorOsClaims {
   iss: string;
   aud: string;
@@ -7,13 +12,34 @@ export interface OperatorOsClaims {
   sub: string;
   user_id: string;
   email?: string;
+  name?: string | null;
   role?: string;
   module_slug: string;
   plan_slug?: string | null;
   organization_id?: string | null;
+  // --- Extended claims (Task #68). All optional for back-compat with the
+  // minimal OperatorOS payload — older tokens still launch successfully and
+  // fall through to whatever local snapshot exists. ---
+  tenant_id?: string | null;
+  module_role?: string | null;
+  target_module_key?: string | null;
+  target_module_enabled?: boolean | null;
+  target_module_access_level?: OperatorOsAccessLevel | null;
+  target_module_features?: string[] | null;
+  subscription_status?: string | null;
   jti: string;
   iat: number;
   exp: number;
+}
+
+// Resolve the configured "child app module key" — defaults to the SSO
+// audience for back-compat so existing deployments don't need a new env var.
+function childAppModuleKey(): string {
+  return (
+    process.env.CHILD_APP_MODULE_KEY ||
+    process.env.OPERATOROS_SSO_AUDIENCE ||
+    ""
+  ).toLowerCase();
 }
 
 export type OperatorOsRejectCode =
@@ -46,12 +72,25 @@ const TOKEN_MAX_AGE_SECONDS = 90;
 const CLOCK_SKEW_SECONDS = 5;
 
 function readEnv() {
+  // Accept both legacy and Task #68 env-var names so deployments can adopt
+  // OPERATOROS_JWT_SECRET / OPERATOROS_ISSUER without breaking existing ones.
   return {
-    secret: process.env.MODULE_SSO_SECRET || "",
-    issuer: process.env.OPERATOROS_BASE_URL || "",
-    audience: (process.env.OPERATOROS_SSO_AUDIENCE || "").toLowerCase(),
+    secret:
+      process.env.OPERATOROS_JWT_SECRET ||
+      process.env.MODULE_SSO_SECRET ||
+      "",
+    issuer:
+      process.env.OPERATOROS_ISSUER ||
+      process.env.OPERATOROS_BASE_URL ||
+      "",
+    audience: (
+      process.env.CHILD_APP_MODULE_KEY ||
+      process.env.OPERATOROS_SSO_AUDIENCE ||
+      ""
+    ).toLowerCase(),
     env: (process.env.OPERATOROS_SSO_ENV || "") as "prod" | "staging" | "dev" | "",
     apiUrl: process.env.OPERATOROS_API_URL || "",
+    serviceToken: process.env.OPERATOROS_SERVICE_TOKEN || "",
   };
 }
 
@@ -70,6 +109,17 @@ export function assertOperatorOsSsoConfigOrThrow(): void {
       "[operatoros-sso] OPERATOROS_BASE_URL, OPERATOROS_SSO_AUDIENCE, OPERATOROS_SSO_ENV, and OPERATOROS_API_URL must all be set in production.",
     );
   }
+  if (!cfg.serviceToken) {
+    throw new Error(
+      "[operatoros-sso] OPERATOROS_SERVICE_TOKEN must be set in production so OperatorOS can push entitlement updates.",
+    );
+  }
+}
+
+// Read-only accessor for routes that need the configured service-to-service
+// token (the /api/operatoros/entitlements/sync header check).
+export function getOperatorOsServiceToken(): string {
+  return readEnv().serviceToken;
 }
 
 function err(status: number, code: OperatorOsRejectCode): OperatorOsVerifyErr {
@@ -142,6 +192,17 @@ export async function verifyLaunchToken(
   if (
     cfg.audience &&
     (claims.aud !== cfg.audience || claims.module_slug !== cfg.audience)
+  ) {
+    return err(401, "audience_mismatch");
+  }
+  // If the OperatorOS payload includes target_module_key it must match our
+  // configured child-app module key. Older tokens without this claim still
+  // pass through for back-compat (the aud + module_slug check above already
+  // pins them to this app).
+  if (
+    claims.target_module_key &&
+    typeof claims.target_module_key === "string" &&
+    claims.target_module_key.toLowerCase() !== cfg.audience
   ) {
     return err(401, "audience_mismatch");
   }
