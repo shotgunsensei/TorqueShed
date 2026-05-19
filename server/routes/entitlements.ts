@@ -54,23 +54,46 @@ export function register(app: Express): void {
       const snap = (user.entitlementSnapshotJson as EntitlementSnapshot | null) ?? null;
       const tier = snapshotTier(snap);
       const features = await userFeatures(user.id);
+      const enabled = snap ? snap.enabled : true;
+      const moduleDisabled = snapshotIsModuleDisabled(snap);
+      const readOnly = snapshotIsReadOnly(snap);
+      const accessLevel = snap?.access_level ?? null;
+      const planSlug = snap?.plan_slug ?? null;
+      const subscriptionStatus = snap?.subscription_status ?? null;
+      const lastSyncAt = user.lastEntitlementSyncAt?.toISOString() ?? null;
+      const manageBillingUrl = process.env.OPERATOROS_BASE_URL || null;
+      const role = user.role ?? "user";
+      // Emit BOTH snake_case (documented OperatorOS contract) and camelCase
+      // (existing in-app client). Both keys are populated with the same
+      // values so we don't break either consumer.
       res.json({
+        managed_by: "operatoros",
         managedBy: "operatoros",
+        user_id: user.id,
         userId: user.id,
+        operatoros_user_id: user.operatorOsUserId,
         operatorOsUserId: user.operatorOsUserId,
+        operatoros_tenant_id: user.operatorOsTenantId,
         operatorOsTenantId: user.operatorOsTenantId,
-        enabled: snap ? snap.enabled : true,
-        moduleDisabled: snapshotIsModuleDisabled(snap),
-        readOnly: snapshotIsReadOnly(snap),
-        accessLevel: snap?.access_level ?? null,
-        role: user.role ?? "user",
+        enabled,
+        module_disabled: moduleDisabled,
+        moduleDisabled,
+        read_only: readOnly,
+        readOnly,
+        access_level: accessLevel,
+        accessLevel,
+        role,
         tier,
-        planSlug: snap?.plan_slug ?? null,
-        subscriptionStatus: snap?.subscription_status ?? null,
+        plan_slug: planSlug,
+        planSlug,
+        subscription_status: subscriptionStatus,
+        subscriptionStatus,
         features,
         snapshot: snap,
-        lastSyncAt: user.lastEntitlementSyncAt?.toISOString() ?? null,
-        manageBillingUrl: process.env.OPERATOROS_BASE_URL || null,
+        last_sync_at: lastSyncAt,
+        lastSyncAt,
+        manage_billing_url: manageBillingUrl,
+        manageBillingUrl,
       });
     } catch (error) {
       console.error("[entitlements] /me failed", error);
@@ -123,7 +146,17 @@ export function register(app: Express): void {
       updated_at: new Date().toISOString(),
     };
     const localRole = snapshotLocalRole(snapshot);
-    const updated = await storage.updateUserEntitlementSnapshot(user.id, snapshot, localRole);
+    const updated = await storage.updateUserEntitlementSnapshot(
+      user.id,
+      snapshot,
+      localRole,
+      {
+        tenantId: snapshot.operatoros_tenant_id,
+        name: snapshot.name,
+        email: snapshot.email,
+        planSlug: snapshot.plan_slug,
+      },
+    );
     res.json({
       ok: true,
       userId: updated?.id ?? user.id,

@@ -267,6 +267,12 @@ export function requireFeatureOrTeam(feature: Feature) {
 // whose snapshot has enabled=false / access_level=none. Mounted on the
 // `/api/*` router so it covers every route except the SSO callback and the
 // public landing page. Anonymous requests fall through to per-route auth.
+//
+// Fail-closed: if the snapshot lookup throws (DB outage, transient error)
+// while an authenticated user is asking for a gated route, we MUST NOT
+// silently let them through — that would temporarily disable the entire
+// OperatorOS access boundary during partial outages. Return 503 and let
+// the client retry once OperatorOS state is reachable again.
 export async function moduleEnabledGate(
   req: Request,
   res: Response,
@@ -278,8 +284,12 @@ export async function moduleEnabledGate(
     if (await isModuleDisabledForUser(userId)) {
       return res.status(403).json({ code: "module_disabled", managedBy: "operatoros" });
     }
-  } catch {
-    // Don't block on transient DB errors.
+    return next();
+  } catch (error) {
+    console.error("[moduleEnabledGate] entitlement lookup failed", error);
+    return res.status(503).json({
+      code: "entitlement_lookup_unavailable",
+      managedBy: "operatoros",
+    });
   }
-  return next();
 }

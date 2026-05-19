@@ -145,7 +145,17 @@ export interface IStorage {
     localRole?: "admin" | "user" | null;
     snapshot?: unknown;
   }): Promise<User>;
-  updateUserEntitlementSnapshot(userId: string, snapshot: unknown, localRole: "admin" | "user"): Promise<User | undefined>;
+  updateUserEntitlementSnapshot(
+    userId: string,
+    snapshot: unknown,
+    localRole: "admin" | "user",
+    mirror?: {
+      tenantId?: string | null;
+      name?: string | null;
+      email?: string | null;
+      planSlug?: string | null;
+    },
+  ): Promise<User | undefined>;
   getUserByOperatorOsId(sub: string): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
   getPublicProfile(id: string): Promise<PublicProfile | undefined>;
@@ -298,13 +308,39 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     snapshot: unknown,
     localRole: "admin" | "user",
+    mirror?: {
+      tenantId?: string | null;
+      name?: string | null;
+      email?: string | null;
+      planSlug?: string | null;
+    },
   ): Promise<User | undefined> {
+    // Mirror tenant/name/email/plan onto the top-level user columns so
+    // downstream code (admin dashboards, integrations, indexed lookups)
+    // sees consistent values after an entitlement sync. Only the keys
+    // actually present on `mirror` are updated — undefined keys are left
+    // alone, while explicit null clears the column.
+    const mirrorUpdates: Record<string, unknown> = {};
+    if (mirror && Object.prototype.hasOwnProperty.call(mirror, "tenantId")) {
+      mirrorUpdates.operatorOsTenantId = mirror.tenantId ?? null;
+    }
+    if (mirror && Object.prototype.hasOwnProperty.call(mirror, "name")) {
+      mirrorUpdates.name = mirror.name ?? null;
+    }
+    if (mirror && Object.prototype.hasOwnProperty.call(mirror, "email")) {
+      mirrorUpdates.operatorOsEmail = mirror.email ?? null;
+    }
+    if (mirror && Object.prototype.hasOwnProperty.call(mirror, "planSlug")) {
+      mirrorUpdates.operatorOsPlanSlug = mirror.planSlug ?? null;
+    }
     const [u] = await db
       .update(users)
       .set({
         entitlementSnapshotJson: snapshot as object,
         lastEntitlementSyncAt: new Date(),
         role: localRole,
+        operatorOsLastSeenAt: new Date(),
+        ...mirrorUpdates,
       })
       .where(eq(users.id, userId))
       .returning();
