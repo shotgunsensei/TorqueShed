@@ -85,21 +85,36 @@ describe("snapshotIsReadOnly", () => {
 });
 
 describe("snapshotLocalRole", () => {
-  it("admin/owner access_level → admin", () => {
-    expect(snapshotLocalRole(snap({ access_level: "admin" }))).toBe("admin");
+  it("tenant owner (access_level=owner) → admin", () => {
     expect(snapshotLocalRole(snap({ access_level: "owner" }))).toBe("admin");
-  });
-  it("module_role / role string admin variants → admin", () => {
-    expect(snapshotLocalRole(snap({ module_role: "module_admin" }))).toBe("admin");
-    expect(snapshotLocalRole(snap({ module_role: "tenant_admin" }))).toBe("admin");
     expect(snapshotLocalRole(snap({ role: "owner" }))).toBe("admin");
+    expect(snapshotLocalRole(snap({ module_role: "owner" }))).toBe("admin");
   });
-  it("disabled snapshot → user", () => {
+  it("module admin → admin", () => {
+    expect(snapshotLocalRole(snap({ module_role: "module_admin" }))).toBe("admin");
+    expect(snapshotLocalRole(snap({ role: "module_admin" }))).toBe("admin");
+  });
+  it("tenant_admin + module_admin conjunction → admin", () => {
+    expect(
+      snapshotLocalRole(snap({ role: "tenant_admin", module_role: "module_admin" })),
+    ).toBe("admin");
+  });
+  it("tenant_admin alone (no module_admin) → user (no over-grant)", () => {
+    expect(snapshotLocalRole(snap({ module_role: "tenant_admin" }))).toBe("user");
+    expect(snapshotLocalRole(snap({ role: "tenant_admin" }))).toBe("user");
+    // access_level=admin without module_admin role is NOT enough
+    expect(snapshotLocalRole(snap({ access_level: "admin" }))).toBe("user");
+  });
+  it("disabled snapshot → user (even if owner)", () => {
     expect(snapshotLocalRole(snap({ enabled: false, access_level: "owner" }))).toBe("user");
+    expect(
+      snapshotLocalRole(snap({ enabled: false, module_role: "module_admin" })),
+    ).toBe("user");
   });
-  it("plain user → user", () => {
+  it("plain user / viewer / none → user", () => {
     expect(snapshotLocalRole(snap({ access_level: "user" }))).toBe("user");
     expect(snapshotLocalRole(snap({ access_level: "viewer" }))).toBe("user");
+    expect(snapshotLocalRole(snap({ access_level: "none" }))).toBe("user");
     expect(snapshotLocalRole(null)).toBe("user");
   });
 });

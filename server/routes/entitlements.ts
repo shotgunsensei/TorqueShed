@@ -6,7 +6,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
-import { getOperatorOsServiceToken } from "../lib/operatorOsSso";
+import { getOperatorOsServiceToken, getChildAppModuleKey } from "../lib/operatorOsSso";
 import {
   snapshotIsModuleDisabled,
   snapshotIsReadOnly,
@@ -92,6 +92,15 @@ export function register(app: Express): void {
       return res.status(400).json({ error: parsed.error.errors.map((e) => e.message).join(", ") });
     }
     const body = parsed.data;
+    // Enforce that the pushed module_key matches our configured child-app
+    // module key. Without this an attacker (or misrouted OperatorOS call)
+    // that obtains the service token could overwrite TorqueShed entitlements
+    // with another module's payload. Tolerant case + accepts no configured
+    // key in dev (env-var optional).
+    const expectedModuleKey = getChildAppModuleKey();
+    if (expectedModuleKey && body.module_key.toLowerCase() !== expectedModuleKey) {
+      return res.status(400).json({ code: "module_key_mismatch" });
+    }
     const user = await storage.getUserByOperatorOsId(body.operatoros_user_id);
     if (!user) {
       return res.status(404).json({ code: "user_not_found" });

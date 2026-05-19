@@ -122,6 +122,13 @@ export function getOperatorOsServiceToken(): string {
   return readEnv().serviceToken;
 }
 
+// Read-only accessor for the configured child-app module key. Used to
+// validate the `module_key` field on the entitlement sync payload so we
+// can't be tricked into writing entitlements for a different module.
+export function getChildAppModuleKey(): string {
+  return childAppModuleKey();
+}
+
 function err(status: number, code: OperatorOsRejectCode): OperatorOsVerifyErr {
   return { ok: false, status, code };
 }

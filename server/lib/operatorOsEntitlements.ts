@@ -82,23 +82,29 @@ export function snapshotIsReadOnly(snap: EntitlementSnapshot | null | undefined)
 }
 
 // Map OperatorOS role + access_level → local users.role ("admin" | "user").
-// Documented mapping from the task plan:
-//   - owner / (tenant_admin + module_admin) / module_admin → admin
-//   - module_user → user
-//   - viewer → user (read-only enforced separately)
-//   - none / disabled → user (but module-disabled gate denies them anyway)
+// Documented mapping from the task plan (deliberately conservative — we never
+// elevate to local admin unless OperatorOS explicitly says so):
+//   - tenant owner (access_level === "owner" OR module_role/role === "owner")
+//       → admin
+//   - module admin (module_role === "module_admin" OR role === "module_admin")
+//       → admin. This also covers the tenant_admin + module_admin conjunction
+//       — a tenant admin who is also a module admin still has module_admin
+//       set on the snapshot, so they land here.
+//   - tenant_admin WITHOUT module_admin → user. Tenant-level admin in
+//       OperatorOS does NOT imply child-app admin; the OperatorOS spec
+//       requires the conjunction (tenant_admin + module_admin) before a
+//       tenant admin can act as admin inside the module.
+//   - module_user / viewer / none / disabled → user.
 export function snapshotLocalRole(snap: EntitlementSnapshot | null | undefined): "admin" | "user" {
   if (!snap || !snap.enabled) return "user";
-  if (snap.access_level === "owner" || snap.access_level === "admin") return "admin";
-  const rawRole = (snap.module_role || snap.role || "").toLowerCase();
-  if (
-    rawRole === "owner" ||
-    rawRole === "module_admin" ||
-    rawRole === "tenant_admin" ||
-    rawRole === "admin"
-  ) {
-    return "admin";
-  }
+  if (snap.access_level === "owner") return "admin";
+  const moduleRole = (snap.module_role || "").toLowerCase();
+  const role = (snap.role || "").toLowerCase();
+  // tenant owner expressed via role strings
+  if (moduleRole === "owner" || role === "owner") return "admin";
+  // module admin (covers tenant_admin + module_admin conjunction)
+  if (moduleRole === "module_admin" || role === "module_admin") return "admin";
+  // tenant_admin alone is NOT enough — must be combined with module_admin
   return "user";
 }
 

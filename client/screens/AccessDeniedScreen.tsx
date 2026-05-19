@@ -35,24 +35,24 @@ export default function AccessDeniedScreen() {
           <Feather name="lock" size={28} color={theme.primary} />
         </View>
         <ThemedText type="h2" style={styles.title}>
-          TorqueShed access is paused
+          Access is managed by OperatorOS
         </ThemedText>
         <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center" }}>
-          Your OperatorOS workspace doesn't currently have access to TorqueShed.
-          Plans, seats, and access are managed in OperatorOS — open it to
-          enable this module or contact your workspace administrator.
+          Access to this module is managed by OperatorOS. Your workspace
+          doesn't currently have TorqueShed enabled — open OperatorOS to
+          enable it or contact your workspace administrator.
         </ThemedText>
         {manageBillingUrl ? (
           <Pressable
             onPress={() => openExternal(manageBillingUrl)}
             style={[styles.cta, { backgroundColor: theme.primary }]}
-            testID="button-open-operatoros"
+            testID="button-return-to-operatoros"
             accessibilityRole="link"
-            accessibilityLabel="Open OperatorOS to manage access"
+            accessibilityLabel="Return to OperatorOS"
           >
             <Feather name="external-link" size={16} color="#0D0F12" />
             <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
-              Open OperatorOS
+              Return to OperatorOS
             </ThemedText>
           </Pressable>
         ) : null}
