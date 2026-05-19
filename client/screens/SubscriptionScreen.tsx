@@ -1,119 +1,50 @@
-import React, { useState } from "react";
-import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Platform, Linking } from "react-native";
+// Task #68 — Plans are managed in OperatorOS. This screen is read-only and
+// only shows the current tier + a link to OperatorOS to change plan.
+import React from "react";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  Platform,
+  Linking,
+} from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
-import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useEntitlements, type Tier, tierIndex } from "@/lib/entitlements";
-import { startCheckout, openBillingPortal, type BillingInterval } from "@/lib/billing";
-import { confirmCheckoutSession } from "@/lib/stripe-return";
-import { apiRequest } from "@/lib/query-client";
-import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
+import {
+  useEntitlements,
+  TIER_LABEL,
+  TIER_ORDER,
+  tierIndex,
+  type Tier,
+} from "@/lib/entitlements";
 
-type Nav = NativeStackNavigationProp<MoreStackParamList>;
-type SubscriptionRouteProp = RouteProp<MoreStackParamList, "Subscription">;
+const TIER_BLURBS: Record<Tier, string> = {
+  free: "Basic community access.",
+  diy_pro: "Advanced diagnostics, unlimited saved cases, PDF repair plans.",
+  garage_pro: "Everything in DIY Pro + multi-vehicle, maintenance, build logs.",
+  shop_pro: "Everything in Garage Pro + public shop profile, services, leads, team.",
+};
 
-interface TierCard {
-  tier: Tier;
-  name: string;
-  monthly: string;
-  annual: string | null;
-  monthlyEquivalent: string | null;
-  tagline: string;
-  features: string[];
-}
-
-const TIERS: TierCard[] = [
-  {
-    tier: "free",
-    name: "Free",
-    monthly: "$0",
-    annual: null,
-    monthlyEquivalent: null,
-    tagline: "Get help from the community",
-    features: [
-      "Basic case creation",
-      "Basic Torque Assist summary",
-      "Community replies",
-      "Up to 3 saved cases",
-      "Basic parts & tool suggestions",
-    ],
-  },
-  {
-    tier: "diy_pro",
-    name: "DIY Pro",
-    monthly: "$9.99 / month",
-    annual: "$99 / year",
-    monthlyEquivalent: "$8.25/mo billed yearly",
-    tagline: "For weekend wrenchers",
-    features: [
-      "Advanced diagnostic tree",
-      "Unlimited saved cases",
-      "PDF repair plan export",
-      "Full parts & tool checklist",
-      "Similar solved case matching",
-      "Priority follow-up questions",
-    ],
-  },
-  {
-    tier: "garage_pro",
-    name: "Garage Pro",
-    monthly: "$29 / month",
-    annual: "$290 / year",
-    monthlyEquivalent: "$24.17/mo billed yearly",
-    tagline: "For multi-vehicle households",
-    features: [
-      "Everything in DIY Pro",
-      "Multiple vehicles",
-      "Maintenance tracking",
-      "Advanced repair history",
-      "Cost tracking & build logs",
-      "Saved tool inventory",
-      "Advanced marketplace listings",
-    ],
-  },
-  {
-    tier: "shop_pro",
-    name: "Shop Pro",
-    monthly: "$79 / month",
-    annual: "$790 / year",
-    monthlyEquivalent: "$65.83/mo billed yearly",
-    tagline: "For independent shops",
-    features: [
-      "Everything in Garage Pro",
-      "Public shop profile",
-      "Service listings",
-      "Lead capture",
-      "Team / member access",
-      "Public credibility profile",
-      "Customer-facing diagnostic summaries",
-    ],
-  },
-];
-
-async function openExternalUrl(url: string) {
+async function openExternal(url: string) {
   try {
-    if (Platform.OS === "web") {
-      // On web, open in a new tab so users return to the app naturally.
-      if (typeof window !== "undefined") {
-        window.open(url, "_blank");
-        return;
-      }
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.open(url, "_blank");
+      return;
     }
     await WebBrowser.openBrowserAsync(url);
   } catch {
     try {
       await Linking.openURL(url);
     } catch {
-      // ignore
+      /* ignore */
     }
   }
 }
@@ -121,127 +52,7 @@ async function openExternalUrl(url: string) {
 export default function SubscriptionScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
-  const toast = useToast();
-  const navigation = useNavigation<Nav>();
-  const route = useRoute<SubscriptionRouteProp>();
-  const upgradeReason = route.params?.reason;
-  const queryClient = useQueryClient();
-  const { tier: currentTier, isLoading, subscription, isBillingDelinquent, stripeMode, hasStripeCustomer } = useEntitlements();
-  const stripeConfigured = subscription?.stripeConfigured ?? false;
-  const hasStripeSubscription = subscription?.hasStripeSubscription ?? false;
-  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
-  const periodEndDate = subscription?.currentPeriodEnd
-    ? new Date(subscription.currentPeriodEnd)
-    : null;
-  const subStatus = subscription?.status ?? "active";
-  const latestInvoiceStatus = subscription?.latestInvoiceStatus ?? null;
-  const paymentMethodLast4 = subscription?.paymentMethodLast4 ?? null;
-  const invoiceFailed =
-    hasStripeSubscription &&
-    (latestInvoiceStatus === "uncollectible" ||
-      (subStatus === "past_due" && latestInvoiceStatus !== "paid"));
-  const statusBadge: { label: string; tone: "ok" | "warn" | "info" } | null = !hasStripeSubscription
-    ? null
-    : cancelAtPeriodEnd
-      ? { label: "Canceling", tone: "info" }
-      : subStatus === "past_due"
-        ? { label: "Past due", tone: "warn" }
-        : subStatus === "canceled"
-          ? { label: "Canceled", tone: "warn" }
-          : subStatus === "trialing"
-            ? { label: "Trial", tone: "info" }
-            : { label: "Active", tone: "ok" };
-  const [busyTier, setBusyTier] = useState<Tier | null>(null);
-  const annualPricesConfigured = subscription?.annualPricesConfigured ?? false;
-  const trialEligible = subscription?.trialEligible ?? false;
-  const trialPeriodDays = subscription?.trialPeriodDays ?? 14;
-  const currentInterval = subscription?.interval ?? null;
-  const [interval, setInterval] = useState<BillingInterval>(
-    currentInterval === "year" ? "year" : "month",
-  );
-
-  const downgradeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/upgrade", { tier: "free" });
-      return res.json();
-    },
-    onSuccess: async (data, variables) => {
-      if (data?.mode === "checkout" && data?.checkoutUrl) {
-        toast.show("Opening secure Stripe checkout…", "success");
-        await openExternalUrl(data.checkoutUrl);
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-        }, 1500);
-        return;
-      }
-      if (data?.mode === "portal" && data?.portalUrl) {
-        toast.show("Opening billing portal to manage your plan…", "success");
-        await openExternalUrl(data.portalUrl);
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-        }, 1500);
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      const msg = data?.sandbox ? "Switched to Free (sandbox mode)" : "Switched to the Free plan";
-      toast.show(msg, "success");
-    },
-    onError: (error: Error) => toast.show(error.message || "Failed to update plan", "error"),
-  });
-
-  const portalMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/portal", {});
-      return res.json();
-    },
-    onSuccess: async (data) => {
-      if (data?.url) {
-        await openExternalUrl(data.url);
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-        }, 1500);
-      }
-    },
-    onError: (error: Error) => {
-      toast.show(error.message || "Failed to open billing portal", "error");
-    },
-  });
-
-  const handleAction = async (target: Tier) => {
-    if (target === currentTier) return;
-    if (target === "free") {
-      if (subscription?.hasStripeCustomer) {
-        setBusyTier(target);
-        const result = await openBillingPortal();
-        setBusyTier(null);
-        if (result.kind === "error") toast.show(result.message, "error");
-        return;
-      }
-      downgradeMutation.mutate();
-      return;
-    }
-    setBusyTier(target);
-    const useInterval: BillingInterval = annualPricesConfigured ? interval : "month";
-    const result = await startCheckout(target, useInterval);
-    setBusyTier(null);
-    if (result.kind === "missing_config") {
-      toast.show("Live billing is not fully configured yet — see Manage Billing.", "error");
-      navigation.navigate("Billing");
-    } else if (result.kind === "error") {
-      toast.show(result.message, "error");
-    } else if (result.kind === "opened" && result.sessionId && result.mode !== "portal") {
-      // On native, openBrowserAsync resolves when the user dismisses the in-app
-      // browser. Confirm immediately with the session ID we already have so the
-      // UI reflects the new tier without waiting for the webhook (and in case
-      // the deep-link return URL didn't fire).
-      if (Platform.OS !== "web") {
-        await confirmCheckoutSession(result.sessionId, {
-          queryClient,
-          showToast: toast.show,
-        });
-      }
-    }
-  };
+  const { tier, isLoading, manageBillingUrl, entitlements } = useEntitlements();
 
   if (isLoading) {
     return (
@@ -251,10 +62,8 @@ export default function SubscriptionScreen() {
     );
   }
 
-  const currentIndex = tierIndex(currentTier);
-  const renewBlurb = subscription?.currentPeriodEnd
-    ? `${subscription.cancelAtPeriodEnd ? "Cancels" : "Renews"} ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
-    : null;
+  const currentIdx = tierIndex(tier);
+  const planSlug = entitlements?.planSlug ?? null;
 
   return (
     <ScrollView
@@ -265,444 +74,124 @@ export default function SubscriptionScreen() {
         paddingHorizontal: Spacing.lg,
       }}
     >
-      {stripeMode === "missing_config" ? (
-        <BillingBanner
-          tone="warn"
-          icon="alert-triangle"
-          title="Live billing isn't fully configured"
-          body="Stripe price IDs or webhook secret are missing. Paid upgrades won't go through until an admin finishes setup."
-          action={{ label: "Open Billing", onPress: () => navigation.navigate("Billing") }}
-        />
-      ) : stripeMode === "test" ? (
-        <BillingBanner
-          tone="info"
-          icon="info"
-          title="Stripe test mode"
-          body="Charges in this environment use test cards (4242 4242 4242 4242). No real money will move."
-        />
-      ) : null}
-
-      {isBillingDelinquent || invoiceFailed ? (
-        <BillingBanner
-          tone="error"
-          icon="credit-card"
-          title="Payment failed"
-          body={
-            paymentMethodLast4
-              ? `We couldn't charge the card ending in ${paymentMethodLast4}. Update your payment method to keep your plan active.`
-              : "We couldn't charge your card. Update your payment method in the billing portal to keep your plan active."
-          }
-          action={{
-            label: "Update payment method",
-            onPress: () => portalMutation.mutate(),
-          }}
-        />
-      ) : null}
-
-      {upgradeReason ? (
-        <BillingBanner
-          tone="info"
-          icon="zap"
-          title="Upgrade to keep going"
-          body={upgradeReason}
-        />
-      ) : null}
-
-      <ThemedText type="h2" style={styles.title}>Plans built for the way you wrench</ThemedText>
-      <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-        Free covers casework. Upgrade only when you need premium diagnostics, exports, or shop tools.
+      <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>
+        Plans
+      </ThemedText>
+      <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
+        Your TorqueShed plan is set by your OperatorOS workspace. To change plans
+        or add seats, open OperatorOS.
       </ThemedText>
 
-      {annualPricesConfigured ? (
-        <View style={[styles.intervalToggle, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundTertiary }]}>
-          {(["month", "year"] as const).map((opt) => {
-            const active = interval === opt;
-            return (
-              <Pressable
-                key={opt}
-                onPress={() => setInterval(opt)}
-                style={[
-                  styles.intervalPill,
-                  active && { backgroundColor: theme.primary },
-                ]}
-                testID={`toggle-interval-${opt}`}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={opt === "month" ? "Monthly billing" : "Annual billing, 2 months free"}
-              >
-                <ThemedText
-                  type="small"
-                  style={{ color: active ? "#0D0F12" : theme.text, fontWeight: "700" }}
-                >
-                  {opt === "month" ? "Monthly" : "Annual"}
-                </ThemedText>
-                {opt === "year" ? (
-                  <View style={[styles.savePill, { backgroundColor: active ? "#0D0F12" : theme.primary + "22" }]}>
-                    <ThemedText
-                      type="caption"
-                      style={{ color: active ? theme.primary : theme.primary, fontWeight: "700" }}
-                    >
-                      2 months free
-                    </ThemedText>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+      <Card elevation={2} style={styles.currentCard}>
+        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+          Current plan
+        </ThemedText>
+        <ThemedText type="h2" style={{ color: theme.primary, fontWeight: "800" }} testID="text-current-tier">
+          {TIER_LABEL[tier]}
+        </ThemedText>
+        {planSlug ? (
+          <ThemedText type="caption" style={{ color: theme.textMuted }}>
+            OperatorOS plan slug: {planSlug}
+          </ThemedText>
+        ) : null}
+      </Card>
 
-      {hasStripeSubscription ? (
-        <>
-          {statusBadge ? (
-            <View style={styles.statusRow}>
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor:
-                      statusBadge.tone === "ok"
-                        ? theme.primary + "22"
-                        : statusBadge.tone === "warn"
-                          ? theme.error + "22"
-                          : theme.primary + "18",
-                    borderColor:
-                      statusBadge.tone === "warn" ? theme.error : theme.primary,
-                  },
-                ]}
-                testID={`badge-subscription-${statusBadge.label.toLowerCase().replace(/\s+/g, "-")}`}
-              >
-                <ThemedText
-                  type="caption"
-                  style={{
-                    color: statusBadge.tone === "warn" ? theme.error : theme.primary,
-                    fontWeight: "700",
-                  }}
-                >
-                  {statusBadge.label}
-                </ThemedText>
-              </View>
-              {periodEndDate ? (
-                <ThemedText
-                  type="caption"
-                  style={{ color: theme.textSecondary }}
-                  testID="text-renewal-note"
-                >
-                  {cancelAtPeriodEnd
-                    ? `Cancels ${periodEndDate.toLocaleDateString()}`
-                    : `Renews ${periodEndDate.toLocaleDateString()}`}
-                </ThemedText>
+      {TIER_ORDER.map((t) => {
+        const isCurrent = t === tier;
+        const isLower = tierIndex(t) < currentIdx;
+        return (
+          <Card
+            key={t}
+            elevation={isCurrent ? 2 : 1}
+            style={[
+              styles.tierCard,
+              isCurrent
+                ? { borderColor: theme.primary, borderWidth: 2 }
+                : { borderColor: theme.cardBorder, borderWidth: 1 },
+            ]}
+            testID={`card-tier-${t}`}
+          >
+            <View style={styles.tierHeader}>
+              <ThemedText type="h3" style={{ fontWeight: "700" }}>
+                {TIER_LABEL[t]}
+              </ThemedText>
+              {isCurrent ? (
+                <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                  <ThemedText type="caption" style={{ color: "#0D0F12", fontWeight: "700" }}>
+                    CURRENT
+                  </ThemedText>
+                </View>
+              ) : isLower ? (
+                <View style={[styles.badge, { backgroundColor: theme.cardBorder }]}>
+                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                    LOWER
+                  </ThemedText>
+                </View>
               ) : null}
             </View>
-          ) : null}
-          {paymentMethodLast4 ? (
-            <ThemedText
-              type="caption"
-              style={[styles.renewalNote, { color: theme.textSecondary }]}
-              testID="text-payment-method"
-            >
-              Card on file: •••• {paymentMethodLast4}
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              {TIER_BLURBS[t]}
             </ThemedText>
-          ) : null}
-          <Pressable
-            style={[styles.manageBtn, { backgroundColor: theme.backgroundTertiary, borderColor: theme.border }]}
-            onPress={() => portalMutation.mutate()}
-            disabled={portalMutation.isPending}
-            testID="button-manage-billing"
-            accessibilityRole="button"
-            accessibilityLabel={portalMutation.isPending ? "Opening billing portal" : "Manage billing and invoices"}
-            accessibilityHint="Open the Stripe billing portal in your browser"
-            accessibilityState={{ disabled: portalMutation.isPending, busy: portalMutation.isPending }}
-          >
-            <Feather name="credit-card" size={16} color={theme.text} style={{ marginRight: Spacing.sm }} />
-            <ThemedText type="body" style={{ color: theme.text, fontWeight: "600" }}>
-              {portalMutation.isPending ? "Opening…" : "Manage billing & invoices"}
-            </ThemedText>
-          </Pressable>
-        </>
-      ) : null}
+          </Card>
+        );
+      })}
 
-      <View style={styles.tierList}>
-        {TIERS.map((t) => {
-          const isCurrent = t.tier === currentTier;
-          const targetIndex = tierIndex(t.tier);
-          const isUpgrade = targetIndex > currentIndex;
-          const isDowngrade = targetIndex < currentIndex;
-          const showTrialTag = trialEligible && isUpgrade && t.tier !== "free";
-          const cta =
-            isCurrent
-              ? hasStripeCustomer && t.tier !== "free"
-                ? "Manage Billing"
-                : "Current"
-              : isUpgrade
-                ? showTrialTag
-                  ? `Start ${trialPeriodDays}-day free trial`
-                  : `Upgrade to ${t.name}`
-                : isDowngrade
-                  ? hasStripeCustomer
-                    ? "Manage Billing"
-                    : t.tier === "free"
-                      ? "Downgrade to Free"
-                      : `Switch to ${t.name}`
-                  : `Switch to ${t.name}`;
-          const showAnnual = annualPricesConfigured && interval === "year" && t.annual;
-          const priceLabel = showAnnual ? (t.annual as string) : t.monthly;
-          const priceSubLabel = showAnnual ? t.monthlyEquivalent : null;
-
-          const disabled =
-            (isCurrent && (t.tier === "free" || !hasStripeCustomer)) ||
-            busyTier !== null ||
-            downgradeMutation.isPending;
-
-          const onPress = () => {
-            if (isCurrent) {
-              if (hasStripeCustomer) navigation.navigate("Billing");
-              return;
-            }
-            if (isDowngrade && hasStripeCustomer) {
-              navigation.navigate("Billing");
-              return;
-            }
-            handleAction(t.tier);
-          };
-
-          const muted = t.tier === "free" || (isCurrent && !hasStripeCustomer);
-          return (
-            <Card
-              key={t.tier}
-              elevation={2}
-              style={isCurrent ? { ...styles.tierCard, borderColor: theme.primary, borderWidth: 2 } : styles.tierCard}
-            >
-              <View style={styles.tierHeader}>
-                <ThemedText type="h3">{t.name}</ThemedText>
-                {isCurrent ? (
-                  <View style={[styles.currentPill, { backgroundColor: theme.primary + "20" }]}>
-                    <ThemedText type="caption" style={{ color: theme.primary }}>
-                      {renewBlurb && t.tier !== "free" ? `Current · ${renewBlurb}` : "Current"}
-                    </ThemedText>
-                  </View>
-                ) : null}
-              </View>
-              <ThemedText type="h4" style={{ color: theme.primary, marginTop: Spacing.xs }} testID={`text-tier-price-${t.tier}`}>{priceLabel}</ThemedText>
-              {priceSubLabel ? (
-                <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.xxs }}>
-                  {priceSubLabel}
-                </ThemedText>
-              ) : null}
-              <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xxs, marginBottom: Spacing.md }}>
-                {t.tagline}
-              </ThemedText>
-              {showTrialTag ? (
-                <View style={[styles.trialTag, { borderColor: theme.primary, backgroundColor: theme.primary + "18" }]}>
-                  <Feather name="gift" size={12} color={theme.primary} style={{ marginRight: Spacing.xxs }} />
-                  <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
-                    {trialPeriodDays}-day free trial · cancel anytime
-                  </ThemedText>
-                </View>
-              ) : null}
-              {t.features.map((f) => (
-                <View key={f} style={styles.featureRow}>
-                  <Feather name="check" size={16} color={theme.primary} style={{ marginRight: Spacing.sm }} />
-                  <ThemedText type="small" style={{ flex: 1 }}>{f}</ThemedText>
-                </View>
-              ))}
-              <Pressable
-                style={[
-                  styles.upgradeBtn,
-                  {
-                    backgroundColor: muted ? theme.backgroundTertiary : theme.primary,
-                    opacity: disabled ? 0.6 : 1,
-                  },
-                ]}
-                onPress={onPress}
-                disabled={disabled}
-                testID={`button-tier-${t.tier}`}
-                accessibilityRole="button"
-                accessibilityLabel={`${cta}, ${t.name} plan, ${interval === "year" && t.annual ? t.annual : t.monthly}`}
-                accessibilityHint={isCurrent ? "This is your current plan" : `Switch your plan to ${t.name}`}
-                accessibilityState={{ disabled, selected: isCurrent, busy: busyTier === t.tier }}
-              >
-                {busyTier === t.tier ? (
-                  <ActivityIndicator color={muted ? theme.text : "#0D0F12"} />
-                ) : (
-                  <ThemedText type="body" style={{ color: muted ? theme.text : "#0D0F12", fontWeight: "600" }}>
-                    {cta}
-                  </ThemedText>
-                )}
-              </Pressable>
-            </Card>
-          );
-        })}
-      </View>
-
-      {hasStripeCustomer ? (
+      {manageBillingUrl ? (
         <Pressable
-          onPress={() => navigation.navigate("Billing")}
-          style={[styles.manageLink, { borderColor: theme.cardBorder }]}
-          testID="button-open-billing"
+          onPress={() => openExternal(manageBillingUrl)}
+          style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
+          testID="button-manage-in-operatoros"
           accessibilityRole="link"
-          accessibilityLabel="Manage billing and invoices"
-          accessibilityHint="Open the billing screen"
+          accessibilityLabel="Manage plan in OperatorOS"
         >
-          <Feather name="credit-card" size={16} color={theme.primary} />
-          <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-            Manage billing & invoices
+          <Feather name="external-link" size={16} color="#0D0F12" />
+          <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
+            Manage Plan in OperatorOS
           </ThemedText>
         </Pressable>
-      ) : null}
-
-      <ThemedText type="caption" style={[styles.disclaimer, { color: theme.textMuted }]}>
-        {stripeConfigured
-          ? "Secure payments by Stripe. You can cancel anytime from the billing portal."
-          : "Stripe is not connected on this environment. Plan changes are sandbox only and do not charge a real card."}
-      </ThemedText>
+      ) : (
+        <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: Spacing.lg, textAlign: "center" }}>
+          OperatorOS URL not configured on the server.
+        </ThemedText>
+      )}
     </ScrollView>
-  );
-}
-
-function BillingBanner({
-  tone,
-  icon,
-  title,
-  body,
-  action,
-}: {
-  tone: "info" | "warn" | "error";
-  icon: keyof typeof Feather.glyphMap;
-  title: string;
-  body: string;
-  action?: { label: string; onPress: () => void };
-}) {
-  const { theme } = useTheme();
-  const palette = {
-    info: { bg: theme.primary + "18", border: theme.primary, fg: theme.primary },
-    warn: { bg: "#F59E0B22", border: "#F59E0B", fg: "#F59E0B" },
-    error: { bg: theme.error + "22", border: theme.error, fg: theme.error },
-  }[tone];
-  return (
-    <View
-      style={[
-        styles.banner,
-        { backgroundColor: palette.bg, borderColor: palette.border },
-      ]}
-      testID={`banner-billing-${tone}`}
-    >
-      <Feather name={icon} size={18} color={palette.fg} style={{ marginTop: 2 }} />
-      <View style={{ flex: 1 }}>
-        <ThemedText type="small" style={{ color: palette.fg, fontWeight: "700" }}>{title}</ThemedText>
-        <ThemedText type="small" style={{ color: theme.text, marginTop: 2 }}>{body}</ThemedText>
-        {action ? (
-          <Pressable
-            onPress={action.onPress}
-            style={{ marginTop: Spacing.xs }}
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
-            testID={`button-banner-${tone}-action`}
-          >
-            <ThemedText type="small" style={{ color: palette.fg, fontWeight: "700" }}>
-              {action.label} ›
-            </ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { marginBottom: Spacing.xs },
-  subtitle: { marginBottom: Spacing.lg },
-  tierList: { gap: Spacing.md },
-  tierCard: { padding: Spacing.lg, borderRadius: BorderRadius["2xl"] },
-  tierHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  currentPill: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xxs, borderRadius: BorderRadius.full },
-  featureRow: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs },
-  renewalNote: { textAlign: "center", marginBottom: Spacing.sm },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xxs,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-  },
-  manageBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: Spacing.lg,
-  },
-  upgradeBtn: {
-    marginTop: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 40,
-  },
-  manageLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    marginTop: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderStyle: "dashed",
-  },
-  disclaimer: { textAlign: "center", marginTop: Spacing.lg, paddingHorizontal: Spacing.md },
-  intervalToggle: {
-    flexDirection: "row",
-    alignSelf: "center",
-    padding: 4,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    gap: 4,
-  },
-  intervalPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
+  currentCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius["2xl"],
     gap: Spacing.xs,
+    marginBottom: Spacing.lg,
+    alignItems: "flex-start",
   },
-  savePill: {
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
+  tierCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius["2xl"],
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  trialTag: {
+  tierHeader: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xxs,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
+    justifyContent: "space-between",
   },
-  banner: {
+  badge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  primaryBtn: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.sm,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    minHeight: 48,
+    marginTop: Spacing.lg,
   },
 });
-

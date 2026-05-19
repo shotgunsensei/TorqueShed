@@ -10,6 +10,9 @@ export interface EntitlementSnapshot {
   enabled: boolean;
   access_level: OperatorOsAccessLevel;
   features: string[];
+  // True when OperatorOS sent an explicit `target_module_features` / `features`
+  // array (even empty). False when omitted — feature set is derived from tier.
+  featuresExplicit?: boolean;
   role: string | null;
   module_role: string | null;
   plan_slug: string | null;
@@ -131,8 +134,9 @@ export function buildSnapshotFromClaims(
       : true;
   const accessLevel: OperatorOsAccessLevel =
     claims.target_module_access_level || "user";
-  const features = Array.isArray(claims.target_module_features)
-    ? claims.target_module_features.filter((f) => typeof f === "string")
+  const featuresExplicit = Array.isArray(claims.target_module_features);
+  const features = featuresExplicit
+    ? (claims.target_module_features as string[]).filter((f) => typeof f === "string")
     : [];
   return {
     operatoros_user_id: claims.sub,
@@ -141,6 +145,7 @@ export function buildSnapshotFromClaims(
     enabled,
     access_level: accessLevel,
     features,
+    featuresExplicit,
     role: claims.role ?? null,
     module_role: claims.module_role ?? null,
     plan_slug: claims.plan_slug ?? null,

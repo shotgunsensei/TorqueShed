@@ -7,6 +7,10 @@ import {
   assertOperatorOsSsoConfigOrThrow,
   type OperatorOsRejectCode,
 } from "../lib/operatorOsSso";
+import {
+  buildSnapshotFromClaims,
+  snapshotLocalRole,
+} from "../lib/operatorOsEntitlements";
 
 assertOperatorOsSsoConfigOrThrow();
 
@@ -42,12 +46,22 @@ export function register(app: Express): void {
     }
 
     try {
+      const fallbackModuleKey =
+        (process.env.CHILD_APP_MODULE_KEY ||
+          process.env.OPERATOROS_SSO_AUDIENCE ||
+          "").toLowerCase();
+      const snapshot = buildSnapshotFromClaims(result.claims, fallbackModuleKey);
+      const localRole = snapshotLocalRole(snapshot);
       const user = await storage.findOrCreateUserByOperatorOsId({
         sub: result.claims.sub,
         email: result.claims.email ?? null,
+        name: result.claims.name ?? null,
         role: result.claims.role ?? null,
         planSlug: result.claims.plan_slug ?? null,
         organizationId: result.claims.organization_id ?? null,
+        tenantId: result.claims.tenant_id ?? result.claims.organization_id ?? null,
+        localRole,
+        snapshot,
       });
       const sessionToken = signJWT({ sub: user.id, role: user.role || "user" });
       if (!sessionToken) {

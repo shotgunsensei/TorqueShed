@@ -789,6 +789,21 @@ async function initStripe(): Promise<void> {
     await assertSchemaInSync();
   }
 
+  // Task #68 — block module-disabled OperatorOS users from every /api/*
+  // route except the entitlements read endpoint (so the client can still
+  // discover its denied state) and the OperatorOS service-to-service
+  // callbacks. Anonymous requests fall through to per-route auth.
+  const { optionalAuth } = await import("./middleware/auth");
+  const { moduleEnabledGate } = await import("./entitlements");
+  const MODULE_GATE_SKIP = (p: string) =>
+    p === "/api/entitlements/me" || p.startsWith("/api/operatoros/");
+  app.use("/api", (req, res, next) => {
+    if (MODULE_GATE_SKIP(req.path)) return next();
+    optionalAuth(req as never, res, () =>
+      moduleEnabledGate(req, res, next),
+    );
+  });
+
   // API routes
   const server = await registerRoutes(app);
 

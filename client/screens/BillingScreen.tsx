@@ -1,28 +1,43 @@
-import React, { useState } from "react";
-import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+// Task #68 — Billing is managed in OperatorOS. This screen is read-only.
+import React from "react";
+import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Linking, Platform } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
-import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useEntitlements, TIER_LABEL } from "@/lib/entitlements";
-import { openBillingPortal, startCheckout } from "@/lib/billing";
-import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
 
-type Nav = NativeStackNavigationProp<MoreStackParamList>;
+async function openExternal(url: string) {
+  try {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.open(url, "_blank");
+      return;
+    }
+    await WebBrowser.openBrowserAsync(url);
+  } catch {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 export default function BillingScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
-  const toast = useToast();
-  const navigation = useNavigation<Nav>();
-  const { tier, subscription, isLoading, hasStripeCustomer, isBillingDelinquent, stripeMode } = useEntitlements();
-  const [busy, setBusy] = useState<"portal" | "checkout" | null>(null);
+  const {
+    tier,
+    isLoading,
+    isBillingDelinquent,
+    entitlements,
+    manageBillingUrl,
+    readOnly,
+  } = useEntitlements();
 
   if (isLoading) {
     return (
@@ -32,45 +47,16 @@ export default function BillingScreen() {
     );
   }
 
-  const handlePortal = async () => {
-    setBusy("portal");
-    const result = await openBillingPortal();
-    setBusy(null);
-    if (result.kind === "error") toast.show(result.message, "error");
-  };
-
-  const handleCheckoutDiy = async () => {
-    setBusy("checkout");
-    const result = await startCheckout("diy_pro");
-    setBusy(null);
-    if (result.kind === "missing_config") {
-      toast.show("Live billing isn't configured yet.", "error");
-    } else if (result.kind === "error") {
-      toast.show(result.message, "error");
-    }
-  };
-
-  const renewDate = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
-  const renewBlurb = renewDate
-    ? `${subscription?.cancelAtPeriodEnd ? "Cancels" : "Renews"} ${renewDate.toLocaleDateString()}`
-    : "No renewal scheduled";
-
-  const trialEndsDate = subscription?.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
-  const trialDaysLeft = trialEndsDate
-    ? Math.max(0, Math.ceil((trialEndsDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null;
-  const isInTrial = subscription?.status === "trialing" && trialDaysLeft !== null && trialDaysLeft > 0;
-  const intervalLabel =
-    subscription?.interval === "year"
-      ? "Annual"
-      : subscription?.interval === "month"
-        ? "Monthly"
-        : null;
+  const planSlug = entitlements?.planSlug ?? null;
+  const subStatus = entitlements?.subscriptionStatus ?? "active";
+  const lastSync = entitlements?.lastSyncAt
+    ? new Date(entitlements.lastSyncAt).toLocaleString()
+    : "Never";
 
   const statusColor =
-    subscription?.status === "active" || subscription?.status === "trialing"
+    subStatus === "active" || subStatus === "trialing"
       ? theme.success ?? theme.primary
-      : subscription?.status === "past_due"
+      : subStatus === "past_due"
         ? theme.error
         : theme.textSecondary;
 
@@ -85,43 +71,38 @@ export default function BillingScreen() {
     >
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>Billing</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
-        Manage your TorqueShed subscription, payment method, and invoices.
+        Plans, seats, and payment are managed in OperatorOS — TorqueShed reflects
+        whatever access your workspace has been granted there.
       </ThemedText>
 
       <Card elevation={2} style={styles.card}>
         <View style={styles.row}>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>Plan</ThemedText>
-          <ThemedText type="body" style={{ fontWeight: "700" }}>{TIER_LABEL[tier]}</ThemedText>
+          <ThemedText type="body" style={{ fontWeight: "700" }} testID="text-current-plan">
+            {TIER_LABEL[tier]}
+          </ThemedText>
         </View>
+        {planSlug ? (
+          <View style={styles.row}>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>OperatorOS plan</ThemedText>
+            <ThemedText type="small">{planSlug}</ThemedText>
+          </View>
+        ) : null}
         <View style={styles.row}>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>Status</ThemedText>
-          <ThemedText type="body" style={{ color: statusColor, fontWeight: "700" }}>
-            {(subscription?.status ?? "active").replace("_", " ")}
+          <ThemedText type="body" style={{ color: statusColor, fontWeight: "700" }} testID="text-sub-status">
+            {(subStatus ?? "active").replace("_", " ")}
           </ThemedText>
         </View>
-        {intervalLabel ? (
+        {readOnly ? (
           <View style={styles.row}>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>Billing interval</ThemedText>
-            <ThemedText type="small" testID="text-billing-interval">{intervalLabel}</ThemedText>
-          </View>
-        ) : null}
-        {isInTrial ? (
-          <View style={styles.row}>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>Trial</ThemedText>
-            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "700" }} testID="text-trial-countdown">
-              {trialDaysLeft === 1 ? "Ends tomorrow" : `Ends in ${trialDaysLeft} days`}
-            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>Access</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>Read-only (viewer)</ThemedText>
           </View>
         ) : null}
         <View style={styles.row}>
-          <ThemedText type="small" style={{ color: theme.textSecondary }}>Billing cycle</ThemedText>
-          <ThemedText type="small" testID="text-renew-blurb">{renewBlurb}</ThemedText>
-        </View>
-        <View style={styles.row}>
-          <ThemedText type="small" style={{ color: theme.textSecondary }}>Stripe mode</ThemedText>
-          <ThemedText type="small">
-            {stripeMode === "live" ? "Live" : stripeMode === "test" ? "Test" : "Not configured"}
-          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>Last sync</ThemedText>
+          <ThemedText type="small">{lastSync}</ThemedText>
         </View>
       </Card>
 
@@ -129,81 +110,30 @@ export default function BillingScreen() {
         <View style={[styles.banner, { backgroundColor: theme.error + "22", borderColor: theme.error }]}>
           <Feather name="alert-circle" size={18} color={theme.error} />
           <ThemedText type="small" style={{ color: theme.text, flex: 1 }}>
-            Your most recent payment failed. Update your card in the billing portal to keep premium features active.
+            OperatorOS reports your most recent payment failed. Update your billing
+            info in OperatorOS to keep premium features active.
           </ThemedText>
         </View>
       ) : null}
 
-      {hasStripeCustomer ? (
+      {manageBillingUrl ? (
         <Pressable
-          onPress={handlePortal}
-          disabled={busy !== null}
-          style={[styles.primaryBtn, { backgroundColor: theme.primary, opacity: busy ? 0.6 : 1 }]}
-          testID="button-open-portal"
-          accessibilityRole="button"
-          accessibilityLabel={busy === "portal" ? "Opening Stripe billing portal" : "Open Stripe billing portal"}
-          accessibilityHint="Manage your card and invoices in Stripe"
-          accessibilityState={{ disabled: busy !== null, busy: busy === "portal" }}
+          onPress={() => openExternal(manageBillingUrl)}
+          style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
+          testID="button-manage-in-operatoros"
+          accessibilityRole="link"
+          accessibilityLabel="Manage billing in OperatorOS"
         >
-          {busy === "portal" ? (
-            <ActivityIndicator color="#0D0F12" />
-          ) : (
-            <>
-              <Feather name="external-link" size={16} color="#0D0F12" />
-              <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
-                Open Stripe Billing Portal
-              </ThemedText>
-            </>
-          )}
+          <Feather name="external-link" size={16} color="#0D0F12" />
+          <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
+            Manage Billing in OperatorOS
+          </ThemedText>
         </Pressable>
       ) : (
-        <Pressable
-          onPress={handleCheckoutDiy}
-          disabled={busy !== null || stripeMode === "missing_config"}
-          accessibilityRole="button"
-          accessibilityLabel={busy === "checkout" ? "Starting checkout" : "Subscribe to DIY Pro"}
-          accessibilityHint="Start a Stripe checkout for the DIY Pro plan"
-          accessibilityState={{ disabled: busy !== null || stripeMode === "missing_config", busy: busy === "checkout" }}
-          style={[
-            styles.primaryBtn,
-            {
-              backgroundColor: theme.primary,
-              opacity: busy || stripeMode === "missing_config" ? 0.6 : 1,
-            },
-          ]}
-          testID="button-start-checkout"
-        >
-          {busy === "checkout" ? (
-            <ActivityIndicator color="#0D0F12" />
-          ) : (
-            <>
-              <Feather name="zap" size={16} color="#0D0F12" />
-              <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
-                Subscribe to DIY Pro
-              </ThemedText>
-            </>
-          )}
-        </Pressable>
-      )}
-
-      <Pressable
-        onPress={() => navigation.navigate("Subscription")}
-        style={[styles.secondaryBtn, { borderColor: theme.cardBorder }]}
-        testID="button-compare-plans"
-        accessibilityRole="link"
-        accessibilityLabel="Compare all plans"
-        accessibilityHint="Open the subscription tiers comparison screen"
-      >
-        <ThemedText type="small" style={{ color: theme.text, fontWeight: "600" }}>
-          Compare all plans
-        </ThemedText>
-      </Pressable>
-
-      {stripeMode === "missing_config" ? (
         <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: Spacing.lg, textAlign: "center" }}>
-          Live billing isn't fully configured yet. An admin needs to add Stripe price IDs and webhook secret on the server.
+          OperatorOS billing URL is not configured on the server.
         </ThemedText>
-      ) : null}
+      )}
     </ScrollView>
   );
 }
@@ -230,14 +160,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.full,
     minHeight: 48,
-  },
-  secondaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginTop: Spacing.md,
   },
 });

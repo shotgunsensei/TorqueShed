@@ -1,3 +1,7 @@
+// DORMANT (task #68) — OperatorOS is the source of truth for plans/entitlements.
+// Stripe is no longer used for access decisions. This file is preserved for
+// data continuity (existing subscriptions table rows / historical webhooks)
+// and may be removed in a future cleanup. Do not add new callers.
 import Stripe from "stripe";
 import type { StripeSync as StripeSyncType } from "stripe-replit-sync";
 

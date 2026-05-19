@@ -21,8 +21,10 @@ import GarageDetailScreen from "@/screens/GarageDetailScreen";
 import LoginScreen from "@/screens/LoginScreen";
 import SignupScreen from "@/screens/SignupScreen";
 import OnboardingScreen from "@/screens/OnboardingScreen";
+import AccessDeniedScreen from "@/screens/AccessDeniedScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntitlements } from "@/lib/entitlements";
 import { useTheme } from "@/hooks/useTheme";
 import { screenTitles } from "@/constants/brand";
 
@@ -51,6 +53,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
   const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
+  const { moduleDisabled } = useEntitlements();
   const { theme } = useTheme();
 
   if (isLoading) {
@@ -76,6 +79,12 @@ export default function RootStackNavigator() {
             options={{ headerShown: false }}
           />
         </>
+      ) : moduleDisabled ? (
+        <Stack.Screen
+          name="Main"
+          component={AccessDeniedScreen}
+          options={{ headerShown: false }}
+        />
       ) : needsOnboarding ? (
         <Stack.Screen
           name="Onboarding"

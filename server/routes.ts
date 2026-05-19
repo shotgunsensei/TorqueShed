@@ -35,6 +35,7 @@ import { register as registerTools } from "./routes/tools";
 import { register as registerListings } from "./routes/listings";
 import { register as registerPublicShop } from "./routes/publicShop";
 import { register as registerOperatorSso } from "./routes/operatorSso";
+import { register as registerEntitlements } from "./routes/entitlements";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Unauthenticated mutating endpoints are rate-limited by IP via rateLimited().
@@ -73,6 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerListings(app);
   registerPublicShop(app);
   registerOperatorSso(app);
+  registerEntitlements(app);
 
   // ---- Stripe webhook ----
   // The single Stripe webhook handler lives in `server/index.ts`

@@ -156,7 +156,11 @@ function effectiveFeaturesFromSnapshot(snap: EntitlementSnapshot | null): Featur
   ) {
     return [];
   }
-  if (Array.isArray(snap.features) && snap.features.length > 0) {
+  // When OperatorOS sends an explicit features array (even empty), it wins —
+  // that lets them intentionally revoke individual features without us
+  // shipping new code. Only fall back to tier expansion when features is
+  // absent (null/undefined), signalled by `featuresExplicit !== true`.
+  if (snap.featuresExplicit === true && Array.isArray(snap.features)) {
     return snap.features.filter((f): f is Feature => f in FEATURE_MIN_TIER);
   }
   return TIER_FEATURES[snapshotTier(snap)] ?? [];
@@ -198,7 +202,7 @@ export function requireFeature(feature: Feature) {
     if (!userId) return res.status(401).json({ error: "Authentication required" });
     const snap = await loadSnapshot(userId);
     if (snapshotIsModuleDisabled(snap)) {
-      return res.status(403).json({ code: "module_disabled" });
+      return res.status(403).json({ code: "module_disabled", managedBy: "operatoros" });
     }
     const features = effectiveFeaturesFromSnapshot(snap);
     if (!features.includes(feature)) {
@@ -237,7 +241,7 @@ export function requireFeatureOrTeam(feature: Feature) {
     if (!userId) return res.status(401).json({ error: "Authentication required" });
     const snap = await loadSnapshot(userId);
     if (snapshotIsModuleDisabled(snap)) {
-      return res.status(403).json({ code: "module_disabled" });
+      return res.status(403).json({ code: "module_disabled", managedBy: "operatoros" });
     }
     if (!(await userOrTeamHasFeature(userId, feature))) {
       const required = minimumTierFor(feature);
@@ -272,7 +276,7 @@ export async function moduleEnabledGate(
   if (!userId) return next();
   try {
     if (await isModuleDisabledForUser(userId)) {
-      return res.status(403).json({ code: "module_disabled" });
+      return res.status(403).json({ code: "module_disabled", managedBy: "operatoros" });
     }
   } catch {
     // Don't block on transient DB errors.

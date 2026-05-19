@@ -56,7 +56,22 @@ A custom UI component library ensures consistency, featuring components like `Ca
 - **zod**: Schema validation.
 - **Stripe**: Payment processing and subscription management.
 
-### Billing & Entitlements
+### OperatorOS Entitlements (source of truth)
+Task #68: OperatorOS owns plans, seats, and module access. TorqueShed never makes its own access decisions from the local `subscriptions` table anymore.
+
+- **Snapshot storage**: `users.entitlement_snapshot_json` (jsonb) holds the latest `EntitlementSnapshot` (`server/lib/operatorOsEntitlements.ts`) — `{ operatoros_user_id, operatoros_tenant_id, module_key, enabled, access_level, features, role, module_role, plan_slug, subscription_status, email, name, updated_at }`. `users.operator_os_tenant_id`, `last_entitlement_sync_at`, and `name` are mirrored alongside `operator_os_user_id` for indexed lookups.
+- **Refresh paths**:
+  1. SSO launch (`GET /sso`) — the verified JWT may carry `target_module_*` claims; `buildSnapshotFromClaims` writes the snapshot on login.
+  2. Server-to-server push — `POST /api/operatoros/entitlements/sync` accepts an `EntitlementSnapshot` body authenticated with the `X-OperatorOS-Service-Token` header (compared with `timingSafeEqual` against `OPERATOROS_SERVICE_TOKEN`). Returns 401 on bad/missing token, 404 if `operatoros_user_id` is unknown.
+  3. Client read — `GET /api/entitlements/me` returns the cached snapshot plus derived `{ tier, role, features, moduleDisabled, readOnly, manageBillingUrl }`. Used by `client/lib/entitlements.ts#useEntitlements`.
+- **Tier mapping** (`snapshotTier`): `plan_slug` (`diy_pro|garage_pro|shop_pro|free`) wins when present, otherwise `access_level` maps `owner→shop_pro`, `admin→garage_pro`, `user→diy_pro`, `viewer/none→free`. Any `subscription_status` outside `{active, trialing, past_due, ok, in_trial, ""}` collapses to `free`.
+- **Module disabled / read-only**: `snapshot.enabled === false` or `access_level === "none"` flags the user as module-disabled — the client routes them to `AccessDeniedScreen` with a "Manage Billing in OperatorOS" link, and server requireFeature responds 403 `{code:"module_disabled", managedBy:"operatoros"}`. `access_level === "viewer"` flags read-only and is surfaced on the client.
+- **Local role**: `snapshotLocalRole` maps owner/admin (or `module_admin`/`tenant_admin`/`owner` role strings) → `admin`, everything else → `user`.
+- **Required env vars** (in addition to the SSO ones above): `OPERATOROS_SERVICE_TOKEN` (mandatory in production; ≥16 chars) for the sync endpoint. Also accepted as aliases: `OPERATOROS_JWT_SECRET`/`OPERATOROS_ISSUER`/`CHILD_APP_MODULE_KEY`.
+- **Billing UI**: `BillingScreen` and `SubscriptionScreen` are read-only — they display the current tier from OperatorOS plus a "Manage Billing in OperatorOS" link to `OPERATOROS_BASE_URL`. No checkout / portal buttons remain.
+- **Legacy Stripe code**: `server/stripe.ts`, `stripeBilling.ts`, `stripeClient.ts`, `stripeWebhookRoute.ts`, `webhookEventHandlers.ts`, `server/routes/subscriptions.ts` are marked `// DORMANT (task #68)`. They still load so the server boots without `STRIPE_*` env vars, but no live access decisions flow through them.
+
+### Billing & Entitlements (legacy / dormant)
 Subscription tiers (DIY Pro, Garage Pro, Shop Pro) ship with both monthly and annual prices. The `subscriptions` table stores `interval` (`month`|`year`) and `trialEndsAt` so the client can render a trial countdown and a "Renews YYYY-MM-DD" line on the Billing screen. New paying customers automatically receive a 14-day free trial via Stripe Checkout `trial_period_days` (gated on `!subscription.stripeSubscriptionId`, so reactivations skip the trial).
 
 Required Stripe env vars:
