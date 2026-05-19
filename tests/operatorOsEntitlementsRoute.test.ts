@@ -79,12 +79,15 @@ beforeAll(async () => {
   app.use(express.urlencoded({ extended: false }));
   await registerRoutes(app);
 
-  // Mount the same gate the real server mounts on /api/* so we can exercise
-  // it end-to-end. Skips the entitlements read endpoint and OperatorOS
-  // service callbacks — those must remain reachable for disabled users.
+  // Mount the gate EXACTLY the way the real server does in server/index.ts.
+  // Mounting under "/api" means req.path is RELATIVE — must match
+  // "/entitlements/me" and "/operatoros/...". Anything else (including a
+  // bug that uses the absolute "/api/..." prefix) would cause the gate to
+  // block /me for disabled users and is regressed by these tests.
+  const MODULE_GATE_SKIP = (p: string) =>
+    p === "/entitlements/me" || p.startsWith("/operatoros/");
   app.use("/api", (req, res, next) => {
-    if (req.path === "/api/entitlements/me" || req.path === "/entitlements/me") return next();
-    if (req.path.startsWith("/operatoros/") || req.path.startsWith("/api/operatoros/")) return next();
+    if (MODULE_GATE_SKIP(req.path)) return next();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     optionalAuth(req as any, res, () => moduleEnabledGate(req, res, next));
   });

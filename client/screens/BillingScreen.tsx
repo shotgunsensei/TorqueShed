@@ -94,16 +94,48 @@ export default function BillingScreen() {
             {(subStatus ?? "active").replace("_", " ")}
           </ThemedText>
         </View>
-        {readOnly ? (
-          <View style={styles.row}>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>Access</ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>Read-only (viewer)</ThemedText>
-          </View>
-        ) : null}
+        <View style={styles.row}>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>Access level</ThemedText>
+          <ThemedText type="small" testID="text-access-level">
+            {entitlements?.accessLevel ?? "—"}
+            {readOnly ? " (read-only)" : ""}
+          </ThemedText>
+        </View>
+        <View style={styles.row}>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>Role</ThemedText>
+          <ThemedText type="small" testID="text-role">
+            {entitlements?.role ?? "user"}
+          </ThemedText>
+        </View>
         <View style={styles.row}>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>Last sync</ThemedText>
           <ThemedText type="small">{lastSync}</ThemedText>
         </View>
+      </Card>
+
+      <Card elevation={1} style={styles.card}>
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+          Enabled features
+        </ThemedText>
+        {entitlements?.features?.length ? (
+          <View style={styles.chipWrap} testID="list-features">
+            {entitlements.features.map((f) => (
+              <View
+                key={f}
+                style={[styles.chip, { backgroundColor: theme.primary + "22", borderColor: theme.primary }]}
+                testID={`chip-feature-${f}`}
+              >
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
+                  {f}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <ThemedText type="small" style={{ color: theme.textMuted }}>
+            No premium features are enabled for your workspace right now.
+          </ThemedText>
+        )}
       </Card>
 
       {isBillingDelinquent ? (
@@ -160,5 +192,16 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.full,
     minHeight: 48,
+  },
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  chip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
 });

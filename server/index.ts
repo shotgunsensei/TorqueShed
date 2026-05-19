@@ -795,8 +795,13 @@ async function initStripe(): Promise<void> {
   // callbacks. Anonymous requests fall through to per-route auth.
   const { optionalAuth } = await import("./middleware/auth");
   const { moduleEnabledGate } = await import("./entitlements");
+  // NOTE: because the gate is mounted at "/api", req.path is RELATIVE to
+  // that mount point (e.g. "/entitlements/me", "/operatoros/...").
+  // Matching the full "/api/..." prefix here would silently skip nothing
+  // and the entitlements read endpoint would be gated, leaving disabled
+  // users with no way to load their /me state.
   const MODULE_GATE_SKIP = (p: string) =>
-    p === "/api/entitlements/me" || p.startsWith("/api/operatoros/");
+    p === "/entitlements/me" || p.startsWith("/operatoros/");
   app.use("/api", (req, res, next) => {
     if (MODULE_GATE_SKIP(req.path)) return next();
     optionalAuth(req as never, res, () =>
