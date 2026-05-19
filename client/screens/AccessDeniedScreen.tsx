@@ -37,10 +37,8 @@ export default function AccessDeniedScreen() {
         <ThemedText type="h2" style={styles.title}>
           Access is managed by OperatorOS
         </ThemedText>
-        <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center" }}>
-          Access to this module is managed by OperatorOS. Your workspace
-          doesn't currently have TorqueShed enabled — open OperatorOS to
-          enable it or contact your workspace administrator.
+        <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center" }} testID="text-access-denied-message">
+          Access to this module is managed by OperatorOS. Contact your tenant administrator or upgrade your OperatorOS plan.
         </ThemedText>
         {manageBillingUrl ? (
           <Pressable

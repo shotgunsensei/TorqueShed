@@ -320,6 +320,132 @@ describe("GET /sso internal_error branch", () => {
   });
 });
 
+describe("GET /sso — entitlement snapshot + role mapping", () => {
+  // Role-mapping permutation matrix. The login route must:
+  //  (a) persist an entitlement snapshot to users.entitlementSnapshotJson
+  //      derived from the `target_module_*` claims on every SSO launch, and
+  //  (b) map the snapshot to the correct local role using snapshotLocalRole.
+  const cases: Array<{
+    label: string;
+    claims: Record<string, unknown>;
+    expectedRole: "admin" | "user";
+    expectedAccessLevel: string;
+    expectedEnabled: boolean;
+  }> = [
+    {
+      label: "tenant owner → admin",
+      claims: { target_module_access_level: "owner", target_module_enabled: true },
+      expectedRole: "admin",
+      expectedAccessLevel: "owner",
+      expectedEnabled: true,
+    },
+    {
+      label: "module_admin role → admin",
+      claims: {
+        target_module_access_level: "user",
+        module_role: "module_admin",
+        target_module_enabled: true,
+      },
+      expectedRole: "admin",
+      expectedAccessLevel: "user",
+      expectedEnabled: true,
+    },
+    {
+      label: "plain user → user",
+      claims: { target_module_access_level: "user", target_module_enabled: true },
+      expectedRole: "user",
+      expectedAccessLevel: "user",
+      expectedEnabled: true,
+    },
+    {
+      label: "viewer → user (read-only)",
+      claims: { target_module_access_level: "viewer", target_module_enabled: true },
+      expectedRole: "user",
+      expectedAccessLevel: "viewer",
+      expectedEnabled: true,
+    },
+    {
+      label: "access_level=none / disabled → user (module disabled)",
+      claims: { target_module_access_level: "none", target_module_enabled: false },
+      expectedRole: "user",
+      expectedAccessLevel: "none",
+      expectedEnabled: false,
+    },
+    {
+      label: "tenant_admin alone (no module_admin) → user (no over-grant)",
+      claims: {
+        target_module_access_level: "user",
+        module_role: "tenant_admin",
+        target_module_enabled: true,
+      },
+      expectedRole: "user",
+      expectedAccessLevel: "user",
+      expectedEnabled: true,
+    },
+  ];
+
+  for (const c of cases) {
+    it(`writes snapshot and maps role correctly: ${c.label}`, async () => {
+      const sub = uniqueSub("rolemap");
+      const token = sign(
+        makeClaims({
+          sub,
+          target_module_key: SSO_AUDIENCE,
+          ...c.claims,
+        }),
+      );
+      const res = await request(app).get(`/sso?token=${encodeURIComponent(token)}`);
+      expect(res.status).toBe(302);
+
+      const [u] = await db.select().from(users).where(eq(users.operatorOsUserId, sub));
+      expect(u).toBeDefined();
+      expect(u.role).toBe(c.expectedRole);
+      const snap = u.entitlementSnapshotJson as Record<string, unknown> | null;
+      expect(snap).not.toBeNull();
+      expect(snap?.access_level).toBe(c.expectedAccessLevel);
+      expect(snap?.enabled).toBe(c.expectedEnabled);
+      expect(u.lastEntitlementSyncAt).toBeInstanceOf(Date);
+    });
+  }
+
+  it("rewrites the snapshot on every SSO login (per-launch refresh)", async () => {
+    const sub = uniqueSub("refresh");
+    // First launch: viewer / read-only.
+    const t1 = sign(
+      makeClaims({
+        sub,
+        target_module_key: SSO_AUDIENCE,
+        target_module_access_level: "viewer",
+        target_module_enabled: true,
+      }),
+    );
+    const r1 = await request(app).get(`/sso?token=${encodeURIComponent(t1)}`);
+    expect(r1.status).toBe(302);
+    const [first] = await db.select().from(users).where(eq(users.operatorOsUserId, sub));
+    expect((first.entitlementSnapshotJson as { access_level: string }).access_level).toBe("viewer");
+    expect(first.role).toBe("user");
+    const firstSyncAt = first.lastEntitlementSyncAt!;
+
+    await new Promise((r) => setTimeout(r, 25));
+
+    // Second launch: promoted to owner. Snapshot AND role must update.
+    const t2 = sign(
+      makeClaims({
+        sub,
+        target_module_key: SSO_AUDIENCE,
+        target_module_access_level: "owner",
+        target_module_enabled: true,
+      }),
+    );
+    const r2 = await request(app).get(`/sso?token=${encodeURIComponent(t2)}`);
+    expect(r2.status).toBe(302);
+    const [second] = await db.select().from(users).where(eq(users.operatorOsUserId, sub));
+    expect((second.entitlementSnapshotJson as { access_level: string }).access_level).toBe("owner");
+    expect(second.role).toBe("admin");
+    expect(second.lastEntitlementSyncAt!.getTime()).toBeGreaterThan(firstSyncAt.getTime());
+  });
+});
+
 describe("Local password login against an SSO-provisioned account", () => {
   it("returns 401 with the 'sign in via OperatorOS' short-circuit message", async () => {
     const sub = uniqueSub("loginshort");
