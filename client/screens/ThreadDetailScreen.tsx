@@ -553,7 +553,7 @@ export default function ThreadDetailScreen() {
             onPress={() => openFinalFix(item.id)}
             testID={`button-mark-solution-${item.id}`}
             accessibilityRole="button"
-            accessibilityLabel="Mark this reply as the solution"
+            accessibilityLabel="Mark this update as the solution"
             accessibilityHint="Open the form to record what fixed it"
           >
             <Feather name="check" size={14} color={theme.success} />

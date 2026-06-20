@@ -447,7 +447,7 @@ export default function GarageDetailScreen() {
                           {c.username}
                         </ThemedText>
                         <ThemedText type="caption" style={{ color: theme.textMuted, fontSize: 10 }}>
-                          {c.replyCount} {c.replyCount === 1 ? "reply" : "replies"}
+                          {c.replyCount} {c.replyCount === 1 ? "update" : "updates"}
                         </ThemedText>
                       </View>
                     </View>

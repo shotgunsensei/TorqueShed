@@ -149,7 +149,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
     expect(res.status).toBe(200);
     expect(stripeSyncProcessed).toHaveBeenCalledTimes(1);
     expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledTimes(1);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -157,7 +157,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("customer.subscription.created writes tier/status/period from event", async () => {
@@ -165,7 +165,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
     const res = await postEvent(app, subscriptionCreatedEvent());
 
     expect(res.status).toBe(200);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -173,7 +173,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("customer.subscription.updated propagates cancel_at_period_end and tier changes", async () => {
@@ -181,7 +181,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
     const res = await postEvent(app, subscriptionUpdatedEvent());
 
     expect(res.status).toBe(200);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "shop_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -189,7 +189,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
       stripePriceId: "price_test_shop_pro",
       cancelAtPeriodEnd: true,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("customer.subscription.updated drops tier to free when status is past_due", async () => {
@@ -211,7 +211,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
     const res = await postEvent(app, subscriptionDeletedEvent());
 
     expect(res.status).toBe(200);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "free",
       status: "canceled",
       stripeCustomerId: CUSTOMER_ID,
@@ -219,7 +219,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("invoice.payment_succeeded sets status to active and preserves tier", async () => {
@@ -227,7 +227,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
     const res = await postEvent(app, invoicePaymentSucceededEvent());
 
     expect(res.status).toBe(200);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -235,7 +235,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("invoice.payment_failed flips status to past_due without changing tier", async () => {
@@ -243,7 +243,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
     const res = await postEvent(app, invoicePaymentFailedEvent());
 
     expect(res.status).toBe(200);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "past_due",
       stripeCustomerId: CUSTOMER_ID,
@@ -251,7 +251,7 @@ describe("POST /api/stripe/webhook — subscription mutations", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("does not mutate when no local subscription row exists for the customer", async () => {

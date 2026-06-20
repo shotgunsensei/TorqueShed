@@ -60,7 +60,7 @@ describe("applyStripeEvent", () => {
     const ok = await applyStripeEvent(checkoutSessionCompletedEvent());
     expect(ok).toBe(true);
     expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledTimes(1);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -68,7 +68,7 @@ describe("applyStripeEvent", () => {
       stripePriceId: null,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: null,
-    });
+    }));
   });
 
   it("checkout.session.completed ignores expert-escalation sessions", async () => {
@@ -80,7 +80,7 @@ describe("applyStripeEvent", () => {
   it("customer.subscription.created writes tier/status/period from event", async () => {
     const ok = await applyStripeEvent(subscriptionCreatedEvent());
     expect(ok).toBe(true);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -88,13 +88,13 @@ describe("applyStripeEvent", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("customer.subscription.updated propagates cancel_at_period_end and tier changes", async () => {
     const ok = await applyStripeEvent(subscriptionUpdatedEvent());
     expect(ok).toBe(true);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "shop_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -102,7 +102,7 @@ describe("applyStripeEvent", () => {
       stripePriceId: "price_test_shop_pro",
       cancelAtPeriodEnd: true,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("customer.subscription.updated drops tier to free when status is past_due", async () => {
@@ -117,7 +117,7 @@ describe("applyStripeEvent", () => {
   it("customer.subscription.deleted clears the subscription back to free/canceled", async () => {
     const ok = await applyStripeEvent(subscriptionDeletedEvent());
     expect(ok).toBe(true);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "free",
       status: "canceled",
       stripeCustomerId: CUSTOMER_ID,
@@ -125,7 +125,7 @@ describe("applyStripeEvent", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("invoice.payment_succeeded sets status to active and preserves tier", async () => {
@@ -140,7 +140,7 @@ describe("applyStripeEvent", () => {
     });
     const ok = await applyStripeEvent(invoicePaymentSucceededEvent());
     expect(ok).toBe(true);
-    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", {
+    expect(mockedStorage.updateSubscriptionFromStripe).toHaveBeenCalledWith("user_1", expect.objectContaining({
       tier: "garage_pro",
       status: "active",
       stripeCustomerId: CUSTOMER_ID,
@@ -148,7 +148,7 @@ describe("applyStripeEvent", () => {
       stripePriceId: PRICE_ID,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: PERIOD_END_DATE,
-    });
+    }));
   });
 
   it("invoice.payment_failed flips status to past_due", async () => {

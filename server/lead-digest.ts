@@ -221,7 +221,7 @@ export async function runLeadDigestOnce(now: Date = new Date()): Promise<RunStat
 }
 
 let schedulerStarted = false;
-let intervalHandle: NodeJS.Timeout | null = null;
+let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 export function startLeadDigestScheduler(): void {
   if (schedulerStarted) return;

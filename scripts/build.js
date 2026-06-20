@@ -6,6 +6,15 @@ const { pipeline } = require("stream/promises");
 
 let metroProcess = null;
 
+function nodePathEnv() {
+  const nodeDir = path.dirname(process.execPath);
+  return `${nodeDir}${path.delimiter}${process.env.PATH || ""}`;
+}
+
+function expoCliPath() {
+  return path.join("node_modules", "expo", "bin", "cli");
+}
+
 function exitWithError(message) {
   console.error(message);
   if (metroProcess) {
@@ -118,8 +127,9 @@ async function startMetro(expoPublicDomain) {
   const env = {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
+    PATH: nodePathEnv(),
   };
-  metroProcess = spawn("npm", ["run", "expo:start:static:build"], {
+  metroProcess = spawn(process.execPath, [expoCliPath(), "start", "--no-dev", "--minify", "--localhost"], {
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
     env,
@@ -462,9 +472,10 @@ async function buildWebVersion(domain) {
       ...process.env,
       EXPO_PUBLIC_DOMAIN: domain,
       NODE_ENV: "production",
+      PATH: nodePathEnv(),
     };
     
-    const webBuildProcess = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web"], {
+    const webBuildProcess = spawn(process.execPath, [expoCliPath(), "export", "--platform", "web", "--output-dir", "static-build/web"], {
       stdio: ["ignore", "pipe", "pipe"],
       env,
     });

@@ -226,7 +226,7 @@ function ThreadCard({
       style={[styles.horizontalCard, { minWidth: 260 }]}
       onPress={onPress}
       testID={`card-thread-${thread.id}`}
-      accessibilityLabel={`${thread.title}. By ${thread.userName}. ${thread.replyCount || 0} ${(thread.replyCount || 0) === 1 ? "reply" : "replies"}.${thread.hasSolution ? " Solved." : ""}${isNew ? " New." : ""}${garageInfo ? ` In ${garageInfo.name}.` : ""}${timeAgo ? ` Last activity ${timeAgo}.` : ""}`}
+      accessibilityLabel={`${thread.title}. By ${thread.userName}. ${thread.replyCount || 0} ${(thread.replyCount || 0) === 1 ? "update" : "updates"}.${thread.hasSolution ? " Solved." : ""}${isNew ? " New." : ""}${garageInfo ? ` In ${garageInfo.name}.` : ""}${timeAgo ? ` Last activity ${timeAgo}.` : ""}`}
       accessibilityHint="Open repair case"
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs }}>
@@ -688,7 +688,7 @@ export default function HomeScreen() {
                 style={styles.activityCard}
                 onPress={() => navigation.navigate("ThreadDetail", { threadId: t.id })}
                 testID={`card-continue-thread-${t.id}`}
-                accessibilityLabel={`Open repair case: ${t.title}, ${t.replyCount || 0} ${(t.replyCount || 0) === 1 ? "reply" : "replies"}${formatTimeAgo(t.lastActivityAt || t.createdAt) ? `, ${formatTimeAgo(t.lastActivityAt || t.createdAt)}` : ""}`}
+                accessibilityLabel={`Open repair case: ${t.title}, ${t.replyCount || 0} ${(t.replyCount || 0) === 1 ? "update" : "updates"}${formatTimeAgo(t.lastActivityAt || t.createdAt) ? `, ${formatTimeAgo(t.lastActivityAt || t.createdAt)}` : ""}`}
                 accessibilityHint="Open repair case"
               >
                 <View style={styles.promptContent}>
@@ -723,7 +723,7 @@ export default function HomeScreen() {
                       {t.title}
                     </ThemedText>
                     <ThemedText type="caption" style={{ color: theme.textMuted }}>
-                      {t.replyCount || 0} {(t.replyCount || 0) === 1 ? "reply" : "replies"} {formatTimeAgo(t.lastActivityAt || t.createdAt)}
+                      {t.replyCount || 0} {(t.replyCount || 0) === 1 ? "update" : "updates"} {formatTimeAgo(t.lastActivityAt || t.createdAt)}
                     </ThemedText>
                   </View>
                   <StatusBadge label="Unsolved" variant="warning" size="sm" />

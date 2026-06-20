@@ -137,7 +137,7 @@ export function register(app: Express): void {
       let emailChanged = false;
       let normalizedEmail: string | null | undefined = undefined;
       if (parsed.email !== undefined) {
-        normalizedEmail = parsed.email === "" ? null : parsed.email.toLowerCase().trim();
+        normalizedEmail = parsed.email ? parsed.email.toLowerCase().trim() : null;
         updates.email = normalizedEmail;
       }
       if (parsed.expoPushToken !== undefined) updates.expoPushToken = parsed.expoPushToken === "" ? null : parsed.expoPushToken;

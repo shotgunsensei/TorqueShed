@@ -121,6 +121,7 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const navigation = useNavigation<NavigationProp>();
+  const { isDesktop } = useResponsive();
   const { hasFeature, isPaid } = useEntitlements();
   const hasUnlimitedSaves = hasFeature("unlimited_saved_cases");
 
@@ -426,7 +427,7 @@ export default function ProfileScreen() {
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <StatItem value={stats.solutionCount} label="Solutions" icon="check-circle" color={theme.success} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <StatItem value={stats.replyCount} label="Replies" icon="message-square" color={theme.primary} />
+          <StatItem value={stats.replyCount} label="Updates" icon="message-square" color={theme.primary} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <StatItem value={stats.listingCount} label="Listings" icon="tag" color={theme.primary} />
         </View>
@@ -627,7 +628,7 @@ export default function ProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.activityTitle, { color: theme.text }]} numberOfLines={1}>
-                  {activity.type === "thread" ? "Started: " : "Replied to: "}
+                  {activity.type === "thread" ? "Started case: " : "Updated case: "}
                   {activity.title}
                 </Text>
                 <Text style={[styles.activityTime, { color: theme.textMuted }]}>{formatTimeAgo(activity.createdAt)}</Text>
