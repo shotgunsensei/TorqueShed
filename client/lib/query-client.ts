@@ -1,10 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { APP_URLS } from "@shared/brand";
 
 const TOKEN_KEY = "torqueshed_auth_token";
 
-const PRODUCTION_API_URL = "https://torqueshed.pro";
+const PRODUCTION_API_URL = APP_URLS.production;
 
 /**
  * Gets the base URL for the Express API server (e.g., "https://torqueshed.pro")
@@ -80,6 +81,32 @@ export async function apiRequest(
 
   await throwIfResNotOk(res);
   return res;
+}
+
+export async function apiJson<T>(
+  method: string,
+  route: string,
+  data?: unknown | undefined,
+): Promise<T> {
+  const res = await apiRequest(method, route, data);
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await res.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
+}
+
+export async function apiEmpty(
+  method: string,
+  route: string,
+  data?: unknown | undefined,
+): Promise<void> {
+  await apiRequest(method, route, data);
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

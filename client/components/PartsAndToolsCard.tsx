@@ -20,7 +20,7 @@ interface Recommendation {
   fitmentNote?: string | null;
 }
 
-interface MarketplaceListing {
+interface MarketListing {
   id: string;
   title: string;
   price: string | null;
@@ -33,7 +33,7 @@ interface RecommendationResponse {
   likelyParts: Recommendation[];
   consumables: Recommendation[];
   safetyEquipment: Recommendation[];
-  marketplaceListings: MarketplaceListing[];
+  marketplaceListings: MarketListing[];
   totalCostRange: { min: number; max: number; label: string };
   affiliateNote: string;
   fullChecklist?: boolean;
@@ -156,7 +156,7 @@ export default function PartsAndToolsCard({ caseId, onUpgrade, onBrowseMarketpla
 
           <Pressable onPress={onBrowseMarketplace} style={[styles.browseBtn, { borderColor: theme.cardBorder }]}>
             <Feather name="shopping-bag" size={14} color={theme.text} />
-            <ThemedText type="small" style={{ marginLeft: Spacing.xs }}>Browse Swap Shop for matching parts</ThemedText>
+            <ThemedText type="small" style={{ marginLeft: Spacing.xs }}>Browse matching parts and tools</ThemedText>
           </Pressable>
 
           <ThemedText type="caption" style={[styles.disclaimer, { color: theme.textMuted }]}>{data.affiliateNote}</ThemedText>

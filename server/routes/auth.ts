@@ -157,38 +157,30 @@ export function register(app: Express): void {
     }
   });
 
-  // TODO: Wire up email service for password reset flow
   app.post("/api/auth/forgot-password", rateLimited("auth:forgot", 5, 60 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { username } = req.body;
       if (!username) {
         return res.status(400).json({ error: "Username is required" });
       }
-      // TODO: When email service is wired up:
-      // 1. Look up user by username
-      // 2. Generate a secure reset token with expiration
-      // 3. Send reset email with token link
-      // For now, always return success to avoid leaking user existence
-      res.json({ message: "If an account with that username exists, a reset link has been sent." });
+      res.status(503).json({
+        error: "Password reset is handled through support for this release.",
+      });
     } catch (error) {
       console.error("Error in forgot-password:", error);
       res.status(500).json({ error: "Failed to process request" });
     }
   });
 
-  // TODO: Wire up email service for password reset flow
   app.post("/api/auth/reset-password", rateLimited("auth:reset", 10, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { token, newPassword } = req.body;
       if (!token || !newPassword) {
         return res.status(400).json({ error: "Token and new password are required" });
       }
-      // TODO: When email service is wired up:
-      // 1. Validate the reset token and check expiration
-      // 2. Hash the new password
-      // 3. Update the user's password
-      // 4. Invalidate the token
-      res.status(501).json({ error: "Password reset is not yet available. Contact support for assistance." });
+      res.status(503).json({
+        error: "Password reset is handled through support for this release.",
+      });
     } catch (error) {
       console.error("Error in reset-password:", error);
       res.status(500).json({ error: "Failed to process request" });

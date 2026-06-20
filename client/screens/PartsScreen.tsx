@@ -19,6 +19,7 @@ import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { SimilarCasesCard } from "@/components/SimilarCasesCard";
 import { Spacing, Typography, BorderRadius, Colors } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
@@ -79,6 +80,7 @@ export default function PartsScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useSafeTabBarHeight();
+  const { isTablet, isDesktop } = useResponsive();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
   const scrollRef = useRef<ScrollView>(null);
@@ -87,6 +89,11 @@ export default function PartsScreen() {
   const [activeTestId, setActiveTestId] = useState<string | null>(null);
   const [testNotes, setTestNotes] = useState("");
   const [showExport, setShowExport] = useState(false);
+  const categoryCardWidth: "31%" | "47%" | "100%" = isDesktop
+    ? "31%"
+    : isTablet
+      ? "47%"
+      : "100%";
 
   const { data: userVehicles } = useQuery<Array<{ id: string; year: number; make: string; model: string; engine: string; vin: string }>>({
     queryKey: ["/api/vehicles"],
@@ -459,6 +466,7 @@ export default function PartsScreen() {
               key={cat.id}
               style={({ pressed }) => [
                 styles.categoryCard,
+                { width: categoryCardWidth },
                 {
                   backgroundColor: theme.backgroundSecondary,
                   borderColor: match ? theme.primary : theme.cardBorder,
@@ -900,14 +908,14 @@ export default function PartsScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.askHelpCard, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "30", opacity: pressed ? 0.9 : 1 }]}
-          onPress={() => navigation.navigate("AskForHelp")}
+          onPress={() => navigation.navigate("NewCase")}
           testID="button-ask-help-torqueassist"
         >
-          <Feather name="users" size={20} color={theme.primary} />
+          <Feather name="clipboard" size={20} color={theme.primary} />
           <View style={{ flex: 1, marginLeft: Spacing.md }}>
-            <Text style={[styles.askHelpTitle, { color: theme.text }]}>Still stuck?</Text>
+            <Text style={[styles.askHelpTitle, { color: theme.text }]}>Need a second pass?</Text>
             <Text style={[styles.askHelpDesc, { color: theme.textSecondary }]}>
-              Post a structured help request with your diagnostic data.
+              Start a repair case with symptoms, evidence, codes, and test results.
             </Text>
           </View>
           <Feather name="chevron-right" size={18} color={theme.primary} />
@@ -1143,6 +1151,9 @@ export default function PartsScreen() {
         {
           paddingTop: headerHeight + Spacing.md,
           paddingBottom: tabBarHeight + Spacing.xl,
+          maxWidth: isDesktop ? 1120 : undefined,
+          alignSelf: isDesktop ? "center" : undefined,
+          width: isDesktop ? "100%" : undefined,
         },
       ]}
       showsVerticalScrollIndicator={false}

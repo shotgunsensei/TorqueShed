@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users, garages } from "@shared/schema";
+import { APP_BRAND } from "@shared/brand";
 import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
@@ -305,12 +306,13 @@ function configureExpoAndLanding(app: express.Application) {
         return res.redirect(`https://${devDomain}:8081`);
       }
     }
-    // In production without a web build, show helpful message
+    // In production without a web build, keep installed-PWA users in a real
+    // support state instead of sending them to old Expo testing instructions.
     res.status(503).send(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>TorqueShed - Web App</title>
+          <title>${APP_BRAND.name} - App Unavailable</title>
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <style>
             body { font-family: -apple-system, sans-serif; background: #0D0F12; color: #E5E7EB; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; text-align: center; }
@@ -322,8 +324,9 @@ function configureExpoAndLanding(app: express.Application) {
         </head>
         <body>
           <div class="container">
-            <h1>Web App Coming Soon</h1>
-            <p>The web version is being prepared. In the meantime, use the <a href="/">mobile app</a> via Expo Go.</p>
+            <h1>${APP_BRAND.name} app is temporarily unavailable</h1>
+            <p>The diagnostic workspace could not load because the web build is missing on this server.</p>
+            <p>Please try again shortly or contact <a href="mailto:${APP_BRAND.supportEmail}">${APP_BRAND.supportEmail}</a>.</p>
           </div>
         </body>
       </html>
@@ -448,7 +451,7 @@ function configureExpoAndLanding(app: express.Application) {
             
             <div class="contact">
               <h2>Need Help?</h2>
-              <p>If you're having trouble deleting your account or have questions, please contact us at <a href="mailto:support@torqueshed.app">support@torqueshed.app</a></p>
+              <p>If you're having trouble deleting your account or have questions, please contact us at <a href="mailto:${APP_BRAND.supportEmail}">${APP_BRAND.supportEmail}</a></p>
             </div>
           </div>
         </body>

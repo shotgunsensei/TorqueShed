@@ -14,7 +14,7 @@ import type { VehicleNote, NoteType } from "@/constants/vehicles";
 
 interface NoteCardProps {
   note: VehicleNote;
-  onPress: () => void;
+  onPress?: () => void;
   onDiagnose?: () => void;
   onAskForHelp?: () => void;
 }
@@ -61,6 +61,7 @@ export function NoteCard({ note, onPress, onDiagnose, onAskForHelp }: NoteCardPr
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      disabled={!onPress}
       style={[
         styles.card,
         {

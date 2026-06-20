@@ -95,7 +95,7 @@ export default function MoreStackNavigator() {
       <Stack.Screen
         name="Subscription"
         component={SubscriptionScreen}
-        options={{ headerTitle: "Subscription" }}
+        options={{ headerTitle: "Plan & Access" }}
       />
       <Stack.Screen
         name="Billing"

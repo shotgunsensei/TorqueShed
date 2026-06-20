@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates } from "@/constants/brand";
@@ -100,6 +101,7 @@ export default function NotesScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
+  const { isTablet, isDesktop } = useResponsive();
   const { hasFeature } = useEntitlements();
   const hasMultiVehicle = hasFeature("multi_vehicle");
 
@@ -108,6 +110,7 @@ export default function NotesScreen() {
   });
 
   const atVehicleLimit = !hasMultiVehicle && vehicles.length >= FREE_VEHICLE_LIMIT;
+  const columns = isDesktop ? 3 : isTablet ? 2 : 1;
 
   const handleVehiclePress = (vehicle: VehicleItem) => {
     const vehicleName = vehicle.nickname || [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle";
@@ -164,6 +167,7 @@ export default function NotesScreen() {
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       {vehicles.length > 0 ? (
         <FlatList
+          key={`vehicles-${columns}`}
           data={vehicles}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -171,8 +175,15 @@ export default function NotesScreen() {
           )}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: tabBarHeight + Spacing.lg + 56 + Spacing.md },
+            {
+              paddingBottom: tabBarHeight + Spacing.lg + 56 + Spacing.md,
+              maxWidth: isDesktop ? 1180 : undefined,
+              alignSelf: isDesktop ? "center" : undefined,
+              width: isDesktop ? "100%" : undefined,
+            },
           ]}
+          numColumns={columns}
+          columnWrapperStyle={columns > 1 ? styles.vehicleGridRow : undefined}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={
@@ -245,9 +256,13 @@ const styles = StyleSheet.create({
     ...Typography.caption,
   },
   card: {
+    flex: 1,
     marginBottom: Spacing.md,
     overflow: "hidden",
     padding: 0,
+  },
+  vehicleGridRow: {
+    gap: Spacing.md,
   },
   cardHeader: {
     flexDirection: "row",

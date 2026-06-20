@@ -22,10 +22,13 @@ import { Input } from "@/components/Input";
 import { ThemedText } from "@/components/ThemedText";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SimilarCasesCard } from "@/components/SimilarCasesCard";
+import { FixPathRail } from "@/components/ResponsivePrimitives";
+import { CaseQualityMeter } from "@/components/CaseDiagnosticPanels";
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
-import { apiRequest } from "@/lib/query-client";
+import { apiJson } from "@/lib/query-client";
 import { lookupObdCode, searchObdCodes } from "@/constants/obdCodes";
 import type { ObdCodeInfo } from "@/constants/obdCodes";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -46,6 +49,10 @@ interface Garage {
   id: string;
   name: string;
   brandColor: string | null;
+}
+
+interface CreatedCase {
+  id: string;
 }
 
 const SYSTEM_OPTIONS: Array<{ key: string; label: string; icon: keyof typeof Feather.glyphMap }> = [
@@ -105,7 +112,8 @@ const TOOLS_AVAILABLE = [
   "Vacuum gauge",
 ];
 
-const STEP_TITLES = ["Vehicle", "Problem", "Review"];
+const FIX_PATH_STEPS = ["Observed", "Hypothesis", "Test", "Result", "Fix Verified"];
+const MANUAL_CODE_PATTERN = /^[PBCU][0-9A-F]{4}$/;
 
 function pickGarageForMake(garages: Garage[], make: string | null): Garage | undefined {
   if (!garages.length) return undefined;
@@ -128,6 +136,7 @@ export default function NewCaseScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { isDesktop } = useResponsive();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -182,7 +191,7 @@ export default function NewCaseScreen() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!targetGarage) throw new Error("No bay available to post to");
+      if (!targetGarage) throw new Error("No case category is available");
       const body: Record<string, unknown> = {
         title: title.trim(),
         content: content.trim() || `Symptoms: ${symptoms.join(", ") || "(none provided)"}`,
@@ -200,21 +209,17 @@ export default function NewCaseScreen() {
         videoUrls: videoUrls.length ? videoUrls : undefined,
         status: "open",
       };
-      return apiRequest("POST", `/api/garages/${targetGarage.id}/threads`, body);
+      return apiJson<CreatedCase>("POST", `/api/garages/${targetGarage.id}/threads`, body);
     },
-    onSuccess: (created: unknown) => {
+    onSuccess: (created) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/threads"] });
       if (targetGarage) {
         queryClient.invalidateQueries({ queryKey: [`/api/garages/${targetGarage.id}/threads`] });
       }
       toast.show("Case opened", "success");
-      const createdId =
-        created && typeof created === "object" && "id" in created && typeof (created as { id: unknown }).id === "string"
-          ? (created as { id: string }).id
-          : null;
-      if (createdId) {
-        navigation.replace("ThreadDetail", { threadId: createdId });
+      if (created?.id) {
+        navigation.replace("ThreadDetail", { threadId: created.id });
       } else {
         navigation.goBack();
       }
@@ -232,6 +237,10 @@ export default function NewCaseScreen() {
   const addCode = (code: string) => {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
+    if (!MANUAL_CODE_PATTERN.test(trimmed)) {
+      toast.show("Enter a code like P0300, P0171, C1234, B0020, or U0100.", "info");
+      return;
+    }
     if (obdCodes.includes(trimmed)) return;
     setObdCodes([...obdCodes, trimmed]);
     setCodeInput("");
@@ -266,7 +275,7 @@ export default function NewCaseScreen() {
       toast.show(msg, "info");
       return;
     }
-    if (step < STEP_TITLES.length - 1) {
+    if (step < 2) {
       setStep(step + 1);
       Haptics.selectionAsync();
     }
@@ -279,38 +288,7 @@ export default function NewCaseScreen() {
   };
 
   const renderStepIndicator = () => (
-    <View style={styles.stepRow}>
-      {STEP_TITLES.map((label, idx) => {
-        const active = idx === step;
-        const done = idx < step;
-        const color = done ? theme.success : active ? theme.primary : theme.textMuted;
-        return (
-          <View key={label} style={styles.stepItem}>
-            <View
-              style={[
-                styles.stepDot,
-                {
-                  backgroundColor: done ? theme.success : active ? theme.primary : theme.backgroundSecondary,
-                  borderColor: color,
-                },
-              ]}
-            >
-              {done ? (
-                <Feather name="check" size={12} color="#fff" />
-              ) : (
-                <Text style={[styles.stepDotText, { color: active ? "#fff" : theme.textMuted }]}>
-                  {idx + 1}
-                </Text>
-              )}
-            </View>
-            <Text style={[styles.stepLabel, { color }]}>{label}</Text>
-            {idx < STEP_TITLES.length - 1 ? (
-              <View style={[styles.stepLine, { backgroundColor: theme.cardBorder }]} />
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
+    <FixPathRail steps={FIX_PATH_STEPS} currentIndex={step === 0 ? 0 : step === 1 ? 1 : 2} style={styles.fixRail} />
   );
 
   const renderStepVehicle = () => (
@@ -478,6 +456,9 @@ export default function NewCaseScreen() {
       </View>
 
       <Text style={[styles.sectionLabel, { color: theme.text }]}>OBD-II codes</Text>
+      <Text style={[styles.fieldHint, { color: theme.textMuted }]}>
+        Manual code entry only. TorqueShed does not connect to a scanner in this flow.
+      </Text>
       <View style={[styles.codeInputRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
         <Feather name="cpu" size={14} color={theme.textMuted} />
         <TextInput
@@ -680,8 +661,27 @@ export default function NewCaseScreen() {
       <View style={styles.stepBody}>
         <ThemedText type="h3">Review your case</ThemedText>
         <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-          Posting to {targetGarage ? targetGarage.name : "General"} bay.
+          This opens a repair case and attaches it to {targetGarage ? targetGarage.name : "General"} for filtering.
         </ThemedText>
+
+        <CaseQualityMeter
+          thread={{
+            id: "preview",
+            title,
+            content,
+            vehicleName: selectedVehicle
+              ? `${selectedVehicle.year ?? ""} ${selectedVehicle.make ?? ""} ${selectedVehicle.model ?? ""}`.trim()
+              : null,
+            symptoms,
+            obdCodes,
+            photoUrls,
+            videoUrls,
+            partsReplaced,
+            hasSolution: false,
+            status: "open",
+          }}
+          replies={[]}
+        />
 
         <View style={[styles.reviewCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
           <Text style={[styles.reviewTitle, { color: theme.text }]}>{title || "(no title)"}</Text>
@@ -758,11 +758,11 @@ export default function NewCaseScreen() {
             <Text style={[styles.previewLabel, { color: theme.textSecondary }]}>Suggested next steps</Text>
             <View style={styles.previewItem}>
               <Feather name="check-square" size={12} color={theme.text} />
-              <Text style={{ color: theme.text, flex: 1 }}>Pull live data to confirm symptoms</Text>
+              <Text style={{ color: theme.text, flex: 1 }}>Pull live data or inspect the circuit to confirm symptoms</Text>
             </View>
             <View style={styles.previewItem}>
               <Feather name="check-square" size={12} color={theme.text} />
-              <Text style={{ color: theme.text, flex: 1 }}>Inspect related sensors and connectors</Text>
+              <Text style={{ color: theme.text, flex: 1 }}>Record one test result before buying parts</Text>
             </View>
             <View style={styles.previewItem}>
               <Feather name="check-square" size={12} color={theme.text} />
@@ -796,6 +796,9 @@ export default function NewCaseScreen() {
           paddingBottom: insets.bottom + 100,
           paddingHorizontal: Spacing.lg,
           gap: Spacing.lg,
+          maxWidth: isDesktop ? 920 : undefined,
+          alignSelf: isDesktop ? "center" : undefined,
+          width: isDesktop ? "100%" : undefined,
         }}
         scrollIndicatorInsets={{ bottom: insets.bottom + 60 }}
       >
@@ -833,7 +836,7 @@ export default function NewCaseScreen() {
         ) : (
           <View style={styles.footerBtn} />
         )}
-        {step < STEP_TITLES.length - 1 ? (
+        {step < 2 ? (
           <Button
             onPress={goNext}
             style={styles.footerBtn}
@@ -849,11 +852,11 @@ export default function NewCaseScreen() {
             disabled={createMutation.isPending}
             style={styles.footerBtn}
             testID="button-open-case"
-            accessibilityLabel={createMutation.isPending ? "Opening case" : "Open case"}
+            accessibilityLabel={createMutation.isPending ? "Opening case" : "Start a repair case"}
             accessibilityHint="Submit this case for help"
             accessibilityState={{ busy: createMutation.isPending }}
           >
-            {createMutation.isPending ? "Opening..." : "Open Case"}
+            {createMutation.isPending ? "Opening..." : "Start Repair Case"}
           </Button>
         )}
       </View>
@@ -863,6 +866,7 @@ export default function NewCaseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  fixRail: { marginBottom: Spacing.md },
   stepRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Spacing.md },
   stepItem: { flexDirection: "row", alignItems: "center", flex: 1 },
   stepDot: {
@@ -904,6 +908,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sectionLabel: { ...Typography.caption, fontWeight: "700", textTransform: "uppercase", marginTop: Spacing.sm },
+  fieldHint: { ...Typography.caption, marginTop: -Spacing.xs },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   pickChip: {
     flexDirection: "row",

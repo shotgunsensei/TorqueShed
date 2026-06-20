@@ -18,9 +18,11 @@ import { Skeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserRoleDisplay } from "@/components/UserAvatar";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { brand } from "@/constants/brand";
 import { apiRequest } from "@/lib/query-client";
 import { useEntitlements, FREE_SAVED_THREAD_LIMIT } from "@/lib/entitlements";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -99,6 +101,7 @@ function formatTimeAgo(dateString: string): string {
 
 function StatItem({ value, label, icon, color }: { value: number; label: string; icon: keyof typeof Feather.glyphMap; color: string }) {
   const { theme } = useTheme();
+  const { isDesktop } = useResponsive();
   return (
     <View style={styles.statCell}>
       <Feather name={icon} size={14} color={color} style={{ marginBottom: 2 }} />
@@ -314,6 +317,9 @@ export default function ProfileScreen() {
         paddingTop: headerHeight + Spacing.lg,
         paddingBottom: insets.bottom + Spacing.xl,
         paddingHorizontal: Spacing.lg,
+        maxWidth: isDesktop ? 960 : undefined,
+        alignSelf: isDesktop ? "center" : undefined,
+        width: isDesktop ? "100%" : undefined,
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
@@ -416,7 +422,7 @@ export default function ProfileScreen() {
         <View style={[styles.statsRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
           <StatItem value={stats.vehicleCount} label="Vehicles" icon="truck" color={theme.primary} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <StatItem value={stats.threadCount} label="Threads" icon="message-circle" color={theme.primary} />
+          <StatItem value={stats.threadCount} label="Cases" icon="clipboard" color={theme.primary} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <StatItem value={stats.solutionCount} label="Solutions" icon="check-circle" color={theme.success} />
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
@@ -747,13 +753,12 @@ export default function ProfileScreen() {
             styles.menuItem,
             { backgroundColor: theme.backgroundDefault, borderColor: theme.cardBorder },
           ]}
-          onPress={() => {
-            Alert.alert(
-              "Notifications",
-              "Notification settings coming soon. You will be able to manage push notifications for new replies, swap shop messages, and community updates.",
-              [{ text: "OK" }]
-            );
-          }}
+          onPress={() =>
+            navigation.navigate("Main", {
+              screen: "MoreTab",
+              params: { screen: "NotificationSettings" },
+            })
+          }
         >
           <View style={styles.menuItemLeft}>
             <Feather name="bell" size={20} color={theme.text} />
@@ -772,7 +777,7 @@ export default function ProfileScreen() {
           onPress={() => {
             Alert.alert(
               "Privacy Settings",
-              "Your data is important to us.\n\n- Profile visibility: Public\n- Activity: Only you can see your activity history\n- Messages: Direct messages are private\n\nFull privacy controls coming in a future update.",
+              "Your data is important to us.\n\n- Profile visibility: Public\n- Activity history: Only you can see it\n- Repair cases: Shared only when you publish or request help",
               [{ text: "OK" }]
             );
           }}
@@ -794,7 +799,7 @@ export default function ProfileScreen() {
           onPress={() => {
             Alert.alert(
               "Help & Support",
-              "Need help with TorqueShed?\n\nFAQ & Guides: Check our community forums for tips and tutorials.\n\nContact Us: support@torqueshed.pro\n\nVersion: 1.0.0",
+              `Need help with TorqueShed?\n\nEmail ${brand.supportEmail} and include your vehicle, case title, and what you were trying to do.\n\nVersion: 1.0.0`,
               [{ text: "OK" }]
             );
           }}

@@ -116,7 +116,7 @@ export default function GarageDetailScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleNewThread = () => {
-    navigation.navigate("AddThread", { garageId });
+    navigation.navigate("NewCase");
   };
 
   const { data: garage } = useQuery<ApiGarageDetail>({
@@ -145,7 +145,7 @@ export default function GarageDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: [`/api/garages/${garageId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
-      toast.show(garage?.isJoined ? "Left bay" : "Joined bay", "success");
+      toast.show(garage?.isJoined ? "Left category" : "Following category", "success");
     },
     onError: () => {
       toast.show("Failed to update membership", "error");
@@ -293,8 +293,8 @@ export default function GarageDetailScreen() {
       return (
         <EmptyState
           icon={config.icon}
-          title={`No ${config.label} threads`}
-          description={`There are no ${config.label} threads in this bay yet`}
+          title={`No ${config.label} cases`}
+          description={`There are no ${config.label} repair cases in this category yet`}
         />
       );
     }
@@ -366,7 +366,7 @@ export default function GarageDetailScreen() {
                   </ThemedText>
                 </View>
                 <View style={styles.heroInfo}>
-                  <ThemedText type="h3">{garage?.name || "Bay"}</ThemedText>
+                  <ThemedText type="h3">{garage?.name || "Category"}</ThemedText>
                   {garage?.description ? (
                     <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
                       {garage.description}
@@ -382,7 +382,7 @@ export default function GarageDetailScreen() {
                     <View style={styles.statItem}>
                       <Feather name="message-circle" size={13} color={theme.textMuted} />
                       <ThemedText type="caption" style={{ color: theme.textMuted, marginLeft: 4 }}>
-                        {garage?.threadCount ?? 0} threads
+                        {garage?.threadCount ?? 0} cases
                       </ThemedText>
                     </View>
                     {solvedCount > 0 ? (
@@ -418,7 +418,7 @@ export default function GarageDetailScreen() {
                   type="caption"
                   style={{ color: isJoined ? theme.text : "#FFFFFF", fontWeight: "600", marginLeft: 4 }}
                 >
-                  {isJoined ? "Joined" : "Join Bay"}
+                  {isJoined ? "Following" : "Follow Category"}
                 </ThemedText>
               </Pressable>
             </LinearGradient>
@@ -460,7 +460,7 @@ export default function GarageDetailScreen() {
               <Feather name="search" size={16} color={theme.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: theme.text }]}
-                placeholder="Search threads..."
+                placeholder="Search repair cases..."
                 placeholderTextColor={theme.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -519,17 +519,11 @@ export default function GarageDetailScreen() {
       />
 
       <Pressable
-        style={[styles.fabSecondary, { backgroundColor: theme.backgroundSecondary, borderColor: theme.primary, bottom: tabBarHeight + Spacing.lg + 60 }]}
-        onPress={() => navigation.navigate("AskForHelp")}
-        testID="button-ask-help-bay"
-      >
-        <Feather name="help-circle" size={22} color={theme.primary} />
-      </Pressable>
-
-      <Pressable
         style={[styles.fab, { backgroundColor: brandColor, bottom: tabBarHeight + Spacing.lg }]}
         onPress={handleNewThread}
         testID="button-new-thread"
+        accessibilityRole="button"
+        accessibilityLabel="Start a repair case"
       >
         <Feather name="plus" size={24} color="#FFFFFF" />
       </Pressable>

@@ -11,7 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 export type MarketStackParamList = {
-  Market: { segment?: "shop" | "swap" | "find" } | undefined;
+  Market: { segment?: "find" | "swap" | "tools" | "saved" } | undefined;
 };
 
 const Stack = createNativeStackNavigator<MarketStackParamList>();

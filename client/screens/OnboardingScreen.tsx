@@ -6,9 +6,10 @@ import {
   ActivityIndicator,
   Text,
   ScrollView,
-  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -27,8 +28,10 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, BorderRadius, BrandColors } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const TOTAL_STEPS = 4;
 
@@ -83,6 +86,8 @@ export default function OnboardingScreen() {
   const { theme } = useTheme();
   const { accessToken, completeOnboarding } = useAuth();
   const toast = useToast();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { isTablet, isDesktop } = useResponsive();
 
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -100,6 +105,7 @@ export default function OnboardingScreen() {
 
   const [selectedBays, setSelectedBays] = useState<string[]>([]);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
 
   const handleVinChange = (value: string) => {
     const upper = value.toUpperCase();
@@ -205,6 +211,18 @@ export default function OnboardingScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.show("Welcome to TorqueShed", "success");
       completeOnboarding();
+      const firstAction = selectedAction;
+      setTimeout(() => {
+        if (firstAction === "case") {
+          navigation.navigate("NewCase");
+        } else if (firstAction === "assist") {
+          navigation.navigate("Main", { screen: "DiagnoseTab" });
+        } else if (firstAction === "garage") {
+          navigation.navigate("Main", { screen: "NotesTab" });
+        } else if (firstAction === "parts") {
+          navigation.navigate("Main", { screen: "MarketTab", params: { screen: "Market", params: { segment: "find" } } });
+        }
+      }, 80);
     } catch (error) {
       toast.show("Something went wrong. Try again.", "error");
     } finally {
@@ -357,7 +375,7 @@ export default function OnboardingScreen() {
 
   const renderStep1 = () => (
     <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(100)} style={styles.stepContent}>
-      {renderStepHeader("Pick Your Bays", "Select brands you follow -- we will add you to their communities")}
+      {renderStepHeader("Pick Repair Categories", "Select the makes and systems you want surfaced in case filters")}
 
       <View style={styles.bayGrid}>
         {BAYS.map((bay) => {
@@ -368,12 +386,13 @@ export default function OnboardingScreen() {
               testID={`button-bay-${bay.id}`}
               onPress={() => toggleBay(bay.id)}
               accessibilityRole="checkbox"
-              accessibilityLabel={`${bay.name} bay`}
+              accessibilityLabel={`${bay.name} repair category`}
               accessibilityState={{ checked: selected }}
               accessibilityHint="Double tap to follow this brand community"
               style={[
                 styles.bayCard,
                 {
+                  flexBasis: isDesktop ? "31%" : isTablet ? "47%" : "47%",
                   backgroundColor: selected
                     ? bay.color + "20"
                     : theme.backgroundSecondary,
@@ -467,13 +486,11 @@ export default function OnboardingScreen() {
     </Animated.View>
   );
 
-  const [selectedAction, setSelectedAction] = useState<string | null>(null);
-
   const FIRST_ACTIONS = [
-    { id: "thread", label: "Ask a question in a Bay", icon: "message-circle" as const, description: "Jump into a community discussion" },
-    { id: "note", label: "Log your first maintenance note", icon: "edit-3" as const, description: "Start tracking work on your vehicle" },
-    { id: "browse", label: "Browse the Swap Shop", icon: "shopping-bag" as const, description: "See what parts are available" },
-    { id: "explore", label: "Explore TorqueAssist", icon: "activity" as const, description: "Diagnose an issue step by step" },
+    { id: "case", label: "Open a repair case", icon: "clipboard" as const, description: "Capture symptoms, codes, photos, and next steps" },
+    { id: "assist", label: "Run TorqueAssist", icon: "activity" as const, description: "Walk through a diagnostic tree step by step" },
+    { id: "garage", label: "Log a garage note", icon: "edit-3" as const, description: "Start tracking work on your vehicle" },
+    { id: "parts", label: "Find parts and tools", icon: "search" as const, description: "Search vendors with vehicle context" },
   ] as const;
 
   const renderStep3 = () => (
@@ -739,7 +756,6 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   bayCard: {
-    width: (Dimensions.get("window").width - Spacing.lg * 2 - Spacing.md) / 2,
     borderRadius: BorderRadius.md,
     borderWidth: 1.5,
     padding: Spacing.lg,

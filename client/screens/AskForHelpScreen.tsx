@@ -16,7 +16,7 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
-import { apiRequest } from "@/lib/query-client";
+import { apiJson } from "@/lib/query-client";
 import { lookupObdCode, searchObdCodes, getObdSystemPrefix } from "@/constants/obdCodes";
 import type { ObdCodeInfo } from "@/constants/obdCodes";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -36,6 +36,10 @@ interface Garage {
   name: string;
   brandColor: string | null;
   isJoined: boolean;
+}
+
+interface CreatedCase {
+  id: string;
 }
 
 const COMMON_SYMPTOMS = [
@@ -147,7 +151,7 @@ export default function AskForHelpScreen() {
   const createThreadMutation = useMutation({
     mutationFn: async () => {
       const garageId = selectedGarageId!;
-      return apiRequest("POST", `/api/garages/${garageId}/threads`, {
+      return apiJson<CreatedCase>("POST", `/api/garages/${garageId}/threads`, {
         title: title.trim(),
         content: details.trim(),
         vehicleId: selectedVehicleId,
@@ -158,14 +162,16 @@ export default function AskForHelpScreen() {
         recentChanges: recentChanges.trim() || null,
       });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/threads"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Help request posted", "success");
-      navigation.goBack();
-      setTimeout(() => {
+      toast.show("Case opened", "success");
+      if (data?.id) {
         navigation.navigate("ThreadDetail", { threadId: data.id });
-      }, 100);
+      } else {
+        navigation.goBack();
+      }
     },
     onError: (error: Error) => {
       toast.show(error.message || "Failed to post help request", "error");

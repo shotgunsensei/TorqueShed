@@ -13,6 +13,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { brand } from "@/constants/brand";
 
 type AuthStackParamList = {
   Login: undefined;
@@ -73,7 +74,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         />
         <ThemedText type="h1" style={styles.title} accessibilityRole="header">TorqueShed</ThemedText>
         <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-          The Garage for Real People
+          {brand.tagline}
         </ThemedText>
       </View>
 

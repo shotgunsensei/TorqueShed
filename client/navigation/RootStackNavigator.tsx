@@ -11,9 +11,7 @@ import AddNoteScreen from "@/screens/AddNoteScreen";
 import AddListingScreen from "@/screens/AddListingScreen";
 import ListingDetailScreen from "@/screens/ListingDetailScreen";
 import EditListingScreen from "@/screens/EditListingScreen";
-import AddThreadScreen from "@/screens/AddThreadScreen";
 import ThreadDetailScreen from "@/screens/ThreadDetailScreen";
-import AskForHelpScreen from "@/screens/AskForHelpScreen";
 import NewCaseScreen from "@/screens/NewCaseScreen";
 import SubmitProductScreen from "@/screens/SubmitProductScreen";
 import AdminProductsScreen from "@/screens/AdminProductsScreen";
@@ -148,25 +146,25 @@ export default function RootStackNavigator() {
           />
           <Stack.Screen
             name="AddThread"
-            component={AddThreadScreen}
+            component={NewCaseScreen}
             options={{
               presentation: "modal",
-              headerTitle: "New Thread",
+              headerTitle: "Start Repair Case",
             }}
           />
           <Stack.Screen
             name="ThreadDetail"
             component={ThreadDetailScreen}
             options={{
-              headerTitle: "Thread",
+              headerTitle: "Repair Case",
             }}
           />
           <Stack.Screen
             name="AskForHelp"
-            component={AskForHelpScreen}
+            component={NewCaseScreen}
             options={{
               presentation: "modal",
-              headerTitle: "Ask for Help",
+              headerTitle: "Start Repair Case",
             }}
           />
           <Stack.Screen
@@ -174,7 +172,7 @@ export default function RootStackNavigator() {
             component={NewCaseScreen}
             options={{
               presentation: "modal",
-              headerTitle: "New Case",
+              headerTitle: "Start Repair Case",
             }}
           />
           <Stack.Screen

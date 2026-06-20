@@ -1493,14 +1493,14 @@
       </div>
     </div>
 
-    <!-- Beta Access -->
+    <!-- App Access -->
     <div class="beta-section" id="beta">
       <div class="container">
-        <h3>Mobile Beta via Expo Go</h3>
-        <p>Testing native features? Scan this QR code with Expo Go to access the mobile beta.</p>
+        <h3>Open the TorqueShed App</h3>
+        <p>Launch the diagnostic workspace for repair cases, evidence, next tests, and confirmed fixes.</p>
         <div class="beta-qr-container">
           <div class="beta-qr" id="qr-code"></div>
-          <a href="exps://EXPS_URL_PLACEHOLDER" class="beta-link">Open in Expo Go</a>
+          <a href="/app" class="beta-link">Open Web App</a>
         </div>
       </div>
     </div>
@@ -1720,7 +1720,7 @@
         var qrCode = new QRCodeStyling({
           width: 400,
           height: 400,
-          data: 'exps://EXPS_URL_PLACEHOLDER',
+          data: 'BASE_URL_PLACEHOLDER/app',
           dotsOptions: { color: '#0D0F12', type: 'rounded' },
           backgroundOptions: { color: '#ffffff' },
           cornersSquareOptions: { type: 'extra-rounded' },

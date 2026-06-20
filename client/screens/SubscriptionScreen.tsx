@@ -75,16 +75,16 @@ export default function SubscriptionScreen() {
       }}
     >
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>
-        Plans
+        Plan & Access
       </ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
-        Your TorqueShed plan is set by your OperatorOS workspace. To change plans
-        or add seats, open OperatorOS.
+        Your TorqueShed access is managed by OperatorOS. Review the active plan,
+        enabled features, and billing portal from one place.
       </ThemedText>
 
       <Card elevation={2} style={styles.currentCard}>
         <ThemedText type="small" style={{ color: theme.textSecondary }}>
-          Current plan
+          Current access
         </ThemedText>
         <ThemedText type="h2" style={{ color: theme.primary, fontWeight: "800" }} testID="text-current-tier">
           {TIER_LABEL[tier]}
@@ -178,7 +178,7 @@ export default function SubscriptionScreen() {
         >
           <Feather name="external-link" size={16} color="#0D0F12" />
           <ThemedText type="body" style={{ color: "#0D0F12", fontWeight: "700" }}>
-            Manage Plan in OperatorOS
+            Manage Plan & Billing in OperatorOS
           </ThemedText>
         </Pressable>
       ) : (

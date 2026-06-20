@@ -71,8 +71,8 @@ function GarageCard({ item, onPress }: { item: ApiGarage; onPress: () => void })
       ]}
       testID={`garage-card-${item.id}`}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name} bay${latestActivity ? `, last activity ${latestActivity}` : ""}`}
-      accessibilityHint="Open this bay to see threads"
+      accessibilityLabel={`${item.name} category${latestActivity ? `, last activity ${latestActivity}` : ""}`}
+      accessibilityHint="Open this repair category to see cases"
     >
       <LinearGradient
         colors={[brandColor, brandColor + "00"]}
@@ -160,7 +160,7 @@ export default function GaragesScreen() {
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <EmptyState
           icon="alert-circle"
-          title="Couldn't Load Bays"
+          title="Couldn't Load Categories"
           description="Something went wrong. Tap below to try again."
           actionLabel="Retry"
           onAction={() => refetch()}
@@ -203,15 +203,15 @@ export default function GaragesScreen() {
         ListHeaderComponent={
           <View style={numColumns > 1 ? styles.gridHeader : undefined}>
             <Text style={[styles.tagline, { color: theme.textSecondary }]}>
-              {brand.tagline}
+              Browse repair categories by make, system, and diagnostic focus.
             </Text>
           </View>
         }
         ListEmptyComponent={
           <EmptyState
             icon="users"
-            title="No Bays Available"
-            description="Bays haven't been set up yet. Pull down to refresh."
+            title="No Categories Available"
+            description="Repair categories haven't been set up yet. Pull down to refresh."
             actionLabel="Retry"
             onAction={() => refetch()}
           />

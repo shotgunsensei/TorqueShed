@@ -11,12 +11,13 @@ import {
   Alert,
   RefreshControl,
   Linking,
+  Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
@@ -26,34 +27,32 @@ import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { resolveImageUri } from "@/utils/objectStorageExpo";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import { emptyStates, microcopy } from "@/constants/brand";
-import { getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 const SEARCH_HISTORY_KEY = "torqueshed_parts_search_history";
 const MAX_SEARCH_HISTORY = 8;
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type SegmentKey = "shop" | "swap" | "find" | "tools" | "scan_tools" | "services" | "project_vehicles" | "saved";
+type SegmentKey = "find" | "swap" | "tools" | "saved";
 
 const SEGMENTS: { key: SegmentKey; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: "swap", label: "Parts", icon: "settings" },
-  { key: "tools", label: "Tools", icon: "tool" },
-  { key: "scan_tools", label: "Scan Tools", icon: "cpu" },
-  { key: "services", label: "Services", icon: "briefcase" },
-  { key: "project_vehicles", label: "Project Vehicles", icon: "truck" },
-  { key: "saved", label: "Saved", icon: "bookmark" },
-  { key: "shop", label: "Shop", icon: "package" },
   { key: "find", label: "Find Parts", icon: "search" },
+  { key: "swap", label: "Parts Listings", icon: "settings" },
+  { key: "tools", label: "Tools", icon: "tool" },
+  { key: "saved", label: "Saved", icon: "bookmark" },
 ];
 
 interface SwapListing {
   id: string;
+  userId?: string | null;
   title: string;
   price: string;
   location: string | null;
@@ -152,7 +151,12 @@ function SwapCard({ item, onPress, onReport }: { item: SwapListing; onPress: () 
     >
       <View style={[s.swapImageArea, { backgroundColor: theme.backgroundTertiary }]}>
         {item.imageUrl ? (
-          <Feather name="image" size={28} color={theme.textMuted} />
+          <Image
+            source={{ uri: resolveImageUri(item.imageUrl) || undefined }}
+            style={s.swapImage}
+            resizeMode="cover"
+            testID={`swap-cover-${item.id}`}
+          />
         ) : (
           <Feather name="camera-off" size={28} color={theme.textMuted} />
         )}
@@ -366,10 +370,32 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
   const insets = useSafeAreaInsets();
+  const { isTablet, isDesktop } = useResponsive();
   const [searchQuery, setSearchQuery] = useState("");
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SwapListing | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+
+  const reportMutation = useMutation({
+    mutationFn: async ({ item, reason }: { item: SwapListing; reason: string }) => {
+      return apiRequest("POST", "/api/reports", {
+        contentType: "swap_listing",
+        contentId: item.id,
+        reportedUserId: item.userId ?? null,
+        reason,
+      });
+    },
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setReportModalVisible(false);
+      setSelectedItem(null);
+      setSelectedReason(null);
+      Alert.alert("Report Submitted", "Thanks for helping keep parts and tool listings useful. We'll review this listing.", [{ text: "OK" }]);
+    },
+    onError: () => {
+      Alert.alert("Report Failed", "We couldn't submit that report. Please try again.");
+    },
+  });
 
   const queryKey = savedOnly ? ["/api/saved/listings"] : ["/api/swap-shop"];
   const { data: listings = [], isLoading, isError: isSwapError, refetch, isRefetching } = useQuery<SwapListing[]>({
@@ -387,6 +413,7 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
         (item.location || "").toLowerCase().includes(searchQuery.toLowerCase())
       )
     : byCategory;
+  const numColumns = isDesktop ? 3 : isTablet ? 2 : 1;
 
   const REPORT_REASONS = [
     { id: "scam", label: "Suspected scam" },
@@ -397,10 +424,8 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
   ];
 
   const handleSubmitReport = () => {
-    if (!selectedReason) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setReportModalVisible(false);
-    Alert.alert("Report Submitted", "Thanks for helping keep Swap Shop safe. We'll review this listing.", [{ text: "OK" }]);
+    if (!selectedReason || !selectedItem) return;
+    reportMutation.mutate({ item: selectedItem, reason: selectedReason });
   };
 
   if (isLoading) return <Skeleton.List count={4} />;
@@ -409,7 +434,7 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
     return (
       <EmptyState
         icon="alert-circle"
-        title="Couldn't Load Swap Shop"
+        title="Couldn't Load Listings"
         description="Something went wrong loading listings. Tap below to try again."
         actionLabel="Retry"
         onAction={() => refetch()}
@@ -420,6 +445,7 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
   return (
     <View style={{ flex: 1 }}>
       <FlatList
+        key={`swap-${numColumns}-${categoryFilter ?? "all"}-${savedOnly ? "saved" : "live"}`}
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
@@ -433,20 +459,28 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
             }}
           />
         )}
-        contentContainerStyle={{ padding: Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl }}
+        numColumns={numColumns}
+        columnWrapperStyle={numColumns > 1 ? s.swapRow : undefined}
+        contentContainerStyle={{
+          padding: Spacing.lg,
+          paddingBottom: tabBarHeight + Spacing.xl,
+          maxWidth: isDesktop ? 1180 : undefined,
+          alignSelf: isDesktop ? "center" : undefined,
+          width: isDesktop ? "100%" : undefined,
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={theme.primary} />}
         ListHeaderComponent={
           <View>
             <View style={[s.trustBanner, { backgroundColor: theme.success + "15", borderColor: theme.success + "30" }]}>
               <Feather name="shield" size={16} color={theme.success} />
-              <Text style={[s.trustText, { color: theme.textSecondary }]}>All contact is in-app only. No personal info shared.</Text>
+              <Text style={[s.trustText, { color: theme.textSecondary }]}>Use photos, seller profiles, and attached cases to vet parts before you buy.</Text>
             </View>
             <View style={[s.searchRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
               <Feather name="search" size={16} color={theme.textMuted} />
               <TextInput
                 style={[s.searchInput, { color: theme.text }]}
-                placeholder="Search listings, sellers, location..."
+                placeholder="Search parts, tools, sellers, location..."
                 placeholderTextColor={theme.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -517,13 +551,15 @@ function SwapSection({ categoryFilter, savedOnly }: { categoryFilter?: string; s
             <Pressable
               style={[s.submitBtn, { backgroundColor: selectedReason ? theme.error : theme.backgroundTertiary }]}
               onPress={handleSubmitReport}
-              disabled={!selectedReason}
+              disabled={!selectedReason || reportMutation.isPending}
               accessibilityRole="button"
               accessibilityLabel="Submit report"
-              accessibilityState={{ disabled: !selectedReason }}
+              accessibilityState={{ disabled: !selectedReason || reportMutation.isPending, busy: reportMutation.isPending }}
               testID="button-submit-report"
             >
-              <Text style={[s.submitBtnText, { color: selectedReason ? "#FFFFFF" : theme.textMuted }]}>Submit Report</Text>
+              <Text style={[s.submitBtnText, { color: selectedReason ? "#FFFFFF" : theme.textMuted }]}>
+                {reportMutation.isPending ? "Submitting..." : "Submit Report"}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -599,9 +635,9 @@ function FindPartsSection() {
       <View style={[s.findHeader, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "25" }]}>
         <Feather name="search" size={20} color={theme.primary} />
         <View style={{ flex: 1, marginLeft: Spacing.md }}>
-          <Text style={[s.findHeaderTitle, { color: theme.text }]}>Search Parts Across Vendors</Text>
+          <Text style={[s.findHeaderTitle, { color: theme.text }]}>Find parts with vehicle context</Text>
           <Text style={[s.findHeaderDesc, { color: theme.textSecondary }]}>
-            Select your vehicle and part, then tap a vendor to search directly on their site.
+            Select a vehicle and part, then search vendor sites without losing your repair context.
           </Text>
         </View>
       </View>
@@ -753,7 +789,7 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
   const tabBarHeight = useSafeTabBarHeight();
   const { currentUser } = useAuth();
   const routeSegment = route?.params?.segment;
-  const [activeSegment, setActiveSegment] = useState<SegmentKey>(routeSegment || "shop");
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>(routeSegment || "find");
 
   useEffect(() => {
     if (routeSegment) {
@@ -763,7 +799,12 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
 
   return (
     <View style={[s.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[s.segmentBar, { backgroundColor: theme.backgroundSecondary, borderBottomColor: theme.border }]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[s.segmentBar, { backgroundColor: theme.backgroundSecondary, borderBottomColor: theme.border }]}
+        contentContainerStyle={s.segmentBarContent}
+      >
         {SEGMENTS.map((seg) => {
           const active = activeSegment === seg.key;
           return (
@@ -784,26 +825,22 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
-      {activeSegment === "shop" ? <ShopSection /> : null}
       {activeSegment === "swap" ? <SwapSection categoryFilter="parts" /> : null}
       {activeSegment === "tools" ? <SwapSection categoryFilter="tools" /> : null}
-      {activeSegment === "scan_tools" ? <SwapSection categoryFilter="scan_tools" /> : null}
-      {activeSegment === "services" ? <SwapSection categoryFilter="services" /> : null}
-      {activeSegment === "project_vehicles" ? <SwapSection categoryFilter="project_vehicles" /> : null}
       {activeSegment === "saved" ? <SwapSection savedOnly /> : null}
       {activeSegment === "find" ? <FindPartsSection /> : null}
 
-      {(activeSegment === "swap" || activeSegment === "tools" || activeSegment === "scan_tools" || activeSegment === "services" || activeSegment === "project_vehicles") ? (
+      {(activeSegment === "swap" || activeSegment === "tools") ? (
         currentUser != null ? (
           <Pressable
             style={[s.fab, { backgroundColor: theme.primary, bottom: tabBarHeight + Spacing.lg }]}
             onPress={() => navigation.navigate("AddListing")}
             testID="button-add-listing"
             accessibilityRole="button"
-            accessibilityLabel="Add a listing"
-            accessibilityHint="Open the new listing form"
+            accessibilityLabel="Add a part or tool listing"
+            accessibilityHint="Open the listing form"
           >
             <Feather name="plus" size={24} color="#FFFFFF" />
           </Pressable>
@@ -816,17 +853,20 @@ export default function SourceScreen({ route }: { route?: { params?: { segment?:
 const s = StyleSheet.create({
   container: { flex: 1 },
   segmentBar: {
-    flexDirection: "row",
     borderBottomWidth: 1,
+  },
+  segmentBarContent: {
+    flexDirection: "row",
     paddingHorizontal: Spacing.lg,
   },
   segmentBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.xs,
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    minWidth: 112,
   },
   segmentText: {
     ...Typography.body,
@@ -834,12 +874,17 @@ const s = StyleSheet.create({
     fontSize: 14,
   },
 
-  swapCard: { marginBottom: Spacing.md, overflow: "hidden", padding: 0 },
+  swapCard: { flex: 1, marginBottom: Spacing.md, overflow: "hidden", padding: 0 },
+  swapRow: { gap: Spacing.md },
   swapImageArea: {
     height: 120,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+  },
+  swapImage: {
+    width: "100%",
+    height: "100%",
   },
   conditionBadge: {
     position: "absolute",

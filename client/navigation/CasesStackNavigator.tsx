@@ -19,21 +19,15 @@ export type CasesStackParamList = {
 const Stack = createNativeStackNavigator<CasesStackParamList>();
 
 type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
-type CasesNavProp = NativeStackNavigationProp<CasesStackParamList>;
 
 function HeaderRightActions() {
   const { theme } = useTheme();
-  const navigation = useNavigation<CasesNavProp & RootNavProp>();
+  const navigation = useNavigation<RootNavProp>();
 
   return (
-    <>
-      <HeaderButton onPress={() => navigation.navigate("Bays")}>
-        <Feather name="grid" size={20} color={theme.text} />
-      </HeaderButton>
-      <HeaderButton onPress={() => navigation.navigate("Profile")}>
-        <Feather name="user" size={22} color={theme.text} />
-      </HeaderButton>
-    </>
+    <HeaderButton onPress={() => navigation.navigate("Profile")}>
+      <Feather name="user" size={22} color={theme.text} />
+    </HeaderButton>
   );
 }
 
@@ -54,7 +48,7 @@ export default function CasesStackNavigator() {
         name="Bays"
         component={GaragesScreen}
         options={{
-          headerTitle: "Browse Bays",
+          headerTitle: "Case Categories",
         }}
       />
     </Stack.Navigator>

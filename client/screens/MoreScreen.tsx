@@ -16,7 +16,9 @@ import { useToast } from "@/components/Toast";
 import { UserAvatar, getUserRoleDisplay } from "@/components/UserAvatar";
 import { TrialReminderBanner } from "@/components/TrialReminderBanner";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { brand } from "@/constants/brand";
 import { useEntitlements } from "@/lib/entitlements";
 import type { MoreStackParamList } from "@/navigation/MoreStackNavigator";
 
@@ -34,72 +36,31 @@ interface MenuItem {
   badgeKey?: "leads";
 }
 
-const ECOSYSTEM_ITEMS: MenuItem[] = [
-  {
-    label: "FaultlineLab",
-    icon: "target",
-    action: "external",
-    url: "https://faultlinelab.com",
-    description: "Sharpen diagnostic instincts with real-world fault scenarios",
-  },
-  {
-    label: "TradeFlowKit",
-    icon: "trending-up",
-    action: "external",
-    url: "https://tradeflowkit.com",
-    description: "Run your shop's quotes, invoices, and cash flow",
-  },
-  {
-    label: "TechDeck",
-    icon: "terminal",
-    action: "external",
-    url: "https://techdeck.app",
-    description: "Scripts and automation for IT and power users",
-  },
-  {
-    label: "Shotgun Ninjas",
-    icon: "compass",
-    action: "external",
-    url: "https://shotgunninjas.com",
-    description: "Explore the full Shotgun Ninjas ecosystem",
-  },
-];
-
 const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
   {
-    title: "Diagnostics",
+    title: "Workspace",
     items: [
-      { label: "TorqueAssist", icon: "tool", action: "stack", screen: "TorqueAssist", description: "Diagnostic wizard and checklists" },
-      { label: "Bays", icon: "grid", action: "tab", tab: "CasesTab", description: "Browse brand-specific community garages" },
-      { label: "Tool Inventory", icon: "briefcase", action: "stack", screen: "ToolInventory", description: "Catalog the tools you own (Garage Pro)" },
-      { label: "Saved Cases", icon: "bookmark", action: "toast", toastMessage: "Saved cases live on your profile.", description: "Review the cases you've bookmarked" },
+      { label: "Repair Cases", icon: "clipboard", action: "tab", tab: "CasesTab", description: "Open cases, continue tests, and search solved fixes" },
+      { label: "Vehicle Garage", icon: "truck", action: "tab", tab: "NotesTab", description: "Vehicles, build notes, repair logs, and maintenance history" },
+      { label: "Parts & Tools", icon: "search", action: "tab", tab: "MarketTab", description: "Find parts and attach useful tools to repair work" },
+      { label: "Tool Inventory", icon: "briefcase", action: "stack", screen: "ToolInventory", description: "Catalog tools you can use during diagnosis" },
     ],
   },
   {
-    title: "Marketplace",
+    title: "Shop Workflow",
     items: [
-      { label: "Tool & Gear", icon: "shopping-bag", action: "stack", screen: "ToolAndGear", description: "Curated tools and gear picks" },
-      { label: "My Listings", icon: "package", action: "stack", screen: "MyListings", description: "Manage your swap shop listings" },
-      { label: "Seller Dashboard", icon: "bar-chart-2", action: "stack", screen: "SellerDashboard", description: "Active listings, drafts, and attached cases" },
-    ],
-  },
-  {
-    title: "Shop Pro",
-    items: [
-      { label: "Shop Profile", icon: "home", action: "stack", screen: "ShopProfile", description: "Your public-facing shop page" },
-      { label: "Services", icon: "list", action: "stack", screen: "ShopServices", description: "Services you offer with pricing" },
-      { label: "Customer Leads", icon: "inbox", action: "stack", screen: "ShopLeads", description: "Inquiries from your shop page", badgeKey: "leads" },
-      { label: "Team", icon: "users", action: "stack", screen: "ShopTeam", description: "Invite techs and advisors to your shop" },
+      { label: "Customer Leads", icon: "inbox", action: "stack", screen: "ShopLeads", description: "Service requests connected to real vehicle needs", badgeKey: "leads" },
+      { label: "Shop Profile", icon: "home", action: "stack", screen: "ShopProfile", description: "Show the services and vehicles your shop handles" },
+      { label: "Team Access", icon: "users", action: "stack", screen: "ShopTeam", description: "Invite techs and advisors to work cases" },
     ],
   },
   {
     title: "Account",
     items: [
-      { label: "Subscription", icon: "star", action: "stack", screen: "Subscription", description: "Plans, billing, and premium features" },
-      { label: "Billing", icon: "credit-card", action: "stack", screen: "Billing", description: "Invoices, payment method, and Stripe portal" },
+      { label: "Plan & Access", icon: "key", action: "stack", screen: "Subscription", description: "OperatorOS access, entitlements, and billing portal" },
       { label: "Notifications", icon: "bell", action: "stack", screen: "NotificationSettings", description: "Maintenance reminders by push or email" },
       { label: "Verify Email", icon: "mail", action: "stack", screen: "VerifyEmail", description: "Confirm your email to receive notices" },
-      { label: "Help", icon: "help-circle", action: "toast", toastMessage: "Help center is coming soon.", description: "FAQs, support, and contact" },
+      { label: "Help", icon: "help-circle", action: "external", url: `mailto:${brand.supportEmail}`, description: "Email TorqueShed support" },
     ],
   },
 ];
@@ -110,6 +71,7 @@ export default function MoreScreen() {
   const navigation = useNavigation<MoreNavProp>();
   const tabBarHeight = useSafeTabBarHeight();
   const headerHeight = useHeaderHeight();
+  const { isDesktop } = useResponsive();
   const toast = useToast();
   const { tier, hasFeature } = useEntitlements();
   const leadCaptureEnabled = hasFeature("lead_capture");
@@ -178,6 +140,9 @@ export default function MoreScreen() {
         paddingTop: headerHeight + Spacing.md,
         paddingBottom: tabBarHeight + Spacing.xl,
         paddingHorizontal: Spacing.lg,
+        maxWidth: isDesktop ? 980 : undefined,
+        alignSelf: isDesktop ? "center" : undefined,
+        width: isDesktop ? "100%" : undefined,
       }}
       showsVerticalScrollIndicator={false}
     >
@@ -212,7 +177,7 @@ export default function MoreScreen() {
         <Feather name="chevron-right" size={20} color={theme.textMuted} />
       </Pressable>
 
-      <TrialReminderBanner onManageBilling={() => navigation.navigate("Billing")} />
+      <TrialReminderBanner onManageBilling={() => navigation.navigate("Subscription")} />
 
       {showVerifyBanner ? (
         <Card
@@ -244,7 +209,7 @@ export default function MoreScreen() {
         </Card>
       ) : null}
 
-      {[...MENU_GROUPS, { title: "Shotgun Ninjas Ecosystem", items: ECOSYSTEM_ITEMS }].map((group) => (
+      {MENU_GROUPS.map((group) => (
         <View key={group.title} style={styles.group}>
           <ThemedText type="caption" style={[styles.groupTitle, { color: theme.textMuted }]}>{group.title.toUpperCase()}</ThemedText>
           <View style={styles.menuList}>
@@ -291,7 +256,7 @@ export default function MoreScreen() {
         type="caption"
         style={{ color: theme.textMuted, textAlign: "center", marginTop: Spacing.md, letterSpacing: 1 }}
       >
-        BUILT BY SHOTGUN NINJAS PRODUCTIONS
+        DIAGNOSTIC WORKSPACE FOR REAL REPAIRS
       </ThemedText>
     </ScrollView>
   );

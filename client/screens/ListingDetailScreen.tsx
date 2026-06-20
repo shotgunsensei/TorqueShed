@@ -21,7 +21,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { brand } from "@/constants/brand";
+import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -172,15 +173,13 @@ export default function ListingDetailScreen() {
 
   const handleContact = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      "Contact Seller",
-      "In-app messaging coming soon! For now, you can find this seller in the community.",
-      [{ text: "OK" }]
-    );
+    if (listing) {
+      navigation.navigate("Profile", { userId: listing.userId });
+    }
   };
 
   const handleShare = async () => {
-    const domain = process.env.EXPO_PUBLIC_DOMAIN || "torqueshed.pro";
+    const domain = process.env.EXPO_PUBLIC_DOMAIN || brand.domain;
     const url = `https://${domain}/listing/${listingId}`;
     try {
       await Clipboard.setStringAsync(url);
@@ -381,7 +380,7 @@ export default function ListingDetailScreen() {
 
         {!isOwner ? (
           <Button onPress={handleContact} style={styles.contactButton}>
-            Contact Seller
+            View Seller Profile
           </Button>
         ) : (
           <View style={styles.ownerActions}>

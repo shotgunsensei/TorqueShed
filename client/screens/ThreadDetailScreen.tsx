@@ -32,7 +32,9 @@ import RepairPlanCard from "@/components/RepairPlanCard";
 import CustomerSummaryCard from "@/components/CustomerSummaryCard";
 import SimilarCasesCard from "@/components/SimilarCasesCard";
 import CaseToolsUsedCard from "@/components/CaseToolsUsedCard";
+import CaseDiagnosticPanels from "@/components/CaseDiagnosticPanels";
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
@@ -145,6 +147,7 @@ export default function ThreadDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { isDesktop } = useResponsive();
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
@@ -211,10 +214,10 @@ export default function ThreadDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/saved/thread-ids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/saved"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show(isSaved ? "Removed from saved" : "Thread saved", "success");
+      toast.show(isSaved ? "Removed from saved" : "Case saved", "success");
     },
     onError: () => {
-      toast.show("Failed to update saved threads", "error");
+      toast.show("Failed to update saved cases", "error");
     },
   });
 
@@ -262,7 +265,7 @@ export default function ThreadDetailScreen() {
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}/replies`] });
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Reply posted", "success");
+      toast.show(replyType === "test_result" ? "Test result added" : "Case update added", "success");
       setReplyText("");
       setReplyType("comment");
       setReplyPhotoUrls([]);
@@ -270,7 +273,7 @@ export default function ThreadDetailScreen() {
       inputRef.current?.blur();
     },
     onError: (error: Error) => {
-      toast.show(error.message || "Failed to post reply", "error");
+      toast.show(error.message || "Failed to add case update", "error");
     },
   });
 
@@ -313,7 +316,7 @@ export default function ThreadDetailScreen() {
       queryClient.invalidateQueries({ queryKey: [`/api/threads/${threadId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/threads"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Case marked solved", "success");
+      toast.show("Final fix saved", "success");
       setShowFinalFix(false);
       setSolvedReplyId(null);
       setRootCause("");
@@ -325,7 +328,7 @@ export default function ThreadDetailScreen() {
       setVerificationNotes("");
     },
     onError: (error: Error) => {
-      toast.show(error.message || "Failed to mark solved", "error");
+      toast.show(error.message || "Failed to save final fix", "error");
     },
   });
 
@@ -341,11 +344,11 @@ export default function ThreadDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/garages"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Thread deleted", "success");
+      toast.show("Case deleted", "success");
       navigation.goBack();
     },
     onError: (error: Error) => {
-      toast.show(error.message || "Failed to delete thread", "error");
+      toast.show(error.message || "Failed to delete case", "error");
     },
   });
 
@@ -370,8 +373,8 @@ export default function ThreadDetailScreen() {
 
   const handleDeleteThread = () => {
     Alert.alert(
-      "Delete Thread",
-      "Are you sure you want to delete this thread and all its replies? This cannot be undone.",
+      "Delete Repair Case",
+      "Are you sure you want to delete this repair case and all of its updates? This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -657,6 +660,22 @@ export default function ThreadDetailScreen() {
     );
   };
 
+  const focusComposer = () => {
+    setShowFinalFix(false);
+    setIsComposing(true);
+    setTimeout(() => inputRef.current?.focus(), 80);
+  };
+
+  const handleAddEvidence = () => {
+    setReplyType("comment");
+    focusComposer();
+  };
+
+  const handleAddTestResult = () => {
+    setReplyType("test_result");
+    focusComposer();
+  };
+
   const renderSolvedSummary = () => {
     if (!thread?.hasSolution) return null;
     const solutionReply = replies.find((r) => r.isSolution);
@@ -719,7 +738,7 @@ export default function ThreadDetailScreen() {
     return (
       <View style={[styles.solutionForm, { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border }]}>
         <View style={styles.solutionFormHeader}>
-          <ThemedText type="h4">Mark Case Solved</ThemedText>
+          <ThemedText type="h4">Confirm Final Fix</ThemedText>
           <Pressable
             onPress={() => setShowFinalFix(false)}
             testID="button-close-finalfix"
@@ -820,14 +839,14 @@ export default function ThreadDetailScreen() {
           <View style={{ width: Spacing.sm }} />
           <Button
             testID="button-submit-finalfix"
-            accessibilityLabel={markSolvedMutation.isPending ? "Saving solution" : "Mark solved"}
+            accessibilityLabel={markSolvedMutation.isPending ? "Saving final fix" : "Confirm final fix"}
             accessibilityHint="Save the root cause and final fix"
             accessibilityState={{ busy: markSolvedMutation.isPending }}
             onPress={handleConfirmSolved}
             disabled={markSolvedMutation.isPending}
             style={{ flex: 1 }}
           >
-            {markSolvedMutation.isPending ? "Saving..." : "Mark Solved"}
+            {markSolvedMutation.isPending ? "Saving..." : "Confirm Fix"}
           </Button>
         </View>
       </View>
@@ -839,6 +858,14 @@ export default function ThreadDetailScreen() {
     return (
       <View style={styles.headerSection}>
         {renderSolvedSummary()}
+        <CaseDiagnosticPanels
+          thread={thread}
+          replies={replies}
+          onAddEvidence={handleAddEvidence}
+          onAddTestResult={handleAddTestResult}
+          onConfirmFix={() => openFinalFix(null)}
+          style={styles.caseRail}
+        />
 
         <Card style={styles.threadCard}>
           {isTeamMemberView ? (
@@ -931,7 +958,7 @@ export default function ThreadDetailScreen() {
                 accessibilityHint="Open the form to record what fixed this case"
               >
                 <Feather name="check-circle" size={14} color="#fff" />
-                <Text style={styles.markSolvedBtnText}>Mark Case Solved</Text>
+                <Text style={styles.markSolvedBtnText}>Confirm Final Fix</Text>
               </Pressable>
             </View>
           ) : null}
@@ -997,13 +1024,13 @@ export default function ThreadDetailScreen() {
                 style={[styles.deleteThreadButton, { borderColor: theme.error }]}
                 testID="button-delete-thread"
                 accessibilityRole="button"
-                accessibilityLabel={deleteThreadMutation.isPending ? "Deleting thread" : "Delete thread"}
-                accessibilityHint="Permanently delete this thread"
+                accessibilityLabel={deleteThreadMutation.isPending ? "Deleting case" : "Delete case"}
+                accessibilityHint="Permanently delete this repair case"
                 accessibilityState={{ disabled: deleteThreadMutation.isPending, busy: deleteThreadMutation.isPending }}
               >
                 <Feather name="trash-2" size={14} color={theme.error} />
                 <ThemedText type="caption" style={{ color: theme.error, marginLeft: 4 }}>
-                  {deleteThreadMutation.isPending ? "Deleting..." : "Delete Thread"}
+                  {deleteThreadMutation.isPending ? "Deleting..." : "Delete Case"}
                 </ThemedText>
               </Pressable>
             ) : null}
@@ -1038,7 +1065,7 @@ export default function ThreadDetailScreen() {
         />
 
         <ThemedText type="h4" style={styles.repliesHeader}>
-          Replies ({replies.length})
+          Case Updates ({replies.length})
         </ThemedText>
       </View>
     );
@@ -1079,8 +1106,8 @@ export default function ThreadDetailScreen() {
           !repliesLoading ? (
             <EmptyState
               icon="message-circle"
-              title="No Replies Yet"
-              description="Be the first to respond to this thread!"
+              title="No Test Results Yet"
+              description="Add the next test, record a result, or capture the confirmed fix when you have it."
             />
           ) : null
         }
@@ -1088,6 +1115,9 @@ export default function ThreadDetailScreen() {
           paddingTop: headerHeight + Spacing.md,
           paddingHorizontal: Spacing.lg,
           paddingBottom: Spacing.lg,
+          maxWidth: isDesktop ? 1040 : undefined,
+          alignSelf: isDesktop ? "center" : undefined,
+          width: isDesktop ? "100%" : undefined,
         }}
         showsVerticalScrollIndicator={false}
       />
@@ -1101,6 +1131,9 @@ export default function ThreadDetailScreen() {
               backgroundColor: theme.backgroundSecondary,
               borderTopColor: theme.border,
               paddingBottom: insets.bottom > 0 ? insets.bottom : Spacing.md,
+              maxWidth: isDesktop ? 1040 : undefined,
+              alignSelf: isDesktop ? "center" : undefined,
+              width: isDesktop ? "100%" : undefined,
             },
           ]}
         >
@@ -1121,7 +1154,7 @@ export default function ThreadDetailScreen() {
                   ]}
                   testID={`button-reply-type-${t}`}
                   accessibilityRole="radio"
-                  accessibilityLabel={`Reply type: ${meta.label}`}
+                  accessibilityLabel={`Update type: ${meta.label}`}
                   accessibilityState={{ selected: active }}
                 >
                   <Feather name={meta.icon} size={11} color={active ? meta.color : theme.textSecondary} />
@@ -1159,8 +1192,8 @@ export default function ThreadDetailScreen() {
               onFocus={() => setIsComposing(true)}
               onBlur={() => setIsComposing(false)}
               testID="input-reply"
-              accessibilityLabel={`${REPLY_TYPE_META[replyType].label} reply, ${replyText.length} of 2000 characters`}
-              accessibilityHint="Type your reply, up to 2000 characters"
+              accessibilityLabel={`${REPLY_TYPE_META[replyType].label} update, ${replyText.length} of 2000 characters`}
+              accessibilityHint="Type your case update, up to 2000 characters"
             />
             <Pressable
               style={[
@@ -1171,7 +1204,7 @@ export default function ThreadDetailScreen() {
               disabled={!replyText.trim() || createReplyMutation.isPending}
               testID="button-send-reply"
               accessibilityRole="button"
-              accessibilityLabel={createReplyMutation.isPending ? "Sending reply" : "Send reply"}
+              accessibilityLabel={createReplyMutation.isPending ? "Sending update" : "Send update"}
               accessibilityState={{
                 disabled: !replyText.trim() || createReplyMutation.isPending,
                 busy: createReplyMutation.isPending,
@@ -1195,6 +1228,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
+    marginBottom: Spacing.lg,
+  },
+  caseRail: {
     marginBottom: Spacing.lg,
   },
   threadCard: {

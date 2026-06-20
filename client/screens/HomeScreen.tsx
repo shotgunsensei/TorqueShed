@@ -25,6 +25,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeTabBarHeight } from "@/hooks/useSafeTabBarHeight";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Spacing, BorderRadius, BrandColors } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -109,11 +110,11 @@ function isNewContent(dateStr?: string | null): boolean {
 }
 
 const GARAGE_LABELS: Record<string, { name: string; color: string }> = {
-  ford: { name: "Ford Bay", color: BrandColors.ford },
-  dodge: { name: "Dodge Bay", color: BrandColors.dodge },
-  chevy: { name: "Chevy Bay", color: BrandColors.chevy },
-  jeep: { name: "Jeep Bay", color: BrandColors.jeep },
-  general: { name: "General Bay", color: BrandColors.general },
+  ford: { name: "Ford", color: BrandColors.ford },
+  dodge: { name: "Dodge/Ram", color: BrandColors.dodge },
+  chevy: { name: "GM", color: BrandColors.chevy },
+  jeep: { name: "Jeep", color: BrandColors.jeep },
+  general: { name: "General", color: BrandColors.general },
 };
 
 const GOAL_TO_SECTION_ORDER: Record<string, string[]> = {
@@ -226,7 +227,7 @@ function ThreadCard({
       onPress={onPress}
       testID={`card-thread-${thread.id}`}
       accessibilityLabel={`${thread.title}. By ${thread.userName}. ${thread.replyCount || 0} ${(thread.replyCount || 0) === 1 ? "reply" : "replies"}.${thread.hasSolution ? " Solved." : ""}${isNew ? " New." : ""}${garageInfo ? ` In ${garageInfo.name}.` : ""}${timeAgo ? ` Last activity ${timeAgo}.` : ""}`}
-      accessibilityHint="Open thread"
+      accessibilityHint="Open repair case"
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs }}>
         {garageInfo ? (
@@ -392,6 +393,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const tabBarHeight = useSafeTabBarHeight();
   const headerHeight = useHeaderHeight();
+  const { isDesktop } = useResponsive();
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery<FeedData>({
     queryKey: ["/api/feed"],
@@ -494,9 +496,9 @@ export default function HomeScreen() {
     bayThreads: (
       <View style={styles.section} key="bayThreads">
         <SectionHeader
-          title="Recent Activity"
+          title="Active Repair Cases"
           icon="activity"
-          onSeeAll={() => navigateToTab("GaragesTab")}
+          onSeeAll={() => navigateToTab("CasesTab")}
         />
         {bayThreads.length > 0 ? (
           <FlatList
@@ -515,19 +517,19 @@ export default function HomeScreen() {
         ) : (
           <Card
             style={styles.promptCard}
-            onPress={() => navigateToTab("GaragesTab")}
+            onPress={() => navigateToTab("CasesTab")}
             testID="card-prompt-join-bay"
-            accessibilityLabel="Join a Bay"
-            accessibilityHint="Browse community bays to join"
+            accessibilityLabel="Browse case categories"
+            accessibilityHint="Open repair cases"
           >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="message-circle" size={24} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <ThemedText type="h4">Join a Bay</ThemedText>
+                <ThemedText type="h4">Search Solved Cases</ThemedText>
                 <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  See what the community is talking about
+                  Filter active and solved cases by vehicle, code, or system
                 </ThemedText>
               </View>
               <Feather name="chevron-right" size={20} color={theme.textMuted} />
@@ -539,9 +541,9 @@ export default function HomeScreen() {
     garageThreads: (
       <View style={styles.section} key="garageThreads">
         <SectionHeader
-          title="For Your Garage"
+          title="Solved for Your Garage"
           icon="check-circle"
-          onSeeAll={() => navigateToTab("GaragesTab")}
+          onSeeAll={() => navigateToTab("CasesTab")}
         />
         {garageThreads.length > 0 ? (
           <FlatList
@@ -561,16 +563,16 @@ export default function HomeScreen() {
           <Card
             style={styles.promptCard}
             testID="card-empty-solved-threads"
-            accessibilityLabel="No solved threads yet. Solved threads matching your vehicles will appear here."
+            accessibilityLabel="No solved cases yet. Solved cases matching your vehicles will appear here."
           >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="check-circle" size={24} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <ThemedText type="h4">No solved threads yet</ThemedText>
+                <ThemedText type="h4">No solved cases yet</ThemedText>
                 <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  Solved threads matching your vehicles will appear here
+                  Solved cases matching your vehicles will appear here
                 </ThemedText>
               </View>
             </View>
@@ -581,9 +583,9 @@ export default function HomeScreen() {
     listings: (
       <View style={styles.section} key="listings">
         <SectionHeader
-          title="New in Swap Shop"
+          title="Parts & Tools That May Help"
           icon="shopping-bag"
-          onSeeAll={() => navigateToTab("SourceTab", { screen: "Source", params: { segment: "swap" } })}
+          onSeeAll={() => navigateToTab("MarketTab", { screen: "Market", params: { segment: "swap" } })}
         />
         {recentListings.length > 0 ? (
           <FlatList
@@ -602,19 +604,19 @@ export default function HomeScreen() {
         ) : (
           <Card
             style={styles.promptCard}
-            onPress={() => navigateToTab("SourceTab", { screen: "Source", params: { segment: "swap" } })}
+            onPress={() => navigateToTab("MarketTab", { screen: "Market", params: { segment: "swap" } })}
             testID="card-prompt-browse-swap"
-            accessibilityLabel="Browse the Swap Shop"
-            accessibilityHint="Find parts or list something for sale"
+            accessibilityLabel="Browse part and tool listings"
+            accessibilityHint="Find parts or tools for a repair"
           >
             <View style={styles.promptContent}>
               <View style={[styles.promptIcon, { backgroundColor: theme.primary + "15" }]}>
                 <Feather name="shopping-bag" size={24} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <ThemedText type="h4">Browse the Swap Shop</ThemedText>
+                <ThemedText type="h4">Browse Parts & Tools</ThemedText>
                 <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  Find parts or list something for sale
+                  Find parts or tools tied to real repair work
                 </ThemedText>
               </View>
               <Feather name="chevron-right" size={20} color={theme.textMuted} />
@@ -635,6 +637,9 @@ export default function HomeScreen() {
       contentContainerStyle={{
         paddingTop: headerHeight + Spacing.xl,
         paddingBottom: tabBarHeight + Spacing.xl,
+        maxWidth: isDesktop ? 1180 : undefined,
+        alignSelf: isDesktop ? "center" : undefined,
+        width: isDesktop ? "100%" : undefined,
       }}
       refreshControl={
         <RefreshControl
@@ -651,19 +656,22 @@ export default function HomeScreen() {
             Welcome back{currentUser?.username ? `, ${currentUser.username}` : ""}
           </ThemedText>
           <Pressable
-            onPress={() => navigation.navigate("AskForHelp")}
+            onPress={() => navigation.navigate("NewCase")}
             style={[styles.helpButton, { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}
             testID="button-ask-help"
             accessibilityRole="button"
-            accessibilityLabel="Ask for help"
-            accessibilityHint="Open the assistant to get troubleshooting help"
+            accessibilityLabel="Open a repair case"
+            accessibilityHint="Start a repair case with symptoms, evidence, and codes"
           >
             <Feather name="help-circle" size={16} color={theme.primary} />
             <ThemedText type="caption" style={{ color: theme.primary, fontFamily: "Inter_500Medium", marginLeft: 4 }}>
-              Ask for Help
+              Start Case
             </ThemedText>
           </Pressable>
         </View>
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
+          Open a repair case, capture evidence, run the next test, and save the verified fix.
+        </ThemedText>
       </View>
 
       {hasContinueActivity ? (
@@ -680,8 +688,8 @@ export default function HomeScreen() {
                 style={styles.activityCard}
                 onPress={() => navigation.navigate("ThreadDetail", { threadId: t.id })}
                 testID={`card-continue-thread-${t.id}`}
-                accessibilityLabel={`Unsolved thread: ${t.title}, ${t.replyCount || 0} ${(t.replyCount || 0) === 1 ? "reply" : "replies"}${formatTimeAgo(t.lastActivityAt || t.createdAt) ? `, ${formatTimeAgo(t.lastActivityAt || t.createdAt)}` : ""}`}
-                accessibilityHint="Open thread"
+                accessibilityLabel={`Open repair case: ${t.title}, ${t.replyCount || 0} ${(t.replyCount || 0) === 1 ? "reply" : "replies"}${formatTimeAgo(t.lastActivityAt || t.createdAt) ? `, ${formatTimeAgo(t.lastActivityAt || t.createdAt)}` : ""}`}
+                accessibilityHint="Open repair case"
               >
                 <View style={styles.promptContent}>
                   {tCover ? (
@@ -804,9 +812,9 @@ export default function HomeScreen() {
       {recommended.length > 0 ? (
         <View style={styles.section}>
           <SectionHeader
-            title="Recommended Bays"
+            title="Recommended Categories"
             icon="compass"
-            onSeeAll={() => navigateToTab("GaragesTab")}
+            onSeeAll={() => navigateToTab("CasesTab")}
           />
           {recommended.map((bay) => {
             const bayInfo = GARAGE_LABELS[bay.id];
@@ -818,7 +826,7 @@ export default function HomeScreen() {
                 onPress={() => navigation.navigate("GarageDetail", { garageId: bay.id, garageName: bay.name })}
                 testID={`card-recommended-bay-${bay.id}`}
                 accessibilityLabel={`${bay.name}, ${bay.memberCount} ${bay.memberCount === 1 ? "member" : "members"}${bay.description ? `. ${bay.description}` : ""}`}
-                accessibilityHint="Open this bay"
+                accessibilityHint="Open this repair category"
               >
                 <View style={styles.promptContent}>
                   <View style={[styles.promptIcon, { backgroundColor: color + "15", width: 40, height: 40, borderRadius: 20 }]}>

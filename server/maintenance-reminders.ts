@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { storage } from "./storage";
 import { users, subscriptions, maintenanceReminders, type MaintenanceReminder } from "@shared/schema";
+import { APP_BRAND } from "@shared/brand";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 const ACCESS_GRANTING_STATUSES = ["active", "trialing", "past_due"];
@@ -93,7 +94,7 @@ async function sendEmail(to: string, item: ReminderItem): Promise<DeliveryResult
   const text = buildBody(item) + "\n\nOpen TorqueShed to log the service or update the next-due interval.";
 
   const resendKey = process.env.RESEND_API_KEY;
-  const fromAddress = process.env.REMINDER_FROM_EMAIL || "TorqueShed <reminders@torqueshed.pro>";
+  const fromAddress = process.env.REMINDER_FROM_EMAIL || `${APP_BRAND.name} <${APP_BRAND.remindersEmail}>`;
 
   if (resendKey) {
     try {

@@ -19,17 +19,15 @@ import { Feather } from "@expo/vector-icons";
 
 import { StatusBadge } from "@/components/StatusBadge";
 import { resolveMediaUrl } from "@/components/MediaPickerRow";
+import { HeroActionCard, MetricCard, ResponsiveGrid } from "@/components/ResponsivePrimitives";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
-import { useToast } from "@/components/Toast";
 import { Spacing, Typography, BorderRadius } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
-import type { CasesStackParamList } from "@/navigation/CasesStackNavigator";
 
 type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
-type CasesNavProp = NativeStackNavigationProp<CasesStackParamList>;
 
 interface CaseRow {
   id: string;
@@ -302,8 +300,6 @@ export default function CasesScreen() {
   const headerHeight = useHeaderHeight();
   const { isDesktop } = useResponsive();
   const rootNav = useNavigation<RootNavProp>();
-  const casesNav = useNavigation<CasesNavProp>();
-  const toast = useToast();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -334,15 +330,25 @@ export default function CasesScreen() {
     queryKey: [`/api/threads${queryParams}`],
   });
 
+  const caseStats = useMemo(() => {
+    let open = 0;
+    let testing = 0;
+    let solved = 0;
+    let urgent = 0;
+    for (const item of cases) {
+      if (item.hasSolution || item.status === "solved") solved += 1;
+      else if (item.status === "testing") testing += 1;
+      else open += 1;
+      if (item.urgency === "high" || item.urgency === "stranded") urgent += 1;
+    }
+    return { open, testing, solved, urgent };
+  }, [cases]);
+
   const garageById = useMemo(() => {
     const map = new Map<string, GarageInfo>();
     for (const g of garages) map.set(g.id, g);
     return map;
   }, [garages]);
-
-  const handleScanCode = () => {
-    toast.show("Scan Code is coming soon — paste codes manually for now", "info");
-  };
 
   const renderCaseItem = ({ item }: { item: CaseRow }) => (
     <CaseCard
@@ -354,6 +360,23 @@ export default function CasesScreen() {
 
   const headerComponent = (
     <View style={styles.headerWrap}>
+      <HeroActionCard
+        title="Repair Case Command Center"
+        description="Open a case, capture evidence, run the next test, and save the confirmed fix for later."
+        icon="activity"
+        actionLabel="Start Repair Case"
+        onPress={() => rootNav.navigate("NewCase")}
+        secondaryLabel="Run TorqueAssist"
+        onSecondaryPress={() => rootNav.navigate("Main", { screen: "DiagnoseTab" })}
+      />
+
+      <ResponsiveGrid minItemWidth={150} gap={Spacing.sm}>
+        <MetricCard label="Open" value={caseStats.open} icon="circle" tone="primary" />
+        <MetricCard label="Testing" value={caseStats.testing} icon="activity" tone="warning" />
+        <MetricCard label="Solved" value={caseStats.solved} icon="check-circle" tone="success" />
+        <MetricCard label="Urgent" value={caseStats.urgent} icon="zap" tone="error" />
+      </ResponsiveGrid>
+
       <View style={[styles.searchRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}>
         <Feather name="search" size={16} color={theme.textMuted} />
         <TextInput
@@ -377,7 +400,7 @@ export default function CasesScreen() {
       <View style={styles.quickActionsRow}>
         <QuickAction
           icon="plus-circle"
-          label="New Case"
+          label="Start Case"
           highlight
           testID="button-new-case"
           onPress={() => rootNav.navigate("NewCase")}
@@ -386,19 +409,19 @@ export default function CasesScreen() {
           icon="activity"
           label="TorqueAssist"
           testID="button-torque-assist"
-          onPress={() => rootNav.navigate("Main")}
+          onPress={() => rootNav.navigate("Main", { screen: "DiagnoseTab" })}
         />
         <QuickAction
-          icon="camera"
-          label="Scan Code"
-          testID="button-scan-code"
-          onPress={handleScanCode}
+          icon="cpu"
+          label="Enter Code"
+          testID="button-enter-code"
+          onPress={() => rootNav.navigate("NewCase")}
         />
         <QuickAction
-          icon="tag"
-          label="Sell Part"
-          testID="button-sell-part"
-          onPress={() => rootNav.navigate("AddListing")}
+          icon="truck"
+          label="Garage"
+          testID="button-garage"
+          onPress={() => rootNav.navigate("Main", { screen: "NotesTab" })}
         />
       </View>
 
@@ -502,7 +525,7 @@ export default function CasesScreen() {
           ]}
         >
           <Feather name="grid" size={12} color={theme.text} />
-          <Text style={[styles.chipText, { color: theme.text }]}>All bays</Text>
+          <Text style={[styles.chipText, { color: theme.text }]}>All categories</Text>
         </Pressable>
         {garages.map((g) => {
           const active = garageFilter === g.id;
@@ -510,7 +533,7 @@ export default function CasesScreen() {
           return (
             <Pressable
               key={g.id}
-              testID={`chip-bay-${g.id}`}
+              testID={`chip-category-${g.id}`}
               onPress={() => setGarageFilter(active ? null : g.id)}
               style={[
                 styles.chip,
@@ -526,13 +549,6 @@ export default function CasesScreen() {
             </Pressable>
           );
         })}
-        <Pressable
-          onPress={() => casesNav.navigate("Bays")}
-          style={[styles.chip, { backgroundColor: theme.backgroundSecondary, borderColor: theme.cardBorder }]}
-        >
-          <Feather name="external-link" size={12} color={theme.text} />
-          <Text style={[styles.chipText, { color: theme.text }]}>Browse all bays</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );
@@ -589,7 +605,7 @@ export default function CasesScreen() {
             description={
               statusFilter !== "all" || systemFilter !== null || garageFilter !== null || search
                 ? "Try clearing your filters."
-                : "Start a repair case or ask Torque Assist."
+                : "Open a repair case, add codes or photos, and work toward a confirmed fix."
             }
             actionLabel="New Case"
             onAction={() => rootNav.navigate("NewCase")}

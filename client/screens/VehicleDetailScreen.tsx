@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { FAB } from "@/components/FAB";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useToast } from "@/components/Toast";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { type VehicleNote, type NoteType } from "@/constants/vehicles";
@@ -116,6 +117,7 @@ export default function VehicleDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { isDesktop } = useResponsive();
   const route = useRoute<RoutePropType>();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
@@ -253,6 +255,9 @@ export default function VehicleDetailScreen() {
           {
             paddingTop: headerHeight + Spacing.lg,
             paddingBottom: insets.bottom + Spacing.xl + 80,
+            maxWidth: isDesktop ? 1040 : undefined,
+            alignSelf: isDesktop ? "center" : undefined,
+            width: isDesktop ? "100%" : undefined,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -498,7 +503,7 @@ export default function VehicleDetailScreen() {
               Recent Entries
             </ThemedText>
             {notes.slice(0, 3).map((note) => (
-              <NoteCard key={note.id} note={note} onPress={() => {}} />
+              <NoteCard key={note.id} note={note} />
             ))}
             {notes.length > 3 ? (
               <Pressable
@@ -521,18 +526,17 @@ export default function VehicleDetailScreen() {
   };
 
   const handleDiagnose = () => {
-    (navigation as any).navigate("MoreTab", { screen: "TorqueAssist" });
+    navigation.navigate("Main", { screen: "DiagnoseTab" });
   };
 
   const handleAskForHelp = () => {
-    (navigation as any).navigate("AskForHelp");
+    navigation.navigate("NewCase");
   };
 
   const renderNotesTab = () => {
     const renderNote = ({ item }: { item: VehicleNote }) => (
       <NoteCard
         note={item}
-        onPress={() => {}}
         onDiagnose={item.type === "issue" ? handleDiagnose : undefined}
         onAskForHelp={item.type === "issue" ? handleAskForHelp : undefined}
       />
@@ -564,6 +568,9 @@ export default function VehicleDetailScreen() {
           {
             paddingTop: headerHeight + Spacing.lg,
             paddingBottom: insets.bottom + Spacing.xl + 80,
+            maxWidth: isDesktop ? 1040 : undefined,
+            alignSelf: isDesktop ? "center" : undefined,
+            width: isDesktop ? "100%" : undefined,
           },
           filteredNotes.length === 0 && !notesLoading
             ? styles.emptyContainer

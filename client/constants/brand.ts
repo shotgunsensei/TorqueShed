@@ -1,13 +1,17 @@
+import { APP_BRAND } from "@shared/brand";
+
 export const brand = {
-  name: 'TorqueShed',
-  tagline: 'The Garage for Real People',
-  legalName: 'TorqueShed, LLC',
-  supportEmail: 'support@torqueshed.com',
+  name: APP_BRAND.name,
+  tagline: APP_BRAND.tagline,
+  legalName: APP_BRAND.legalName,
+  domain: APP_BRAND.primaryDomain,
+  appPath: APP_BRAND.appPath,
+  supportEmail: APP_BRAND.supportEmail,
 } as const;
 
 export const screenTitles = {
   home: 'TorqueShed',
-  bays: 'Bays',
+  bays: 'Case Categories',
   notes: 'Garage',
   torqueAssist: 'TorqueAssist',
   toolGear: 'Tool & Gear',
@@ -200,14 +204,14 @@ export const emptyStates = {
     action: 'Search Parts',
   },
   bay: {
-    title: 'Join a Bay',
-    message: 'Connect with other enthusiasts in brand-specific bays.',
-    action: 'Browse Bays',
+    title: 'Pick a Case Category',
+    message: 'Choose the make or general category that best matches the repair.',
+    action: 'Browse Categories',
   },
   threads: {
-    title: 'No Threads Yet',
-    message: 'Start a thread and get the conversation going.',
-    action: 'New Thread',
+    title: 'No Repair Cases Yet',
+    message: 'Open a case, capture symptoms, and work toward a confirmed fix.',
+    action: 'Start Repair Case',
   },
   products: {
     title: 'No Products Found',
@@ -216,7 +220,7 @@ export const emptyStates = {
   },
   swapShop: {
     title: 'Nothing Listed Yet',
-    message: 'List a spare part, tool, or service.',
+    message: 'List a spare part or tool that can support a real repair.',
     action: 'New Listing',
   },
 } as const;

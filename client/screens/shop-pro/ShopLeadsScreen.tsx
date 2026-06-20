@@ -609,7 +609,7 @@ export default function ShopLeadsScreen() {
                 </View>
                 <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 2 }}>
                   {Platform.OS === "web"
-                    ? "Open TorqueShed in Expo Go on your phone to receive push alerts."
+                    ? "Use the installed mobile app to receive push alerts for new leads."
                     : "Get a push notification the moment a customer submits."}
                 </ThemedText>
               </View>

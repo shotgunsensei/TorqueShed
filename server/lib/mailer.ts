@@ -1,3 +1,5 @@
+import { APP_BRAND } from "@shared/brand";
+
 type EmailProvider = "resend" | "postmark" | "log";
 
 export interface EmailAttachment {
@@ -45,7 +47,7 @@ function getFrom(): string {
   return (
     process.env.EMAIL_FROM ||
     process.env.MAIL_FROM ||
-    "TorqueShed <no-reply@torqueshed.pro>"
+    `${APP_BRAND.name} <${APP_BRAND.noReplyEmail}>`
   );
 }
 
